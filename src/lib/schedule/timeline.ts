@@ -1,0 +1,132 @@
+import { ActivityType } from "@/types/itinerary";
+import { getIntensityConfig } from "@/lib/schedule/travel-style";
+import { napDurationMin } from "@/lib/schedule/nap-policy";
+import { TripPlan } from "@/types/trip-plan";
+
+export function parseTimeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return 8 * 60;
+  return h * 60 + m;
+}
+
+export function minutesToTime(totalMinutes: number): string {
+  const clamped = Math.max(6 * 60, Math.min(22 * 60, totalMinutes));
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+}
+
+export const GROCERY_DURATION_MIN = 30;
+
+export function isGroceryTitle(title: string): boolean {
+  return /\bgrocery\b/i.test(title);
+}
+
+export function itemDurationMin(
+  item: { type: ActivityType; title: string },
+  plan: TripPlan,
+): number {
+  if (item.type === "activity" && isGroceryTitle(item.title)) {
+    return GROCERY_DURATION_MIN;
+  }
+  return defaultDurationMin(item.type, plan);
+}
+
+export function defaultDurationMin(type: ActivityType, plan: TripPlan): number {
+  const intensity = getIntensityConfig(plan);
+  switch (type) {
+    case "meal":
+      return 60;
+    case "activity":
+      return intensity.activityDurationMin;
+    case "nap":
+      return napDurationMin(plan);
+    case "rest":
+      return intensity.restDurationMin;
+    case "travel":
+      return 25;
+    default:
+      return 60;
+  }
+}
+
+export function defaultTravelMin(plan: TripPlan): number {
+  if (plan.transportationType === "walking") {
+    return plan.walkingLimit === "low" ? 18 : 12;
+  }
+  if (plan.transportationType === "taxis" || plan.transportationType === "car-rental") {
+    return 15;
+  }
+  return 20;
+}
+
+type Schedulable = {
+  time: string;
+  endTime?: string;
+  type: ActivityType;
+  title: string;
+  notes?: string;
+};
+
+export function rescheduleActivities<T extends Schedulable>(
+  activities: T[],
+  plan: TripPlan,
+  travelAfterEach: number[] = [],
+  startCursor?: number,
+): (T & { endTime: string })[] {
+  if (activities.length === 0) return [];
+
+  const sorted = [...activities].sort(
+    (a, b) => parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time),
+  );
+
+  const result: (T & { endTime: string })[] = [];
+  let cursor = startCursor ?? Math.max(parseTimeToMinutes(sorted[0].time), 8 * 60);
+
+  for (let i = 0; i < sorted.length; i++) {
+    const item = sorted[i];
+    if (i > 0) {
+      const travel = travelAfterEach[i - 1] ?? defaultTravelMin(plan);
+      cursor += travel;
+    } else if (parseTimeToMinutes(item.time) > cursor) {
+      cursor = parseTimeToMinutes(item.time);
+    }
+
+    const duration = itemDurationMin(item, plan);
+    const end = cursor + duration;
+
+    result.push({
+      ...item,
+      time: minutesToTime(cursor),
+      endTime: minutesToTime(end),
+    });
+
+    cursor = end;
+  }
+
+  return result;
+}
+
+export function activitiesOverlap(activities: { time: string; endTime?: string; type: ActivityType }[]): boolean {
+  const slots = activities.map((a) => ({
+    start: parseTimeToMinutes(a.time),
+    end: a.endTime ? parseTimeToMinutes(a.endTime) : parseTimeToMinutes(a.time) + 60,
+  }));
+
+  for (let i = 0; i < slots.length; i++) {
+    for (let j = i + 1; j < slots.length; j++) {
+      if (slots[i].start === slots[j].start) return true;
+      if (slots[i].start < slots[j].end && slots[j].start < slots[i].end) return true;
+    }
+  }
+  return false;
+}
+
+export function duplicateStartTimes(activities: { time: string }[]): boolean {
+  const seen = new Set<string>();
+  for (const a of activities) {
+    if (seen.has(a.time)) return true;
+    seen.add(a.time);
+  }
+  return false;
+}

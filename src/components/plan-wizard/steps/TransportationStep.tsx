@@ -1,0 +1,84 @@
+import { StepProps, TransportationType } from "@/types/trip-plan";
+import { CarIcon, TaxiIcon, TransitIcon, WalkingIcon } from "../icons";
+import { DynamicHint, FieldHint, StepIntro } from "../shared";
+
+const transportationOptions: {
+  value: TransportationType;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    value: "walking",
+    label: "Walking",
+    description: "Exploring on foot — best for compact neighborhoods",
+    icon: <WalkingIcon />,
+  },
+  {
+    value: "car-rental",
+    label: "Car rental",
+    description: "Your own wheels — great for flexibility with kids",
+    icon: <CarIcon />,
+  },
+  {
+    value: "taxis",
+    label: "Taxis & rideshares",
+    description: "Door-to-door without the parking hassle",
+    icon: <TaxiIcon />,
+  },
+  {
+    value: "public-transportation",
+    label: "Public transit",
+    description: "Buses, trains, and metros — an adventure itself",
+    icon: <TransitIcon />,
+  },
+];
+
+export default function TransportationStep({ formData, updateFormData }: StepProps) {
+  const selected = transportationOptions.find((o) => o.value === formData.transportationType);
+
+  return (
+    <div className="space-y-6">
+      <StepIntro
+        emoji="🚗"
+        title="How will you get around?"
+        subtitle="Pick how you'll move between stops — we'll keep routes realistic."
+      />
+
+      <FieldHint>Choose the option you&apos;ll use most days at your destination.</FieldHint>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {transportationOptions.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => updateFormData({ transportationType: option.value })}
+            className={`rounded-2xl border p-5 text-left transition ${
+              formData.transportationType === option.value
+                ? "border-sky-500 bg-sky-50 ring-2 ring-sky-100"
+                : "border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50/40"
+            }`}
+          >
+            <div
+              className={`mb-3 inline-flex rounded-xl p-2.5 ${
+                formData.transportationType === option.value
+                  ? "bg-sky-100 text-sky-700"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {option.icon}
+            </div>
+            <span className="block font-semibold text-slate-900">{option.label}</span>
+            <p className="mt-1 text-sm leading-relaxed text-slate-500">{option.description}</p>
+          </button>
+        ))}
+      </div>
+
+      {selected && (
+        <DynamicHint>
+          Got it — we&apos;ll plan routes that work well with {selected.label.toLowerCase()}.
+        </DynamicHint>
+      )}
+    </div>
+  );
+}
