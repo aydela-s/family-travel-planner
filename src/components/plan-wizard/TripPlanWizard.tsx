@@ -134,6 +134,7 @@ export default function TripPlanWizard() {
       setStepDirection("forward");
       setStepIndex((index) => index + 1);
       setError("");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }
 
