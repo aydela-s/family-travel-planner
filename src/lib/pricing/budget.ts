@@ -3,14 +3,13 @@ import { familyActivityCost } from "@/lib/pricing/activity-cost";
 import {
   accommodationPlanningTips,
   estimateAccommodationFoodCosts,
+  familyMealUnits,
   getAccommodationProfile,
 } from "@/lib/pricing/accommodation";
 import { hasCookDinnerAtHome } from "@/lib/schedule/meal-planning";
 import { TransportationType, TripPlan } from "@/types/trip-plan";
 import { ItineraryActivity } from "@/types/itinerary";
 import {
-  BUDGET_TARGET_HIGH,
-  BUDGET_TARGET_LOW,
   BUDGET_TARGET_MIN,
   budgetUsagePercent,
   generateCostSavingTips,
@@ -204,10 +203,10 @@ function clampTotal(
   return { food: f, transport: t, activities: acts, total };
 }
 
-const BUDGET_TARGET_IDEAL = 0.88;
+const BUDGET_TARGET_IDEAL = 0.98;
 
 /**
- * Aggressively fill toward 80–95% of cap without exceeding it.
+ * Aggressively fill toward ~100% of cap without exceeding it.
  */
 function fillBudgetToTarget(
   food: number,
@@ -229,7 +228,7 @@ function fillBudgetToTarget(
   let acts = sumActivityCosts(activities);
   let total = f + t + acts;
 
-  if (total >= budgetCap * (BUDGET_TARGET_LOW / 100)) {
+  if (total >= target) {
     return { food: f, transport: t, activities: acts, total };
   }
 
@@ -297,8 +296,72 @@ function fillBudgetToTarget(
     total = f + t + acts;
   }
 
-  if (total < budgetCap * (BUDGET_TARGET_LOW / 100) && acts > 0) {
-    const desiredActs = Math.min(budgetCap * caps.activities, acts + (target - total) * 0.7);
+  // When paid activities can't fill the gap, consider substituting restaurant lunch with a picnic.
+  // Only do this when the per-adult budget is too tight to afford both lunch and dinner at a restaurant.
+  const mealUnits = familyMealUnits(plan);
+  const perAdultBudget = budgetCap / Math.max(1, mealUnits);
+  // Only substitute restaurant lunch for a picnic when the per-adult share can't
+  // even cover a single restaurant lunch (not just the combined lunch + dinner).
+  const budgetTooTightForRestaurantLunch = perAdultBudget < city.food.lunch;
+
+  if (
+    total < target &&
+    budgetTooTightForRestaurantLunch &&
+    !activities.some((a) => a.title.toLowerCase().includes("shopping for picnic"))
+  ) {
+    const lunchIdx = activities.findIndex(
+      (a) =>
+        a.type === "meal" &&
+        parseInt(a.time.split(":")[0] ?? "12", 10) >= 11 &&
+        parseInt(a.time.split(":")[0] ?? "12", 10) < 16 &&
+        !a.title.toLowerCase().includes("picnic"),
+    );
+    if (lunchIdx >= 0) {
+      const supplyCost = roundMoney(
+        Math.min(city.food.lunch * MEAL_TIERS.picnic * mealUnits, target - total),
+        currency,
+      );
+      if (supplyCost > 0) {
+        // Find a free outdoor spot in the city for the picnic meal
+        const outdoorSpot = city.landmarks.find((l) => l.adultPrice === 0) ?? null;
+        const picnicLocation = outdoorSpot
+          ? { name: outdoorSpot.name, lat: outdoorSpot.lat, lng: outdoorSpot.lng }
+          : { name: "Local park", lat: city.lat + 0.005, lng: city.lng - 0.003 };
+
+        // Keep existing lunch as a "meal" — just change it to picnic.
+          // Use 12:30 so both shopping and picnic sort to the end of the morning
+          // queue in rescheduleActivities (after other 9–11 AM activities), and
+          // so neither falls inside the nap window (13:00–15:00).
+          activities[lunchIdx] = {
+            ...activities[lunchIdx],
+            title: `Picnic lunch at ${picnicLocation.name}`,
+            time: "12:30",
+            notes: "A relaxed outdoor lunch together as a family.",
+            location: picnicLocation,
+          };
+
+          // Insert shopping activity immediately before the picnic meal.
+          // Time 12:00 sorts it just before the picnic in the morning queue.
+          activities.splice(lunchIdx, 0, {
+            time: "12:00",
+            title: "Shopping for picnic supplies",
+          type: "activity",
+          timeOfDay: "morning",
+          notes: "Pick up sandwiches, fruit, snacks, and drinks for a family picnic lunch.",
+          activityCost: supplyCost,
+          location: { name: "Local supermarket", lat: city.lat + 0.009, lng: city.lng - 0.006 },
+        });
+        flags.groceryStopAdded = true;
+        acts = sumActivityCosts(activities);
+        total = f + t + acts;
+      }
+    }
+  }
+
+  if (total < target && acts > 0) {
+    // Cap to actual remaining headroom (food + transport already fixed), not a
+    // fraction cap — a higher-budget day should spend more on activities.
+    const desiredActs = Math.min(budgetCap - f - t, acts + (target - total));
     if (desiredActs > acts) {
       const scale = desiredActs / acts;
       activities
@@ -311,7 +374,7 @@ function fillBudgetToTarget(
     }
   }
 
-  if (total < budgetCap * (BUDGET_TARGET_LOW / 100)) {
+  if (total < target) {
     f = Math.min(foodMax, Math.max(f, estimateMealCosts(activities, city, budgetCap, caps.food, plan)));
   }
 
@@ -403,12 +466,9 @@ function fitActivitiesToBudget(
   currency: string,
   flags: OptimizationFlags,
 ): void {
-  adjusted
-    .filter((a) => a.type === "activity")
-    .forEach((a) => {
-      if ((a.activityCost ?? 0) > activityBudget) a.activityCost = 0;
-    });
-
+  // Do not zero individual activities — a single expensive family experience
+  // (e.g. family zoo ticket) may legitimately fill most of the activity budget.
+  // Proportional scaling below handles the over-budget case correctly.
   const actsTotal = sumActivityCosts(adjusted);
   if (actsTotal > activityBudget && activityBudget > 0) {
     const scale = activityBudget / actsTotal;
@@ -531,7 +591,7 @@ export function enforceDailyBudget(
     usage = budgetUsagePercent(total, budgetCapLocal);
   }
 
-  if (usage < BUDGET_TARGET_LOW && total < budgetCapLocal) {
+  if (usage < BUDGET_TARGET_IDEAL * 100 && total < budgetCapLocal) {
     const activeCaps = CATEGORY_CAPS[effectiveTransport] ?? CATEGORY_CAPS[""];
     const filled = fillBudgetToTarget(
       food,
@@ -557,7 +617,7 @@ export function enforceDailyBudget(
     usage = budgetUsagePercent(total, budgetCapLocal);
   }
 
-  if (usage < BUDGET_TARGET_LOW) {
+  if (usage < BUDGET_TARGET_IDEAL * 100) {
     const activeCaps = CATEGORY_CAPS[effectiveTransport] ?? CATEGORY_CAPS[""];
     const refilled = fillBudgetToTarget(
       food,
@@ -623,7 +683,13 @@ export function estimatePreliminaryUsage(
   plan: TripPlan,
   budgetCapLocal: number,
 ): number {
-  const food = city.food.breakfast + city.food.lunch + city.food.dinner;
+  const mealUnits = plan.adults + plan.children.reduce((sum, age) => {
+    if (age <= 2) return sum + 0.1;
+    if (age <= 6) return sum + 0.4;
+    if (age <= 12) return sum + 0.6;
+    return sum + 0.9;
+  }, 0);
+  const food = (city.food.breakfast + city.food.lunch + city.food.dinner) * mealUnits;
   const transport =
     plan.transportationType === "taxis"
       ? city.transport.baseFare * 4

@@ -1,6 +1,6 @@
 import { TripPlan } from "@/types/trip-plan";
 import { ActivityType } from "@/types/itinerary";
-import { getNapWindow, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
+import { getNapWindow, napDurationMin, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import {
   defaultDurationMin,
   defaultTravelMin,
@@ -192,12 +192,19 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       : 8 * 60;
 
   if (napItems.length > 0 && napWindow) {
+    // Slide the nap start to the later of the preferred window or when morning
+    // activities actually finish — prevents overlap when shopping/picnic run long.
+    const napDur = napDurationMin(plan);
+    const actualNapStart = Math.min(
+      Math.max(napWindow.startMin, cursor),
+      napWindow.startMin + 30,
+    );
     result.push({
       ...napItems[0],
-      time: minutesToTime(napWindow.startMin),
-      endTime: minutesToTime(napWindow.endMin),
+      time: minutesToTime(actualNapStart),
+      endTime: minutesToTime(actualNapStart + napDur),
     });
-    cursor = napWindow.endMin + defaultTravelMin(plan);
+    cursor = actualNapStart + napDur + defaultTravelMin(plan);
   }
 
   if (afterNap.length > 0) {

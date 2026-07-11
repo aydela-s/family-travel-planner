@@ -116,6 +116,16 @@ export function accommodationMealMultiplier(
   return base * mealTier;
 }
 
+export function familyMealUnits(plan: TripPlan): number {
+  const childUnits = plan.children.reduce((sum, age) => {
+    if (age <= 2) return sum + 0.1;  // toddlers eat from parents' plates
+    if (age <= 6) return sum + 0.4;  // kids menu
+    if (age <= 12) return sum + 0.6; // kids menu / smaller portion
+    return sum + 0.9;                // teen, nearly full meal
+  }, 0);
+  return plan.adults + childUnits;
+}
+
 export function estimateAccommodationFoodCosts(
   activities: ItineraryActivity[],
   city: CityConfig,
@@ -123,6 +133,7 @@ export function estimateAccommodationFoodCosts(
   foodCap: number,
   mealTierFn: (activity: ItineraryActivity) => number,
 ): number {
+  const mealUnits = familyMealUnits(plan);
   let total = 0;
   for (const a of activities) {
     if (a.type !== "meal") continue;
@@ -130,7 +141,7 @@ export function estimateAccommodationFoodCosts(
     const base =
       hour < 11 ? city.food.breakfast : hour < 16 ? city.food.lunch : city.food.dinner;
     const tier = mealTierFn(a);
-    total += base * accommodationMealMultiplier(plan.accommodationType, hour, tier);
+    total += base * accommodationMealMultiplier(plan.accommodationType, hour, tier) * mealUnits;
   }
   return Math.min(total, foodCap);
 }

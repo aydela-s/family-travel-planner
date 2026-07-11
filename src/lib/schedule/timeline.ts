@@ -26,7 +26,7 @@ export function itemDurationMin(
   item: { type: ActivityType; title: string },
   plan: TripPlan,
 ): number {
-  if (item.type === "activity" && isGroceryTitle(item.title)) {
+  if (item.type === "activity" && (isGroceryTitle(item.title) || /\bpicnic supplies\b/i.test(item.title))) {
     return GROCERY_DURATION_MIN;
   }
   return defaultDurationMin(item.type, plan);
