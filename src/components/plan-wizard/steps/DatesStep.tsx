@@ -14,6 +14,11 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
 
   const startInPast = formData.startDate !== "" && formData.startDate < today;
 
+  const endBeforeStart =
+    formData.startDate !== "" &&
+    formData.endDate !== "" &&
+    formData.endDate < formData.startDate;
+
 
 
   return (
@@ -58,7 +63,9 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
 
               const value = e.target.value;
 
-              if (value && value < today) return;
+              // Ignore "" from incomplete date segments (controlled inputs wipe month/day).
+
+              if (!value) return;
 
               updateFormData({ startDate: value });
 
@@ -98,17 +105,35 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
 
             required
 
-            min={formData.startDate || today}
+            min={today}
 
             value={formData.endDate}
 
-            onChange={(e) => updateFormData({ endDate: e.target.value })}
+            onChange={(e) => {
+
+              const value = e.target.value;
+
+              if (!value) return;
+
+              updateFormData({ endDate: value });
+
+            }}
 
             className={inputClassName}
 
           />
 
           <FieldHint>Last day before you head back.</FieldHint>
+
+          {endBeforeStart && (
+
+            <p className="mt-2 text-sm font-medium text-red-600">
+
+              Your return date must be on or after your departure date.
+
+            </p>
+
+          )}
 
         </div>
 
