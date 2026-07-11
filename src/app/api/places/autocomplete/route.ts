@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { CITY_CONFIGS } from "@/config/city-pricing";
+import { getLocalPlaceSuggestions } from "@/lib/places-autocomplete";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -10,7 +10,6 @@ export async function GET(request: Request) {
   }
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  const normalized = query.toLowerCase();
 
   if (apiKey) {
     try {
@@ -31,14 +30,7 @@ export async function GET(request: Request) {
     }
   }
 
-  const local = CITY_CONFIGS.flatMap((c) => [
-    { label: `${c.name}, ${c.country === "US" ? "USA" : c.country}`, placeId: c.id },
-    ...c.aliases.map((a) => ({
-      label: a.replace(/\b\w/g, (ch) => ch.toUpperCase()),
-      placeId: c.id,
-    })),
-  ]).filter((s) => s.label.toLowerCase().includes(normalized));
-
-  const unique = Array.from(new Map(local.map((s) => [s.label, s])).values()).slice(0, 8);
-  return NextResponse.json({ suggestions: unique });
+  return NextResponse.json({
+    suggestions: getLocalPlaceSuggestions(query),
+  });
 }
