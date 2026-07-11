@@ -47,7 +47,7 @@ export function getFamilyAgeProfile(plan: TripPlan): FamilyAgeProfile {
     hasTween: ages.some((a) => a >= 9 && a <= 12),
     hasTeen: ages.some((a) => a >= 13),
     isMixedAges: bands.size > 1,
-    ageSummary: `ages ${youngest}–${oldest}`,
+    ageSummary: youngest === oldest ? `age ${youngest}` : `ages ${youngest}–${oldest}`,
   };
 }
 
