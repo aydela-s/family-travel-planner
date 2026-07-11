@@ -1,4 +1,5 @@
 import { AccommodationType, StepProps } from "@/types/trip-plan";
+import { ACCOMMODATION_LABELS } from "@/lib/format-labels";
 import { dietaryQuickPicks, FieldHint, inputClassName, OptionCard, OptionalLabel, SelectChip, StepIntro } from "../shared";
 
 const accommodationOptions: {
@@ -9,31 +10,31 @@ const accommodationOptions: {
 }[] = [
   {
     value: "hotel_breakfast_included",
-    label: "Hotel — breakfast included",
+    label: ACCOMMODATION_LABELS.hotel_breakfast_included,
     description: "Start the day without paying for breakfast",
     emoji: "🏨",
   },
   {
     value: "hotel_no_breakfast",
-    label: "Hotel — no breakfast",
+    label: ACCOMMODATION_LABELS.hotel_no_breakfast,
     description: "You'll buy breakfast out each morning",
     emoji: "🛎️",
   },
   {
     value: "airbnb_with_kitchen",
-    label: "Rental with kitchen",
+    label: ACCOMMODATION_LABELS.airbnb_with_kitchen,
     description: "Cook some meals, grocery stops make sense",
     emoji: "🍳",
   },
   {
     value: "airbnb_no_kitchen",
-    label: "Rental without kitchen",
+    label: ACCOMMODATION_LABELS.airbnb_no_kitchen,
     description: "Takeaway and cafés for most meals",
     emoji: "🏠",
   },
   {
     value: "staying_with_family_or_friends",
-    label: "With family or friends",
+    label: ACCOMMODATION_LABELS.staying_with_family_or_friends,
     description: "Many meals may be covered by your hosts",
     emoji: "👨‍👩‍👧",
   },

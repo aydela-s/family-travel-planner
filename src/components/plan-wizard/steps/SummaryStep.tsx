@@ -1,4 +1,4 @@
-import { formatAccommodationLabel } from "@/lib/pricing/accommodation";
+import { getAccommodationLabel, getTransportationLabel } from "@/lib/format-labels";
 import { StepProps, TripPlan } from "@/types/trip-plan";
 import { StepIntro } from "../shared";
 
@@ -40,8 +40,8 @@ export default function SummaryStep({ formData }: StepProps) {
       label: "Travel style",
       value: `${formatLabel(formData.travelStyle)} pace`,
     },
-    { label: "Getting around", value: formatLabel(formData.transportationType) },
-    { label: "Accommodation", value: formatAccommodationLabel(formData.accommodationType) },
+    { label: "Getting around", value: getTransportationLabel(formData.transportationType) },
+    { label: "Accommodation", value: getAccommodationLabel(formData.accommodationType) },
     { label: "Food notes", value: formData.dietaryRestrictions || "Nothing specific" },
     ...(formData.children.length > 0
       ? [{ label: "Nap schedule", value: formData.napSchedule || "Flexible" }]

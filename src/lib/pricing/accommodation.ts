@@ -1,4 +1,5 @@
 import { CityConfig } from "@/config/city-pricing";
+import { getAccommodationLabel } from "@/lib/format-labels";
 import { AccommodationType, TripPlan } from "@/types/trip-plan";
 import { ItineraryActivity } from "@/types/itinerary";
 
@@ -138,14 +139,7 @@ export function accommodationPlanningTips(plan: TripPlan): string[] {
   return getAccommodationProfile(plan.accommodationType).planningTips.slice(0, 3);
 }
 
+/** @deprecated Use getAccommodationLabel from @/lib/format-labels directly — kept for the one remaining (dead) caller in itinerary.ts */
 export function formatAccommodationLabel(type: AccommodationType | ""): string {
-  const labels: Record<AccommodationType, string> = {
-    hotel_breakfast_included: "Hotel (breakfast included)",
-    hotel_no_breakfast: "Hotel (no breakfast)",
-    airbnb_with_kitchen: "Airbnb / rental with kitchen",
-    airbnb_no_kitchen: "Airbnb / rental (no kitchen)",
-    staying_with_family_or_friends: "Staying with family or friends",
-    "": "Not specified",
-  };
-  return labels[type] ?? "Not specified";
+  return getAccommodationLabel(type);
 }

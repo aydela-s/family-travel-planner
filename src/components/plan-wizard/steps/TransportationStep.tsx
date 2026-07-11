@@ -1,4 +1,5 @@
 import { StepProps, TransportationType } from "@/types/trip-plan";
+import { TRANSPORTATION_LABELS } from "@/lib/format-labels";
 import { CarIcon, TaxiIcon, TransitIcon, WalkingIcon } from "../icons";
 import { DynamicHint, FieldHint, StepIntro } from "../shared";
 
@@ -10,25 +11,25 @@ const transportationOptions: {
 }[] = [
   {
     value: "walking",
-    label: "Walking",
+    label: TRANSPORTATION_LABELS.walking,
     description: "Exploring on foot — best for compact neighborhoods",
     icon: <WalkingIcon />,
   },
   {
     value: "car-rental",
-    label: "Car rental",
+    label: TRANSPORTATION_LABELS["car-rental"],
     description: "Your own wheels — great for flexibility with kids",
     icon: <CarIcon />,
   },
   {
     value: "taxis",
-    label: "Taxis & rideshares",
+    label: TRANSPORTATION_LABELS.taxis,
     description: "Door-to-door without the parking hassle",
     icon: <TaxiIcon />,
   },
   {
     value: "public-transportation",
-    label: "Public transit",
+    label: TRANSPORTATION_LABELS["public-transportation"],
     description: "Buses, trains, and metros — an adventure itself",
     icon: <TransitIcon />,
   },
