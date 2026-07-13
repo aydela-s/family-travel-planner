@@ -131,3 +131,11 @@ Timeline UI
 - Mobile application
 - UI redesign
 
+---
+
+## License
+
+All Rights Reserved. This repository is public for portfolio purposes only — the code may be
+viewed but not copied, modified, redistributed, or used without written permission. See
+[LICENSE](./LICENSE) for details.
+
