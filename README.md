@@ -30,9 +30,7 @@ Instead of only testing software, I designed product requirements, identified ed
 
 ---
 
-## Project Status
 
-🚧 This project is under active development and serves as both a portfolio project and an exploration of deterministic planning combined with AI-assisted recommendations.
 
 ## Tech Stack
 
@@ -133,9 +131,10 @@ Timeline UI
 
 ---
 
+
+
 ## License
 
 All Rights Reserved. This repository is public for portfolio purposes only — the code may be
 viewed but not copied, modified, redistributed, or used without written permission. See
 [LICENSE](./LICENSE) for details.
-
