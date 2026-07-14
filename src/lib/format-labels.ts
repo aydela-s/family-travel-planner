@@ -40,3 +40,8 @@ export function getBudgetStyleLabel(style: BudgetStyle | ""): string {
   const meta = BUDGET_STYLE_LABELS[style];
   return `${meta.emoji} ${meta.label}`;
 }
+
+export function getBudgetStyleLabelPlain(style: BudgetStyle | ""): string {
+  if (!style) return "—";
+  return BUDGET_STYLE_LABELS[style].label;
+}
