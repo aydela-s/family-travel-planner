@@ -1,6 +1,6 @@
 import { StepProps, TransportationType } from "@/types/trip-plan";
 import { TRANSPORTATION_LABELS } from "@/lib/format-labels";
-import { CarIcon, TaxiIcon, TransitIcon, WalkingIcon } from "../icons";
+import { CarIcon, TaxiIcon, TransitIcon } from "../icons";
 import { DynamicHint, FieldHint, StepIntro } from "../shared";
 
 const transportationOptions: {
@@ -9,12 +9,6 @@ const transportationOptions: {
   description: string;
   icon: React.ReactNode;
 }[] = [
-  {
-    value: "walking",
-    label: TRANSPORTATION_LABELS.walking,
-    description: "Exploring on foot — best for compact neighborhoods",
-    icon: <WalkingIcon />,
-  },
   {
     value: "car-rental",
     label: TRANSPORTATION_LABELS["car-rental"],
@@ -48,7 +42,7 @@ export default function TransportationStep({ formData, updateFormData }: StepPro
 
       <FieldHint>Choose the option you&apos;ll use most days at your destination.</FieldHint>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         {transportationOptions.map((option) => (
           <button
             key={option.value}

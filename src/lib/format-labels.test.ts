@@ -57,8 +57,8 @@ describe("format-labels — exhaustiveness (FAM-17)", () => {
 });
 
 describe("format-labels — locked wording (FAM-17)", () => {
-  it("taxis is just 'Taxis', not 'Taxis & rideshares'", () => {
-    expect(TRANSPORTATION_LABELS.taxis).toBe("Taxis");
+  it("taxis is singular 'Taxi', not 'Taxis & rideshares'", () => {
+    expect(TRANSPORTATION_LABELS.taxis).toBe("Taxi");
   });
 
   it("locks in the exact wizard-step wording for the remaining transportation options", () => {
