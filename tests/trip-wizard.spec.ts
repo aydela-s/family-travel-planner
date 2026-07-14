@@ -1,0 +1,33 @@
+import { test, expect } from '@playwright/test';
+
+test('test', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.getByRole('link', { name: 'Plan my trip' }).click();
+  await page.getByRole('textbox', { name: 'Start typing a city...' }).click();
+  await page.getByRole('textbox', { name: 'Start typing a city...' }).fill('Dallas');
+  await page.getByRole('button', { name: 'Sounds good →' }).click();
+  await page.getByRole('textbox', { name: 'Heading out' }).fill('2026-07-26');
+  await page.getByRole('textbox', { name: 'Coming home' }).fill('2026-07-29');
+  await page.getByRole('button', { name: 'Sounds good →' }).click();
+  await page.getByRole('button', { name: 'Decrease Adults' }).click();
+  await page.getByRole('button', { name: 'Increase Kids' }).click();
+  await page.getByRole('button', { name: 'Increase Kids' }).click();
+  await page.getByRole('button', { name: '5' }).first().click();
+  await page.getByRole('button', { name: '3' }).nth(2).click();
+  await page.getByRole('button', { name: 'Sounds good →' }).click();
+  await page.getByRole('button', { name: '⚖️ Balanced A little' }).click();
+  await page.getByRole('button', { name: 'Sounds good →' }).click();
+  await page.getByRole('button', { name: 'Taxi Door-to-door without' }).click();
+  await page.getByRole('button', { name: 'Sounds good →' }).click();
+  await page.getByRole('button', { name: '👨‍👩‍👧 With family or' }).click();
+  await page.getByRole('button', { name: 'Vegan' }).click();
+  await page.getByRole('button', { name: 'Sounds good →' }).click();
+  await page.getByRole('button', { name: 'Afternoon nap (1–3 PM)' }).click();
+  await page.getByRole('button', { name: 'Sounds good →' }).click();
+  await page.getByRole('button', { name: '⚖️ Balanced A mix of' }).click();
+  await page.getByRole('button', { name: 'Sounds good →' }).click();
+  await page.getByRole('button', { name: '🌳 Parks & nature' }).click();
+  await page.getByRole('button', { name: '☀️ Relaxation' }).click();
+  await page.getByRole('button', { name: 'Sounds good →' }).click();
+  await page.getByRole('button', { name: 'Try demo (free, no API key)' }).click();
+});
