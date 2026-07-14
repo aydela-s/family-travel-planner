@@ -1,4 +1,4 @@
-import { getTripDayCount } from "@/lib/itinerary";
+import { getTripDateContext, tripLengthHint } from "@/lib/planning-engine/trip-date-context";
 import { ageAwareTravelerHints } from "@/lib/schedule/family-profile";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -191,10 +191,7 @@ export function getTravelerHints(children: number[]) {
 
 export function getTripLengthHint(plan: TripPlan) {
   if (!plan.startDate || !plan.endDate) return null;
-  const days = getTripDayCount(plan.startDate, plan.endDate);
-  if (days <= 0) return null;
-  if (days === 1) return "A day trip — we'll pack in the highlights without rushing.";
-  if (days <= 3) return `${days} days of adventure — perfect for a long weekend.`;
-  if (days <= 7) return `${days} days gives you room to explore at a family-friendly pace.`;
-  return `${days} days — we'll help you pace it so nobody burns out.`;
+  const context = getTripDateContext(plan.startDate, plan.endDate);
+  if (!context) return null;
+  return tripLengthHint(context);
 }
