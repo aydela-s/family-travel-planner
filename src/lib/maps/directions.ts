@@ -1,5 +1,11 @@
 import { CityConfig } from "@/config/city-pricing";
-import { calculateRideCost, estimateSegmentDistance } from "@/lib/pricing/transport-cost";
+import {
+  choosePublicTransitFare,
+  estimateFuelCostForDriving,
+  estimateTaxiDailyCost,
+} from "@/lib/pricing/transport-planner";
+import { calculateRideCost } from "@/lib/pricing/transport-cost";
+import { TripPlan } from "@/types/trip-plan";
 
 export type DirectionsResult = {
   distanceKm: number;
@@ -81,30 +87,26 @@ export function estimateWalkingMetrics(
   return { steps: Math.round(distanceKm * 1300), distanceKm };
 }
 
-export function estimateFuelCost(city: CityConfig): number {
-  return Math.round(city.transport.fuelPricePerLiter * city.transport.avgFuelLitersPerDay * 100) / 100;
-}
-
 export function estimateDailyTransport(
   transportType: string,
   city: CityConfig,
+  plan: TripPlan,
   segmentCosts: number[],
   totalKm: number,
-  walkingLimit: string,
 ): { cost: number; label: string; steps?: number; distanceKm?: number; fuelCost?: number } {
   if (transportType === "walking") {
-    const { steps, distanceKm } = estimateWalkingMetrics(totalKm, walkingLimit);
+    const { steps, distanceKm } = estimateWalkingMetrics(totalKm, plan.walkingLimit);
     return { cost: 0, label: `${steps.toLocaleString()} steps · ${distanceKm} km walking`, steps, distanceKm };
   }
   if (transportType === "car-rental") {
-    const fuelCost = estimateFuelCost(city);
-    return { cost: fuelCost, label: `Car rental · est. fuel`, fuelCost };
+    const fuelCost = estimateFuelCostForDriving(city, totalKm);
+    return { cost: fuelCost, label: `Car rental · est. fuel (${totalKm} km)`, fuelCost };
   }
   if (transportType === "public-transportation") {
-    const cost = city.transport.publicTransitDayPass;
-    return { cost, label: `Public transit day pass` };
+    const choice = choosePublicTransitFare(city, plan, segmentCosts.length);
+    return { cost: choice.cost, label: choice.label };
   }
-  const cost = Math.round(segmentCosts.reduce((s, c) => s + c, 0) * 100) / 100;
+  const cost = estimateTaxiDailyCost(segmentCosts);
   return { cost, label: `Taxi / rideshare` };
 }
 

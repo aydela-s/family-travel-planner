@@ -133,9 +133,9 @@ async function enrichDay(
   const transportEstimate = estimateDailyTransport(
     plan.transportationType,
     city,
+    plan,
     segmentCosts,
     totalKm,
-    plan.walkingLimit,
   );
 
   const lockedDailyTransport = transportEstimate.cost;

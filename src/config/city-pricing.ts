@@ -15,6 +15,7 @@ export type CityConfig = {
     ratePerKm: number;
     ratePerMin: number;
     publicTransitDayPass: number;
+    publicTransitSingleRide: number;
     fuelPricePerLiter: number;
     avgFuelLitersPerDay: number;
   };
@@ -53,6 +54,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       ratePerKm: 1.2,
       ratePerMin: 0.35,
       publicTransitDayPass: 6,
+      publicTransitSingleRide: 2.5,
       fuelPricePerLiter: 1.1,
       avgFuelLitersPerDay: 8,
     },
@@ -82,6 +84,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       ratePerKm: 1.5,
       ratePerMin: 0.4,
       publicTransitDayPass: 8.5,
+      publicTransitSingleRide: 2.15,
       fuelPricePerLiter: 1.85,
       avgFuelLitersPerDay: 6,
     },
@@ -111,6 +114,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       ratePerKm: 1.8,
       ratePerMin: 0.45,
       publicTransitDayPass: 10,
+      publicTransitSingleRide: 2.8,
       fuelPricePerLiter: 1.55,
       avgFuelLitersPerDay: 7,
     },
@@ -140,6 +144,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       ratePerKm: 4.2,
       ratePerMin: 1.1,
       publicTransitDayPass: 24,
+      publicTransitSingleRide: 6,
       fuelPricePerLiter: 7.2,
       avgFuelLitersPerDay: 6,
     },
@@ -168,6 +173,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       ratePerKm: 350,
       ratePerMin: 80,
       publicTransitDayPass: 900,
+      publicTransitSingleRide: 210,
       fuelPricePerLiter: 170,
       avgFuelLitersPerDay: 5,
     },
@@ -199,6 +205,7 @@ export const DEFAULT_CITY: CityConfig = {
     ratePerKm: 1.1,
     ratePerMin: 0.3,
     publicTransitDayPass: 8,
+    publicTransitSingleRide: 3,
     fuelPricePerLiter: 1.2,
     avgFuelLitersPerDay: 7,
   },
