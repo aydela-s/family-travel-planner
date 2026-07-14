@@ -49,7 +49,6 @@ export type DayLandmarkContext = {
   lunch: CityConfig["landmarks"][0];
   dinner: CityConfig["landmarks"][0];
   extra?: CityConfig["landmarks"][0];
-  budgetLabel: string;
   dayOffset: number;
 };
 

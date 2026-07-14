@@ -12,7 +12,7 @@ import { getDatesValidationError } from "@/lib/planning-engine/date-validation";
 import { isValidNapSelection } from "@/lib/planning-engine/nap-options";
 import StepTransition from "./StepTransition";
 import ActivityInterestsStep from "./steps/ActivityInterestsStep";
-import BudgetStep from "./steps/BudgetStep";
+import BudgetStyleStep from "./steps/BudgetStyleStep";
 import DatesStep from "./steps/DatesStep";
 import DestinationStep from "./steps/DestinationStep";
 import FoodPreferencesStep from "./steps/FoodPreferencesStep";
@@ -62,9 +62,9 @@ const steps = [
     validate: () => true,
   },
   {
-    title: "Budget",
-    component: BudgetStep,
-    validate: (plan: TripPlan) => plan.budgetPerDay > 0,
+    title: "Budget Style",
+    component: BudgetStyleStep,
+    validate: (plan: TripPlan) => plan.budgetStyle !== "",
   },
   {
     title: "Activity interests",

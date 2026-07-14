@@ -1,5 +1,5 @@
 import { CityConfig } from "@/config/city-pricing";
-import { familyActivityCost } from "@/lib/pricing/activity-cost";
+import { landmarksForStyle } from "@/lib/pricing/budget-style";
 import { TripPlan } from "@/types/trip-plan";
 
 export type FamilyAgeProfile = {
@@ -73,23 +73,22 @@ export function pickLandmarkForFamily(
   plan: TripPlan,
   dayNumber: number,
   slotIndex: number,
-  budgetCapLocal: number,
 ): CityConfig["landmarks"][0] {
   const profile = getFamilyAgeProfile(plan);
   const rotation = (dayNumber - 1) * 3 + slotIndex;
 
-  const ranked = [...city.landmarks]
-    .map((landmark) => ({
-      landmark,
-      score: landmarkAgeScore(landmark.name, profile),
-      familyCost: familyActivityCost(landmark.adultPrice, plan.adults, plan.children),
-    }))
+  // Slot 0 is each day's main activity — under "balanced," this is the one
+  // slot allowed to reach into the paid/premium tier ("one major paid
+  // attraction per day"). Other slots stay in the cheap/free tier.
+  const stylePool = landmarksForStyle(city.landmarks, (l) => l.adultPrice, plan.budgetStyle, {
+    allowPremiumPick: slotIndex === 0,
+  });
+
+  const ranked = [...stylePool]
+    .map((landmark) => ({ landmark, score: landmarkAgeScore(landmark.name, profile) }))
     .sort((a, b) => b.score - a.score || b.landmark.adultPrice - a.landmark.adultPrice);
 
-  const affordable = ranked.filter((r) => r.familyCost <= budgetCapLocal * 0.45);
-  const pool = affordable.length > 0 ? affordable : ranked;
-
-  return pool[rotation % pool.length].landmark;
+  return ranked[rotation % ranked.length].landmark;
 }
 
 export function activityNoteForFamily(plan: TripPlan, day: number): string {

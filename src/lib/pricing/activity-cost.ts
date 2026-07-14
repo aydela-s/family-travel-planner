@@ -17,7 +17,3 @@ export function familyActivityCost(
   return Math.round(total * 100) / 100;
 }
 
-export function defaultActivityPrice(type: string, budgetPerDay: number): number {
-  if (type === "meal" || type === "rest" || type === "nap" || type === "travel") return 0;
-  return Math.max(15, Math.round(budgetPerDay * 0.12));
-}

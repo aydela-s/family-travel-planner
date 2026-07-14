@@ -13,8 +13,6 @@ const ALWAYS: AdjustActionId[] = [
   "add_activity",
   "more_outdoor_time",
   "replace_main_activity",
-  "spend_less_today",
-  "spend_more_today",
 ];
 
 function option(id: AdjustActionId, enabled: boolean, reason?: string): AdjustActionOption {
@@ -110,18 +108,6 @@ function alwaysOptions(ctx: DayAdjustContext): AdjustActionOption[] {
       "replace_main_activity",
       ctx.hasMorningActivity,
       ctx.hasMorningActivity ? undefined : "No main morning activity to replace",
-    ),
-    option(
-      "spend_less_today",
-      ctx.hasPaidActivities || ctx.budgetUsagePercent >= 70,
-      ctx.hasPaidActivities || ctx.budgetUsagePercent >= 70
-        ? undefined
-        : "Already using low-cost options today",
-    ),
-    option(
-      "spend_more_today",
-      ctx.budgetUsagePercent < 95,
-      ctx.budgetUsagePercent < 95 ? undefined : "Already near your daily budget cap",
     ),
   ];
 }

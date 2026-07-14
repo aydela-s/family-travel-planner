@@ -1,4 +1,4 @@
-import { getAccommodationLabel, getTransportationLabel } from "@/lib/format-labels";
+import { getAccommodationLabel, getBudgetStyleLabel, getTransportationLabel } from "@/lib/format-labels";
 import { StepProps, TripPlan } from "@/types/trip-plan";
 import { StepIntro } from "../shared";
 
@@ -47,8 +47,8 @@ export default function SummaryStep({ formData }: StepProps) {
       ? [{ label: "Nap schedule", value: formData.napSchedule || "Flexible" }]
       : []),
     {
-      label: "Daily budget",
-      value: formData.budgetPerDay > 0 ? `~$${formData.budgetPerDay}/day` : "—",
+      label: "Budget style",
+      value: getBudgetStyleLabel(formData.budgetStyle),
     },
     {
       label: "Interests",

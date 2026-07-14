@@ -73,7 +73,7 @@ Trip details:
 - Transportation: ${plan.transportationType}
 - Accommodation: ${formatAccommodationLabel(plan.accommodationType)}
 - Dietary restrictions: ${plan.dietaryRestrictions || "none"}
-${napPromptLines(plan)}- Budget per day (FAMILY TOTAL — must not exceed): $${plan.budgetPerDay} USD equivalent
+${napPromptLines(plan)}- Budget style: ${plan.budgetStyle || "balanced"} (save = free/cheap picks, balanced = a mix with one paid highlight per day, splurge = premium picks welcome)
 - Interests: ${plan.interests.join(", ")}
 
 Rules you MUST follow:
@@ -84,7 +84,7 @@ Rules you MUST follow:
 5. Include breakfast, lunch, and dinner (or appropriate meals) each day.
 6. Avoid overpacking — leave buffer time between activities.
 7. TIME-OF-DAY: Morning 06:00–11:59, afternoon 12:00–17:59, evening 18:00–22:00. Titles must match the time slot.
-8. CRITICAL BUDGET: Combined daily meals + transport + activities for the ENTIRE FAMILY must NEVER exceed $${plan.budgetPerDay}.
+8. BUDGET STYLE: Choose activities and restaurants that match the "${plan.budgetStyle || "balanced"}" budget style — do not try to hit any specific dollar target.
 9. Generate EXACTLY ${dayCount} day objects — no more, no fewer.
 
 Return JSON ONLY in this exact shape:
@@ -122,7 +122,7 @@ export function isValidTripPlan(body: unknown): body is TripPlan {
     typeof plan.endDate === "string" &&
     typeof plan.adults === "number" &&
     Array.isArray(plan.children) &&
-    typeof plan.budgetPerDay === "number" &&
+    typeof plan.budgetStyle === "string" &&
     Array.isArray(plan.interests) &&
     typeof plan.accommodationType === "string"
   );

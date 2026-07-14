@@ -13,13 +13,7 @@ import { normalizeRawItinerary } from "@/lib/itinerary";
 import { pickLandmarkForFamily } from "@/lib/schedule/family-profile";
 import { finalizeEnrichedDay, prepareItineraryForEnrich, scheduleEnrichedActivities, validateEnrichedDay } from "@/lib/schedule/fix-itinerary";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
-import {
-  convertBudgetToLocal,
-  enforceDailyBudget,
-  estimatePreliminaryUsage,
-  getBudgetBalanceNote,
-  pickLandmarkPrice,
-} from "@/lib/pricing/budget";
+import { maybeAddAccommodationGroceryStop, summarizeDailyCost, type DaySpendSummary } from "@/lib/pricing/budget";
 import { familyActivityCost } from "@/lib/pricing/activity-cost";
 import { TripPlan } from "@/types/trip-plan";
 import {
@@ -37,9 +31,8 @@ function pickLandmarkForActivity(
   plan: TripPlan,
   dayNumber: number,
   slotIndex: number,
-  budgetCapLocal: number,
 ): CityConfig["landmarks"][0] {
-  return pickLandmarkForFamily(city, plan, dayNumber, slotIndex, budgetCapLocal);
+  return pickLandmarkForFamily(city, plan, dayNumber, slotIndex);
 }
 
 function landmarkLocation(landmark: CityConfig["landmarks"][0], slotIndex: number, day: number): ActivityLocation {
@@ -60,20 +53,14 @@ function normalizeActivity(activity: ItineraryActivity): ItineraryActivity {
   };
 }
 
-function buildCostBreakdown(
-  enforced: ReturnType<typeof enforceDailyBudget>,
-  currency: string,
-): DayCostBreakdown {
-  const total = enforced.food + enforced.transport + enforced.activities;
+function buildCostBreakdown(summary: DaySpendSummary, currency: string): DayCostBreakdown {
   return {
-    food: enforced.food,
-    transport: enforced.transport,
-    activities: enforced.activities,
-    total,
+    food: summary.food,
+    transport: summary.transport,
+    activities: summary.activities,
+    total: summary.total,
     currency,
-    budgetCap: enforced.budgetCap,
-    onBudget: enforced.onBudget && total <= enforced.budgetCap,
-    budgetNote: getBudgetBalanceNote(enforced.budgetUsagePercentage),
+    note: summary.note,
   };
 }
 
@@ -82,8 +69,6 @@ async function enrichDay(
   plan: TripPlan,
   city: CityConfig,
   dayIndex: number,
-  budgetCapLocal: number,
-  preliminaryUsage: number,
 ): Promise<ItineraryDay> {
   const date = addDays(plan.startDate, dayIndex);
   let activitySlot = 0;
@@ -97,15 +82,10 @@ async function enrichDay(
     };
 
     if (a.type === "activity") {
-      const landmark = pickLandmarkForActivity(city, plan, rawDay.day, activitySlot, budgetCapLocal);
+      const landmark = pickLandmarkForActivity(city, plan, rawDay.day, activitySlot);
       activitySlot += 1;
       act.location = landmarkLocation(landmark, activitySlot, rawDay.day);
-      const adultPrice = pickLandmarkPrice(
-        landmark.adultPrice,
-        budgetCapLocal,
-        plan.transportationType,
-      );
-      act.activityCost = familyActivityCost(adultPrice, plan.adults, plan.children);
+      act.activityCost = familyActivityCost(landmark.adultPrice, plan.adults, plan.children);
     } else if (a.type === "meal") {
       const mealLandmark = city.landmarks[(rawDay.day + activitySlot) % city.landmarks.length];
       act.location = {
@@ -160,37 +140,21 @@ async function enrichDay(
 
   const lockedDailyTransport = transportEstimate.cost;
 
-  const enforced = enforceDailyBudget(
-    budgetCapLocal,
-    city.currency,
-    plan.transportationType,
-    activities,
-    0,
-    lockedDailyTransport,
-    plan,
-    city,
-    preliminaryUsage,
-  );
-
-  const adjustedActivities = enforced.activitiesAdjusted.map(normalizeActivity);
+  const withGroceryStop = maybeAddAccommodationGroceryStop(activities, plan, city);
   const segmentDurations = routeSegments.map((s) => s.durationMin);
   const scheduledActivities = scheduleEnrichedActivities(
-    adjustedActivities,
+    withGroceryStop.map(normalizeActivity),
     plan,
     segmentDurations,
   ).map(normalizeActivity);
 
-  const costBreakdown = buildCostBreakdown(enforced, city.currency);
+  const summary = summarizeDailyCost(scheduledActivities, lockedDailyTransport, city, plan);
+  const costBreakdown = buildCostBreakdown(summary, city.currency);
   const transportCost = costBreakdown.transport;
 
   const mapLocations = scheduledActivities
     .filter((a) => a.location)
     .map((a) => a.location!);
-
-  const movementLabel =
-    enforced.optimizationFlags.transportReduced
-      ? `Budget mode: ${enforced.effectiveTransport || "walking"} · ${transportEstimate.label}`
-      : transportEstimate.label;
 
   const dayResult: ItineraryDay = {
     day: rawDay.day,
@@ -199,9 +163,7 @@ async function enrichDay(
     formattedDate: formatDayHeader(date),
     activities: scheduledActivities,
     costBreakdown,
-    budgetUsagePercentage: enforced.budgetUsagePercentage,
-    costSavingTips: enforced.costSavingTips,
-    accommodationTips: enforced.accommodationTips,
+    accommodationTips: summary.accommodationTips,
     costs: costBreakdown,
     metrics: {
       steps: transportEstimate.steps,
@@ -210,7 +172,7 @@ async function enrichDay(
       transportCost,
       transportLabel: formatTransportDisplay(
         plan.transportationType,
-        movementLabel,
+        transportEstimate.label,
         transportCost,
         city.currencySymbol,
       ),
@@ -250,29 +212,18 @@ export async function enrichItinerary(
     options?.adjustDay,
     options?.adjustNote,
   );
-  const budgetCapLocal = convertBudgetToLocal(plan.budgetPerDay, city.currency);
-  const preliminaryUsage = estimatePreliminaryUsage(city, plan, budgetCapLocal);
 
   let days: ItineraryDay[];
 
   if (options?.adjustDay && options.previousItinerary) {
     const adjustIndex = prepared.days.findIndex((d) => d.day === options.adjustDay);
-    const newDay = await enrichDay(
-      prepared.days[adjustIndex],
-      plan,
-      city,
-      adjustIndex,
-      budgetCapLocal,
-      preliminaryUsage,
-    );
+    const newDay = await enrichDay(prepared.days[adjustIndex], plan, city, adjustIndex);
     days = options.previousItinerary.days.map((d) =>
       d.day === options.adjustDay ? newDay : d,
     );
   } else {
     days = await Promise.all(
-      prepared.days.map((d, index) =>
-        enrichDay(d, plan, city, index, budgetCapLocal, preliminaryUsage),
-      ),
+      prepared.days.map((d, index) => enrichDay(d, plan, city, index)),
     );
   }
 
@@ -301,8 +252,7 @@ export async function enrichItinerary(
     currency: city.currency,
     currencySymbol: city.currencySymbol,
     pricingDisclaimer: PRICING_DISCLAIMER,
-    familyBudgetPerDayUsd: plan.budgetPerDay,
-    familyBudgetPerDayLocal: budgetCapLocal,
+    budgetStyle: plan.budgetStyle,
     days,
   };
 }

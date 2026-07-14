@@ -1,5 +1,4 @@
 import { CityConfig } from "@/config/city-pricing";
-import { getBudgetContext } from "@/lib/pricing/budget";
 import {
   activityNoteForFamily,
   pickLandmarkForFamily,
@@ -29,16 +28,13 @@ export function buildLandmarkContext(
 ): DayLandmarkContext {
   const adjustment = getAdjustmentContext(adjustNote, day);
   const offset = day + adjustment.landmarkOffset;
-  const { budgetCapLocal } = getBudgetContext(plan, city);
-  const budgetLabel = `${city.currencySymbol}${budgetCapLocal}`;
 
   return {
-    morning: pickLandmarkForFamily(city, plan, offset, 0, budgetCapLocal),
-    afternoon: pickLandmarkForFamily(city, plan, offset, 1, budgetCapLocal),
+    morning: pickLandmarkForFamily(city, plan, offset, 0),
+    afternoon: pickLandmarkForFamily(city, plan, offset, 1),
     lunch: city.landmarks[(day + Math.floor(totalDays / 2) + adjustment.landmarkOffset) % city.landmarks.length],
     dinner: city.landmarks[(day + 2 + adjustment.landmarkOffset) % city.landmarks.length],
-    extra: pickLandmarkForFamily(city, plan, offset, 2, budgetCapLocal),
-    budgetLabel,
+    extra: pickLandmarkForFamily(city, plan, offset, 2),
     dayOffset: adjustment.landmarkOffset,
   };
 }
@@ -137,7 +133,7 @@ function fillSlot(
         notes: "No overpacking — room to breathe.",
       };
     case "dinner": {
-      const meal = dinnerLabel(plan, ctx.dinner.name, ctx.budgetLabel, day, adjustment);
+      const meal = dinnerLabel(plan, ctx.dinner.name, day, adjustment);
       return { time: slot.defaultTime, title: meal.title, type, notes: meal.notes };
     }
     default:

@@ -1,5 +1,7 @@
 export type TravelStyle = "relaxed" | "balanced" | "packed";
 
+export type BudgetStyle = "save" | "balanced" | "splurge";
+
 export type WalkingLimit = "low" | "medium" | "high";
 
 export type TransportationType =
@@ -28,7 +30,7 @@ export type TripPlan = {
   accommodationType: AccommodationType;
   dietaryRestrictions: string;
   napSchedule: string;
-  budgetPerDay: number;
+  budgetStyle: BudgetStyle | "";
   interests: string[];
 };
 
@@ -44,7 +46,7 @@ export const initialTripPlan: TripPlan = {
   accommodationType: "",
   dietaryRestrictions: "",
   napSchedule: "",
-  budgetPerDay: 0,
+  budgetStyle: "",
   interests: [],
 };
 

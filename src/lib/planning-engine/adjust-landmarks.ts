@@ -1,6 +1,5 @@
 import { CityConfig } from "@/config/city-pricing";
-import { familyActivityCost } from "@/lib/pricing/activity-cost";
-import { getFamilyAgeProfile } from "@/lib/schedule/family-profile";
+import { landmarksForStyle } from "@/lib/pricing/budget-style";
 import { suggestActivityTitle } from "@/lib/schedule/family-profile";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -11,24 +10,11 @@ const INDOOR = /\b(museum|gallery|indoor|science center)\b/i;
 function rankLandmarks(
   city: CityConfig,
   plan: TripPlan,
-  budgetCapLocal: number,
   filter: (name: string) => boolean,
-  sort: "cheap" | "premium" | "default",
 ) {
   const pool = city.landmarks.filter((l) => filter(l.name));
   const landmarks = pool.length > 0 ? pool : city.landmarks;
-
-  return [...landmarks]
-    .map((landmark) => ({
-      landmark,
-      cost: familyActivityCost(landmark.adultPrice, plan.adults, plan.children),
-    }))
-    .filter((r) => r.cost <= budgetCapLocal * 0.5)
-    .sort((a, b) => {
-      if (sort === "cheap") return a.landmark.adultPrice - b.landmark.adultPrice;
-      if (sort === "premium") return b.landmark.adultPrice - a.landmark.adultPrice;
-      return 0;
-    });
+  return landmarksForStyle(landmarks, (l) => l.adultPrice, plan.budgetStyle);
 }
 
 export function pickAlternateLandmark(
@@ -36,8 +22,7 @@ export function pickAlternateLandmark(
   plan: TripPlan,
   dayNumber: number,
   slotIndex: number,
-  budgetCapLocal: number,
-  mode: "default" | "outdoor" | "playground" | "cheap" | "premium",
+  mode: "default" | "outdoor" | "playground",
   excludeNames: string[] = [],
 ): CityConfig["landmarks"][0] {
   const offset = dayNumber * 3 + slotIndex + excludeNames.length + 1;
@@ -45,30 +30,18 @@ export function pickAlternateLandmark(
 
   switch (mode) {
     case "outdoor":
-      ranked = rankLandmarks(city, plan, budgetCapLocal, (n) => OUTDOOR.test(n) && !INDOOR.test(n), "default");
+      ranked = rankLandmarks(city, plan, (n) => OUTDOOR.test(n) && !INDOOR.test(n));
       break;
     case "playground":
-      ranked = rankLandmarks(
-        city,
-        plan,
-        budgetCapLocal,
-        (n) => PLAYGROUND.test(n) || OUTDOOR.test(n),
-        "default",
-      );
-      break;
-    case "cheap":
-      ranked = rankLandmarks(city, plan, budgetCapLocal, () => true, "cheap");
-      break;
-    case "premium":
-      ranked = rankLandmarks(city, plan, budgetCapLocal, () => true, "premium");
+      ranked = rankLandmarks(city, plan, (n) => PLAYGROUND.test(n) || OUTDOOR.test(n));
       break;
     default:
-      ranked = rankLandmarks(city, plan, budgetCapLocal, () => true, "default");
+      ranked = rankLandmarks(city, plan, () => true);
   }
 
-  const available = ranked.filter((r) => !excludeNames.includes(r.landmark.name));
+  const available = ranked.filter((l) => !excludeNames.includes(l.name));
   const pick = (available.length > 0 ? available : ranked)[offset % Math.max(1, (available.length || ranked.length))];
-  return pick.landmark;
+  return pick;
 }
 
 export function activityTitleForLandmark(

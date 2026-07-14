@@ -1,5 +1,4 @@
 import { detectCity } from "@/lib/city-detect";
-import { getBudgetContext } from "@/lib/pricing/budget";
 import { isGroceryActivity, isDinnerMeal } from "@/lib/schedule/meal-planning";
 import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { activityTitleForLandmark, pickAlternateLandmark } from "@/lib/planning-engine/adjust-landmarks";
@@ -80,9 +79,8 @@ function applyAddActivity(
     return { applied: false, message: "Day is too full to add another stop", activities };
   }
   const city = detectCity(plan.destination);
-  const { budgetCapLocal } = getBudgetContext(plan, city);
   const names = activities.filter((a) => a.type === "activity").map((a) => a.title);
-  const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 3, budgetCapLocal, "default", names);
+  const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 3, "default", names);
   const newAct: RawActivity = {
     time: "16:00",
     title: activityTitleForLandmark(landmark.name, plan, "afternoon"),
@@ -102,9 +100,8 @@ function applyReplaceMain(
     return { applied: false, message: "No main morning activity to replace", activities };
   }
   const city = detectCity(plan.destination);
-  const { budgetCapLocal } = getBudgetContext(plan, city);
   const current = activities[idx].title;
-  const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 0, budgetCapLocal, "default", [current]);
+  const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 0, "default", [current]);
   return {
     applied: true,
     activities: swapActivityTitle(
@@ -122,14 +119,13 @@ function applyOutdoor(
   ctx: DayAdjustContext,
 ): AdjustApplyResult {
   const city = detectCity(plan.destination);
-  const { budgetCapLocal } = getBudgetContext(plan, city);
   const indices = activityIndices(activities);
   if (indices.length === 0) {
     return { applied: false, message: "No activities to adjust", activities };
   }
   let result = cloneActivities(activities);
   indices.forEach((idx, n) => {
-    const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, n, budgetCapLocal, "outdoor", []);
+    const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, n, "outdoor", []);
     const slot = parseTimeToMinutes(result[idx].time) < 13 * 60 ? "morning" : "afternoon";
     result = swapActivityTitle(
       result,
@@ -139,53 +135,6 @@ function applyOutdoor(
     );
   });
   return { applied: true, activities: result };
-}
-
-function applySpendLess(
-  activities: RawActivity[],
-  plan: TripPlan,
-  ctx: DayAdjustContext,
-): AdjustApplyResult {
-  const city = detectCity(plan.destination);
-  const { budgetCapLocal } = getBudgetContext(plan, city);
-  const indices = activityIndices(activities);
-  let result = cloneActivities(activities);
-  indices.forEach((idx, n) => {
-    const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, n, budgetCapLocal, "cheap", []);
-    result = swapActivityTitle(
-      result,
-      idx,
-      activityTitleForLandmark(landmark.name, plan, "afternoon"),
-      "Budget-friendly swap — lower cost, same pace.",
-    );
-  });
-  return { applied: true, activities: result };
-}
-
-function applySpendMore(
-  activities: RawActivity[],
-  plan: TripPlan,
-  ctx: DayAdjustContext,
-): AdjustApplyResult {
-  if (ctx.budgetUsagePercent >= 95) {
-    return { applied: false, message: "Already near your daily budget cap", activities };
-  }
-  const city = detectCity(plan.destination);
-  const { budgetCapLocal } = getBudgetContext(plan, city);
-  const idx = findMorningActivityIndex(activities);
-  if (idx < 0) {
-    return { applied: false, message: "No activity to upgrade", activities };
-  }
-  const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 0, budgetCapLocal, "premium", []);
-  return {
-    applied: true,
-    activities: swapActivityTitle(
-      activities,
-      idx,
-      activityTitleForLandmark(landmark.name, plan, "morning"),
-      "Upgraded experience while staying within your daily budget.",
-    ),
-  };
 }
 
 function applyCookDinner(activities: RawActivity[]): AdjustApplyResult {
@@ -233,13 +182,12 @@ function applyPlayground(
   ctx: DayAdjustContext,
 ): AdjustApplyResult {
   const city = detectCity(plan.destination);
-  const { budgetCapLocal } = getBudgetContext(plan, city);
   const indices = activityIndices(activities).filter((i) => parseTimeToMinutes(activities[i].time) >= 12 * 60);
   const idx = indices[0] ?? findMorningActivityIndex(activities);
   if (idx < 0) {
     return { applied: false, message: "No activity to adjust", activities };
   }
-  const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 2, budgetCapLocal, "playground", []);
+  const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 2, "playground", []);
   return {
     applied: true,
     activities: swapActivityTitle(
@@ -260,8 +208,7 @@ function applyEveningActivity(
     return { applied: false, message: "Not enough time before dinner for another stop", activities };
   }
   const city = detectCity(plan.destination);
-  const { budgetCapLocal } = getBudgetContext(plan, city);
-  const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 4, budgetCapLocal, "default", []);
+  const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 4, "default", []);
   const newAct: RawActivity = {
     time: "17:30",
     title: `Evening: ${landmark.name}`,
@@ -289,10 +236,6 @@ export function applyAdjustAction(
       return applyReplaceMain(activities, plan, ctx);
     case "more_outdoor_time":
       return applyOutdoor(activities, plan, ctx);
-    case "spend_less_today":
-      return applySpendLess(activities, plan, ctx);
-    case "spend_more_today":
-      return applySpendMore(activities, plan, ctx);
     case "cook_dinner_tonight":
       return applyCookDinner(activities);
     case "eat_out_tonight":

@@ -5,8 +5,6 @@ export type AdjustActionId =
   | "add_activity"
   | "more_outdoor_time"
   | "replace_main_activity"
-  | "spend_less_today"
-  | "spend_more_today"
   | "cook_dinner_tonight"
   | "eat_out_tonight"
   | "less_walking"
@@ -29,8 +27,6 @@ export type DayAdjustContext = {
   hasGroceryTonight: boolean;
   isEatOutNight: boolean;
   hasKitchen: boolean;
-  budgetUsagePercent: number;
-  hasPaidActivities: boolean;
   transportationType: TripPlan["transportationType"];
   walkingLimit: TripPlan["walkingLimit"];
   daySteps: number;
@@ -53,8 +49,6 @@ export const ADJUST_ACTION_LABELS: Record<AdjustActionId, string> = {
   add_activity: "Add an activity",
   more_outdoor_time: "More outdoor time",
   replace_main_activity: "Replace main activity",
-  spend_less_today: "Spend less today",
-  spend_more_today: "Spend more today",
   cook_dinner_tonight: "Cook dinner tonight",
   eat_out_tonight: "Eat out tonight",
   less_walking: "Less walking",

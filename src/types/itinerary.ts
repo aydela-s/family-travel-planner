@@ -25,9 +25,8 @@ export type DayCostBreakdown = {
   activities: number;
   total: number;
   currency: string;
-  budgetCap: number;
-  onBudget: boolean;
-  budgetNote?: string;
+  /** Informational only — Budget Style, not a target the planner tries to hit. */
+  note?: string;
 };
 
 export type DayMetrics = {
@@ -53,10 +52,8 @@ export type ItineraryDay = {
   weekday: string;
   formattedDate: string;
   activities: ItineraryActivity[];
-  /** Family daily costs — total MUST NOT exceed budgetCap */
+  /** Informational family daily costs — food/transport/activities, no cap or target. */
   costBreakdown: DayCostBreakdown;
-  budgetUsagePercentage: number;
-  costSavingTips: string[];
   accommodationTips: string[];
   costs: DayCostBreakdown;
   metrics: DayMetrics;
@@ -71,8 +68,7 @@ export type Itinerary = {
   currency: string;
   currencySymbol: string;
   pricingDisclaimer: string;
-  familyBudgetPerDayUsd: number;
-  familyBudgetPerDayLocal: number;
+  budgetStyle: import("./trip-plan").BudgetStyle | "";
   days: ItineraryDay[];
 };
 

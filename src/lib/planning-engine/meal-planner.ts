@@ -1,4 +1,4 @@
-import { TripPlan } from "@/types/trip-plan";
+import { BudgetStyle, TripPlan } from "@/types/trip-plan";
 import { SlotKind } from "@/lib/planning-engine/types";
 import { AdjustmentContext } from "@/lib/planning-engine/day-adjustment";
 
@@ -48,6 +48,32 @@ export function breakfastLabel(plan: TripPlan, spot: string): { title: string; n
   }
 }
 
+/** Restaurant-tier copy for the default (non-kitchen, non-hosted) case — driven by Budget Style, not a dollar target. */
+function restaurantMealLabel(
+  style: BudgetStyle | "",
+  spot: string,
+  meal: "lunch" | "dinner",
+): { title: string; notes: string } {
+  const capitalized = meal === "lunch" ? "Lunch" : "Dinner";
+  switch (style) {
+    case "save":
+      return {
+        title: `Casual ${meal} near ${spot}`,
+        notes: `Takeaway or a low-key spot — keeping ${meal} simple and affordable.`,
+      };
+    case "splurge":
+      return {
+        title: `${capitalized} at a top pick near ${spot}`,
+        notes: `A standout ${meal} experience worth lingering over.`,
+      };
+    default:
+      return {
+        title: `${capitalized} in the ${spot} area`,
+        notes: `A relaxed sit-down ${meal} with a local neighborhood feel.`,
+      };
+  }
+}
+
 export function lunchLabel(plan: TripPlan, spot: string): { title: string; notes: string } {
   if (plan.accommodationType === "airbnb_with_kitchen") {
     return {
@@ -61,23 +87,19 @@ export function lunchLabel(plan: TripPlan, spot: string): { title: string; notes
       notes: "May be shared with hosts — budget extra for treats out.",
     };
   }
-  return {
-    title: `Lunch in the ${spot} area`,
-    notes: "Sit-down meal with a local neighborhood feel.",
-  };
+  return restaurantMealLabel(plan.budgetStyle, spot, "lunch");
 }
 
 export function dinnerLabel(
   plan: TripPlan,
   spot: string,
-  budgetLabel: string,
   day: number,
   adjustment?: AdjustmentContext,
 ): { title: string; notes: string } {
   if (shouldCookDinnerAtHome(plan, day, adjustment)) {
     return {
       title: "Cook dinner at your rental",
-      notes: `Grocery-based dinner — saves budget for activities (${budgetLabel}/day cap).`,
+      notes: "Grocery-based dinner — a relaxed night in, ingredients picked up on the way back.",
     };
   }
   if (plan.accommodationType === "airbnb_with_kitchen") {
@@ -92,10 +114,7 @@ export function dinnerLabel(
       notes: "Meals are likely covered — confirm plans with your hosts.",
     };
   }
-  return {
-    title: `Dinner in the ${spot} area`,
-    notes: `Balanced to use 80–100% of your ${budgetLabel}/day family budget.`,
-  };
+  return restaurantMealLabel(plan.budgetStyle, spot, "dinner");
 }
 
 export function slotActivityType(kind: SlotKind): "meal" | "activity" | "rest" | "nap" {

@@ -2,6 +2,7 @@
 
 import DayMap from "@/components/DayMap";
 import { displayLocation, formatMoney, formatTime12h, formatTimeOfDayLabel, getTimeOfDay } from "@/lib/format";
+import { getBudgetStyleLabel } from "@/lib/format-labels";
 import { Itinerary, ItineraryActivity, ItineraryDay } from "@/types/itinerary";
 
 const typeConfig: Record<
@@ -63,60 +64,18 @@ function TimelineItem({ activity, currencySymbol }: { activity: ItineraryActivit
 
 function CostBreakdown({ day, symbol }: { day: ItineraryDay; symbol: string }) {
   const c = day.costBreakdown;
-  const usage = day.budgetUsagePercentage;
-  const showTips = day.costSavingTips.length > 0;
   const showAccTips = day.accommodationTips.length > 0;
-  const isBalanced = usage >= 80 && usage <= 100;
-  const isUnderTarget = usage < 70;
-
-  const usageBadgeClass = isBalanced
-    ? "bg-emerald-100 text-emerald-800"
-    : isUnderTarget
-      ? "bg-sky-100 text-sky-800"
-      : usage >= 70
-        ? "bg-yellow-100 text-yellow-900"
-        : "bg-amber-100 text-amber-900";
-
-  const barClass = isBalanced
-    ? "bg-emerald-500"
-    : isUnderTarget
-      ? "bg-sky-400"
-      : usage >= 70
-        ? "bg-yellow-400"
-        : "bg-amber-500";
 
   return (
     <div className="mt-6 space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">
-            Family cost breakdown
+            Estimated daily cost
           </h4>
-          <span className={`rounded-full px-3 py-1 text-xs font-bold ${usageBadgeClass}`}>
-            {usage}% budget used
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">
+            for your whole family
           </span>
-        </div>
-
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
-          <div
-            className={`h-full rounded-full transition-all ${barClass}`}
-            style={{ width: `${Math.min(100, usage)}%` }}
-          />
-        </div>
-
-        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-          <div className="rounded-xl bg-white px-3 py-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Daily cap</p>
-            <p className="font-bold text-slate-900">{formatMoney(c.budgetCap, c.currency, symbol)}</p>
-          </div>
-          <div className="rounded-xl bg-white px-3 py-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Estimated cost</p>
-            <p className="font-bold text-sky-700">{formatMoney(c.total, c.currency, symbol)}</p>
-          </div>
-          <div className="rounded-xl bg-white px-3 py-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Utilization</p>
-            <p className="font-bold text-slate-900">{usage}%</p>
-          </div>
         </div>
 
         <dl className="mt-3 space-y-2 text-sm">
@@ -138,9 +97,9 @@ function CostBreakdown({ day, symbol }: { day: ItineraryDay; symbol: string }) {
           </div>
         </dl>
 
-        {c.budgetNote && (
+        {c.note && (
           <p className="mt-3 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs leading-relaxed text-sky-800">
-            {c.budgetNote}
+            {c.note}
           </p>
         )}
         {day.metrics.transportLabel && (
@@ -155,20 +114,6 @@ function CostBreakdown({ day, symbol }: { day: ItineraryDay; symbol: string }) {
           <h4 className="text-sm font-bold text-sky-900">🏠 Stay & meal tips</h4>
           <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-sky-900/90">
             {day.accommodationTips.map((tip) => (
-              <li key={tip} className="flex gap-2">
-                <span aria-hidden>•</span>
-                <span>{tip}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {showTips && (
-        <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-4 sm:p-5">
-          <h4 className="text-sm font-bold text-amber-900">💡 Budget-saving tips</h4>
-          <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-amber-900/90">
-            {day.costSavingTips.map((tip) => (
               <li key={tip} className="flex gap-2">
                 <span aria-hidden>•</span>
                 <span>{tip}</span>
@@ -248,8 +193,7 @@ export default function ItineraryDisplay({
           </h2>
           <p className="mt-1 text-slate-600">
             {itinerary.days.length} day{itinerary.days.length !== 1 ? "s" : ""} ·{" "}
-            {formatMoney(itinerary.familyBudgetPerDayLocal, itinerary.currency, symbol)}/day family
-            cap
+            {getBudgetStyleLabel(itinerary.budgetStyle)} trip
           </p>
         </div>
 

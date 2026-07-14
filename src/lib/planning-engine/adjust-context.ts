@@ -47,8 +47,6 @@ export function buildDayAdjustContext(plan: TripPlan, day: ItineraryDay): DayAdj
       !hasCookDinnerAtHome(rawLike) &&
       /\b(dinner out|dinner in|restaurant)\b/i.test(`${dinner.title} ${dinner.notes ?? ""}`),
     hasKitchen: plan.accommodationType === "airbnb_with_kitchen",
-    budgetUsagePercent: day.budgetUsagePercentage ?? 0,
-    hasPaidActivities: activities.some((a) => (a.activityCost ?? 0) > 0),
     transportationType: plan.transportationType,
     walkingLimit: plan.walkingLimit,
     daySteps: day.metrics?.steps ?? 0,

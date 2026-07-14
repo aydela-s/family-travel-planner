@@ -29,7 +29,7 @@ const BASE_PLAN: Omit<TripPlan, "travelStyle" | "children"> = {
   accommodationType: "hotel_breakfast_included",
   dietaryRestrictions: "",
   napSchedule: "",
-  budgetPerDay: 150,
+  budgetStyle: "balanced",
   interests: [],
 };
 

@@ -1,4 +1,4 @@
-import { AccommodationType, TransportationType } from "@/types/trip-plan";
+import { AccommodationType, BudgetStyle, TransportationType } from "@/types/trip-plan";
 
 /**
  * Single source of truth for user-facing labels of these enums.
@@ -27,4 +27,16 @@ export const ACCOMMODATION_LABELS: Record<AccommodationType, string> = {
 
 export function getAccommodationLabel(type: AccommodationType | ""): string {
   return ACCOMMODATION_LABELS[type] ?? "Not specified";
+}
+
+export const BUDGET_STYLE_LABELS: Record<BudgetStyle, { emoji: string; label: string }> = {
+  save: { emoji: "💰", label: "Save Money" },
+  balanced: { emoji: "⚖️", label: "Balanced" },
+  splurge: { emoji: "✨", label: "Treat Ourselves" },
+};
+
+export function getBudgetStyleLabel(style: BudgetStyle | ""): string {
+  if (!style) return "—";
+  const meta = BUDGET_STYLE_LABELS[style];
+  return `${meta.emoji} ${meta.label}`;
 }

@@ -130,7 +130,6 @@ export function estimateAccommodationFoodCosts(
   activities: ItineraryActivity[],
   city: CityConfig,
   plan: TripPlan,
-  foodCap: number,
   mealTierFn: (activity: ItineraryActivity) => number,
 ): number {
   const mealUnits = familyMealUnits(plan);
@@ -143,7 +142,7 @@ export function estimateAccommodationFoodCosts(
     const tier = mealTierFn(a);
     total += base * accommodationMealMultiplier(plan.accommodationType, hour, tier) * mealUnits;
   }
-  return Math.min(total, foodCap);
+  return total;
 }
 
 export function accommodationPlanningTips(plan: TripPlan): string[] {
