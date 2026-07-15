@@ -6,8 +6,8 @@ test('test', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Start typing a city...' }).click();
   await page.getByRole('textbox', { name: 'Start typing a city...' }).fill('Dallas');
   await page.getByRole('button', { name: 'Sounds good →' }).click();
-  await page.getByRole('textbox', { name: 'Heading out' }).fill('2026-07-26');
-  await page.getByRole('textbox', { name: 'Coming home' }).fill('2026-07-29');
+  await page.getByRole('textbox', { name: 'Trip start' }).fill('2026-07-26');
+  await page.getByRole('textbox', { name: 'Trip end' }).fill('2026-07-29');
   await page.getByRole('button', { name: 'Sounds good →' }).click();
   await page.getByRole('button', { name: 'Decrease Adults' }).click();
   await page.getByRole('button', { name: 'Increase Kids' }).click();
