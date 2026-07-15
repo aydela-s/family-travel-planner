@@ -7,13 +7,18 @@ import {
   formatTripDate,
   getTimeOfDay,
 } from "@/lib/format";
-import { getDirections, estimateDailyTransport, formatTransportDisplay } from "@/lib/maps/directions";
+import { estimateDailyTransport, formatTransportDisplay } from "@/lib/maps/directions";
+import { buildRouteSegments } from "@/lib/maps/route-segments";
 import { buildStaticMapUrl } from "@/lib/maps/static-map";
 import { normalizeRawItinerary } from "@/lib/itinerary";
 import { pickLandmarkForFamily } from "@/lib/schedule/family-profile";
 import { isGroceryActivity } from "@/lib/schedule/meal-planning";
 import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
-import { finalizeEnrichedDay, prepareItineraryForEnrich, scheduleEnrichedActivities, validateEnrichedDay } from "@/lib/schedule/fix-itinerary";
+import {
+  prepareItineraryForEnrich,
+  rescheduleEnrichedActivities,
+  validateEnrichedDay,
+} from "@/lib/schedule/fix-itinerary";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
 import { maybeAddAccommodationGroceryStop, summarizeDailyCost, type DaySpendSummary } from "@/lib/pricing/budget";
 import { familyActivityCost } from "@/lib/pricing/activity-cost";
@@ -25,7 +30,6 @@ import {
   ItineraryActivity,
   ItineraryDay,
   RawItinerary,
-  RouteSegment,
 } from "@/types/itinerary";
 
 function pickLandmarkForActivity(
@@ -64,6 +68,14 @@ function buildCostBreakdown(summary: DaySpendSummary, currency: string): DayCost
     currency,
     note: summary.note,
   };
+}
+
+function applyGroceryLocations(activities: ItineraryActivity[], city: CityConfig): ItineraryActivity[] {
+  return activities.map((activity, i) =>
+    isGroceryActivity(activity)
+      ? { ...activity, location: groceryLocationNearRoute(activities, i, city) }
+      : activity,
+  );
 }
 
 async function enrichDay(
@@ -105,41 +117,14 @@ async function enrichDay(
     return act;
   });
 
-  for (let i = 0; i < activities.length; i++) {
-    if (isGroceryActivity(activities[i])) {
-      activities[i] = {
-        ...activities[i],
-        location: groceryLocationNearRoute(activities, i, city),
-      };
-    }
-  }
+  const withGroceryStop = maybeAddAccommodationGroceryStop(activities, plan, city);
+  const located = applyGroceryLocations(withGroceryStop, city);
 
-  const locActivities = activities.filter((a) => a.location);
-  const routeSegments: RouteSegment[] = [];
-  let totalKm = 0;
-  const segmentCosts: number[] = [];
-
-  for (let i = 0; i < locActivities.length - 1; i++) {
-    const from = locActivities[i].location!;
-    const to = locActivities[i + 1].location!;
-    const dir = await getDirections(
-      city,
-      from,
-      to,
-      plan.transportationType,
-      i % city.taxiProviders.length,
-    );
-    totalKm += dir.distanceKm;
-    segmentCosts.push(plan.transportationType === "taxis" ? dir.cost : 0);
-    routeSegments.push({
-      from: from.name,
-      to: to.name,
-      distanceKm: dir.distanceKm,
-      durationMin: dir.durationMin,
-      cost: dir.cost,
-      provider: dir.provider || undefined,
-    });
-  }
+  const { routeSegments, totalKm, segmentCosts, segmentDurations } = await buildRouteSegments(
+    located,
+    city,
+    plan,
+  );
 
   const transportEstimate = estimateDailyTransport(
     plan.transportationType,
@@ -151,13 +136,9 @@ async function enrichDay(
 
   const lockedDailyTransport = transportEstimate.cost;
 
-  const withGroceryStop = maybeAddAccommodationGroceryStop(activities, plan, city);
-  const segmentDurations = routeSegments.map((s) => s.durationMin);
-  const scheduledActivities = scheduleEnrichedActivities(
-    withGroceryStop.map(normalizeActivity),
-    plan,
-    segmentDurations,
-  ).map(normalizeActivity);
+  const scheduledActivities = rescheduleEnrichedActivities(located, plan, segmentDurations).map(
+    normalizeActivity,
+  );
 
   const summary = summarizeDailyCost(scheduledActivities, lockedDailyTransport, city, plan);
   const costBreakdown = buildCostBreakdown(summary, city.currency);
@@ -192,7 +173,7 @@ async function enrichDay(
     mapUrl: buildStaticMapUrl(mapLocations),
   };
 
-  return finalizeEnrichedDay(dayResult, plan);
+  return dayResult;
 }
 
 export type EnrichOptions = {
@@ -206,7 +187,11 @@ function validateBeforeDisplay(days: ItineraryDay[], plan: TripPlan): ItineraryD
   return days.map((day) => {
     const issues = validateEnrichedDay(day, plan);
     if (issues.length === 0) return day;
-    return finalizeEnrichedDay(day, plan);
+    const segmentDurations = day.routeSegments.map((s) => s.durationMin);
+    return {
+      ...day,
+      activities: rescheduleEnrichedActivities(day.activities, plan, segmentDurations),
+    };
   });
 }
 

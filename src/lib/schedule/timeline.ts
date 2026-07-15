@@ -88,7 +88,10 @@ export function rescheduleActivities<T extends Schedulable>(
     if (i > 0) {
       const travel = travelAfterEach[i - 1] ?? defaultTravelMin(plan);
       cursor += travel;
-    } else if (parseTimeToMinutes(item.time) > cursor) {
+    } else if (startCursor === undefined && parseTimeToMinutes(item.time) > cursor) {
+      // Honor skeleton spacing only for the first scheduling pass (morning).
+      // When chaining after nap/lunch, keep items back-to-back instead of
+      // jumping to skeleton times and leaving multi-hour gaps.
       cursor = parseTimeToMinutes(item.time);
     }
 

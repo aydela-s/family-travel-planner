@@ -11,6 +11,7 @@ import {
   rescheduleActivitiesWithMealAnchors,
   validateMealPlan,
 } from "@/lib/schedule/meal-planning";
+import { validateDaySchedule } from "@/lib/schedule/schedule-invariants";
 import {
   applyNapTiming,
   getNapWindow,
@@ -65,6 +66,12 @@ function processRawActivities(
   let scheduled = rescheduleActivitiesWithMealAnchors(fixed, plan);
   scheduled = anchorDinnerTimes(scheduled, plan);
 
+  for (const v of validateDaySchedule(scheduled, plan)) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`[schedule] ${v.code}: ${v.message}`);
+    }
+  }
+
   return scheduled.map(({ endTime: _e, ...rest }) => rest);
 }
 
@@ -103,7 +110,7 @@ export function fixRawItinerary(
   };
 }
 
-function travelGapsFromSegments(
+export function travelGapsFromSegments(
   activities: ItineraryActivity[],
   segmentDurations: number[],
   plan: TripPlan,
@@ -125,26 +132,53 @@ function travelGapsFromSegments(
   return gaps;
 }
 
-function processEnrichedActivities(
+function mergeEnrichedSchedule(
+  scheduled: Array<RawActivity & { endTime?: string }>,
+  enriched: ItineraryActivity[],
+): ItineraryActivity[] {
+  const pool = [...enriched];
+  return scheduled.map((a) => {
+    const idx = pool.findIndex((e) => e.title === a.title && e.type === a.type);
+    const base = idx >= 0 ? pool.splice(idx, 1)[0] : ({} as ItineraryActivity);
+    return {
+      ...base,
+      time: a.time,
+      title: a.title,
+      type: a.type,
+      notes: a.notes,
+      endTime: a.endTime,
+      timeOfDay: getTimeOfDay(a.time) as TimeOfDay,
+    };
+  });
+}
+
+/** Re-time an enriched day using real segment durations — does not re-run raw meal/nap fixes. */
+export function rescheduleEnrichedActivities(
   activities: ItineraryActivity[],
   plan: TripPlan,
   segmentDurations: number[] = [],
 ): ItineraryActivity[] {
   const raw = activities.map(({ time, title, type, notes }) => ({ time, title, type, notes }));
-  let fixed = processRawActivities(raw, plan);
-  const travelGaps = travelGapsFromSegments(
-    fixed as ItineraryActivity[],
-    segmentDurations,
-    plan,
-  );
-  fixed = rescheduleActivitiesWithMealAnchors(fixed, plan, travelGaps);
-  fixed = anchorDinnerTimes(fixed, plan);
+  const travelGaps = travelGapsFromSegments(activities, segmentDurations, plan);
 
-  return fixed.map((a) => ({
-    ...(activities.find((o) => o.title === a.title && o.type === a.type) ?? {}),
-    ...a,
-    timeOfDay: getTimeOfDay(a.time) as TimeOfDay,
-  })) as ItineraryActivity[];
+  let scheduled = rescheduleActivitiesWithMealAnchors(raw, plan, travelGaps);
+  scheduled = anchorDinnerTimes(scheduled, plan);
+
+  for (const v of validateDaySchedule(scheduled, plan)) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`[schedule:enrich] ${v.code}: ${v.message}`);
+    }
+  }
+
+  return mergeEnrichedSchedule(scheduled, activities);
+}
+
+function processEnrichedActivities(
+  activities: ItineraryActivity[],
+  plan: TripPlan,
+  segmentDurations: number[] = [],
+): ItineraryActivity[] {
+  return rescheduleEnrichedActivities(activities, plan, segmentDurations);
 }
 
 export function scheduleEnrichedActivities(
@@ -228,9 +262,17 @@ export function prepareItineraryForEnrich(
 }
 
 export function finalizeEnrichedDay(day: ItineraryDay, plan: TripPlan): ItineraryDay {
+  const issues = validateEnrichedDay(day, plan);
+  const scheduleIssues = validateDaySchedule(day.activities, plan);
+  if (issues.length === 0 && scheduleIssues.length === 0) {
+    return day;
+  }
+
   const segmentDurations = day.routeSegments.map((s) => s.durationMin);
-  const rescheduled = scheduleEnrichedActivities(day.activities, plan, segmentDurations);
-  return { ...day, activities: rescheduled };
+  return {
+    ...day,
+    activities: rescheduleEnrichedActivities(day.activities, plan, segmentDurations),
+  };
 }
 
 export function mergeAdjustedEnrichedDay(

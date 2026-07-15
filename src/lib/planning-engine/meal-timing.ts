@@ -35,6 +35,14 @@ export function lunchDefaultTime(plan: TripPlan): string {
   return minutesToTime(lunchTimeWindow(plan).defaultMin);
 }
 
+/** Earliest valid lunch start at or after cursor + travel, within the age window. */
+export function clampLunchStart(cursorAfterTravel: number, plan: TripPlan): number {
+  const { minMin, maxMin } = lunchTimeWindow(plan);
+  const preferred = Math.max(cursorAfterTravel, minMin);
+  if (preferred <= maxMin) return preferred;
+  return cursorAfterTravel;
+}
+
 /**
  * P1 dinner windows:
  * - oldest ≤ 7 → 17:00–19:00

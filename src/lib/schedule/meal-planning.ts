@@ -1,4 +1,7 @@
-import { clampToDinnerWindow, dinnerTimeWindow } from "@/lib/planning-engine/meal-timing";
+import {
+  dinnerTimeWindow,
+  lunchTimeWindow,
+} from "@/lib/planning-engine/meal-timing";
 import { TripPlan } from "@/types/trip-plan";
 import { ActivityType } from "@/types/itinerary";
 import { getNapWindow, napDurationMin, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
@@ -9,7 +12,6 @@ import {
   itemDurationMin,
   minutesToTime,
   parseTimeToMinutes,
-  rescheduleActivities,
 } from "@/lib/schedule/timeline";
 
 type RawActivity = {
@@ -41,8 +43,16 @@ export function isDinnerMeal(a: RawActivity): boolean {
 
 export function isLunchMeal(a: RawActivity): boolean {
   if (a.type !== "meal") return false;
+  if (isDinnerMeal(a)) return false;
   const hour = parseTimeToMinutes(a.time);
   return hour >= 11 * 60 && hour < 16 * 60;
+}
+
+/** Lunch slot in the day skeleton — not breakfast or dinner. */
+export function isDaytimeMeal(a: RawActivity): boolean {
+  if (a.type !== "meal" || isDinnerMeal(a)) return false;
+  const t = `${a.title} ${a.notes ?? ""}`.toLowerCase();
+  return !t.includes("breakfast");
 }
 
 export function hasCookDinnerAtHome(activities: RawActivity[]): boolean {
@@ -100,23 +110,25 @@ export function resolveGroceryMealConflicts(activities: RawActivity[], plan: Tri
   return result;
 }
 
-/** Anchor family dinner to age-conditional windows (oldest ≤7 / youngest ≥7). */
+/** Forward-only safety net — never move dinner earlier than already scheduled. */
 export function anchorDinnerTimes<T extends RawActivity & { endTime?: string }>(
   activities: T[],
   plan: TripPlan,
 ): T[] {
-  const { minMin, maxMin, defaultMin } = dinnerTimeWindow(plan);
+  const { minMin, maxMin } = dinnerTimeWindow(plan);
+  const dinnerDuration = defaultDurationMin("meal", plan);
+  const latestStart = maxMin - dinnerDuration;
 
   return activities.map((a) => {
     if (!isDinnerMeal(a)) return a;
     const start = parseTimeToMinutes(a.time);
-    if (start >= minMin && start <= maxMin) return a;
+    if (start >= minMin && start <= latestStart) return a;
 
-    const anchored = clampToDinnerWindow(defaultMin, plan);
+    const anchored = start < minMin ? minMin : latestStart;
     return {
       ...a,
       time: minutesToTime(anchored),
-      endTime: minutesToTime(anchored + 60),
+      endTime: minutesToTime(anchored + dinnerDuration),
     };
   });
 }
@@ -160,70 +172,169 @@ export function validateMealPlan(activities: RawActivity[], plan: TripPlan): str
   return issues;
 }
 
-/** Schedule day items, anchor nap to user window, grocery + dinner to evening */
-export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { endTime?: string }>(
-  activities: T[],
+function isOptionalEveningSlot(a: RawActivity): boolean {
+  return (
+    /\bevening stroll\b/i.test(a.title) ||
+    (a.type === "rest" && /stroll|evening/i.test(a.title))
+  );
+}
+
+function dinnerStartFromCursor(
+  cursor: number,
   plan: TripPlan,
-  travelAfterEach: number[] = [],
-): (T & { endTime: string })[] {
-  const withoutReturnHome = activities.filter(
-    (a) => !RETURN_HOME.test(a.title) && !/\breturn to your rental\b/i.test(a.title),
-  );
-
-  const dinnerItems = withoutReturnHome.filter(isDinnerMeal);
-  const napItems = withoutReturnHome.filter((a) => a.type === "nap");
-  const groceryItems = withoutReturnHome.filter(isGroceryActivity);
-  const coreItems = withoutReturnHome.filter(
-    (a) => !isDinnerMeal(a) && a.type !== "nap" && !isGroceryActivity(a),
-  );
-
-  const napWindow = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
-  const napStart = napWindow?.startMin ?? 13 * 60;
-  const napEnd = napWindow?.endMin ?? 15 * 60;
-
-  const beforeNap = coreItems.filter((a) => parseTimeToMinutes(a.time) < napStart);
-  const afterNap = coreItems.filter((a) => parseTimeToMinutes(a.time) >= napEnd);
-
-  const morning = rescheduleActivities(beforeNap, plan, travelAfterEach.slice(0, Math.max(0, beforeNap.length - 1)));
-  const result: (T & { endTime: string })[] = [...morning];
-
-  let cursor =
-    morning.length > 0
-      ? parseTimeToMinutes(morning[morning.length - 1].endTime!)
-      : 8 * 60;
-
-  if (napItems.length > 0 && napWindow) {
-    // Slide the nap start to the later of the preferred window or when morning
-    // activities actually finish — prevents overlap when shopping/picnic run long.
-    const napDur = napDurationMin(plan);
-    const actualNapStart = Math.min(
-      Math.max(napWindow.startMin, cursor),
-      napWindow.startMin + 30,
-    );
-    result.push({
-      ...napItems[0],
-      time: minutesToTime(actualNapStart),
-      endTime: minutesToTime(actualNapStart + napDur),
-    });
-    cursor = actualNapStart + napDur + defaultTravelMin(plan);
-  }
-
-  if (afterNap.length > 0) {
-    const afternoon = rescheduleActivities(afterNap, plan, [], cursor);
-    result.push(...afternoon);
-    cursor = parseTimeToMinutes(afternoon[afternoon.length - 1].endTime!) + defaultTravelMin(plan);
-  }
-
-  const { minMin, maxMin } = dinnerTimeWindow(plan);
-  const dinnerDuration = defaultDurationMin("meal", plan);
+  hasGrocery: boolean,
+  minMin: number,
+): number {
   let dinnerStart = Math.max(minMin, cursor);
 
-  if (groceryItems.length > 0) {
+  if (hasGrocery) {
     const travel = defaultTravelMin(plan);
     let groceryStart = cursor + travel;
     const latestGroceryStart = minMin - GROCERY_DURATION_MIN - travel;
     if (groceryStart > latestGroceryStart) {
       groceryStart = Math.max(cursor + travel, latestGroceryStart);
+    }
+    dinnerStart = Math.max(minMin, groceryStart + GROCERY_DURATION_MIN + travel);
+  }
+
+  return dinnerStart;
+}
+
+function scheduleOne<T extends RawActivity>(
+  item: T,
+  start: number,
+  plan: TripPlan,
+): T & { endTime: string } {
+  const duration = itemDurationMin(item, plan);
+  return {
+    ...item,
+    time: minutesToTime(start),
+    endTime: minutesToTime(start + duration),
+  };
+}
+
+/**
+ * Linear day scheduler — walks activities in list order (no nap-bucket drops).
+ * Dinner and grocery are anchored to the evening; optional evening stroll may be skipped.
+ */
+export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { endTime?: string }>(
+  activities: T[],
+  plan: TripPlan,
+  travelAfterEach: number[] = [],
+): (T & { endTime: string })[] {
+  const ordered = activities.filter(
+    (a) => !RETURN_HOME.test(a.title) && !/\breturn to your rental\b/i.test(a.title),
+  );
+
+  const dinnerItems = ordered.filter(isDinnerMeal);
+  const groceryItems = ordered.filter(isGroceryActivity);
+  const daySequence = ordered.filter((a) => !isDinnerMeal(a) && !isGroceryActivity(a));
+
+  const required = daySequence.filter((a) => !isOptionalEveningSlot(a));
+  const optional = daySequence.filter(isOptionalEveningSlot);
+
+  const napWindow = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
+  const { minMin: dinnerMin, maxMin: dinnerMax } = dinnerTimeWindow(plan);
+  const dinnerDuration = defaultDurationMin("meal", plan);
+  const latestDinnerStart = dinnerMax - dinnerDuration;
+  const hasGrocery = groceryItems.length > 0;
+
+  const result: (T & { endTime: string })[] = [];
+  let cursor = 8 * 60;
+  let travelIdx = 0;
+
+  const nextTravel = () => travelAfterEach[travelIdx++] ?? defaultTravelMin(plan);
+
+  for (let i = 0; i < required.length; i++) {
+    const item = required[i];
+    const travel = result.length > 0 ? nextTravel() : 0;
+    const lunchIdx = required.findIndex((a, j) => j > i && isDaytimeMeal(a));
+    let start: number;
+
+    if (item.type === "nap" && napWindow) {
+      start = Math.min(
+        Math.max(napWindow.startMin, cursor + travel),
+        napWindow.startMin + 30,
+      );
+    } else if (isDaytimeMeal(item)) {
+      const { maxMin: lunchMax, minMin } = lunchTimeWindow(plan);
+      const natural = cursor + travel;
+      start = Math.min(Math.max(natural, minMin), lunchMax);
+      if (start < natural) {
+        start = natural;
+      }
+    } else if (result.length === 0) {
+      start = Math.max(cursor, parseTimeToMinutes(item.time));
+    } else {
+      start = cursor + travel;
+    }
+
+    let duration = itemDurationMin(item, plan);
+    if (lunchIdx > i) {
+      const { maxMin: lunchMax } = lunchTimeWindow(plan);
+      const gap = defaultTravelMin(plan);
+      let budget = lunchMax - gap;
+      for (let k = lunchIdx - 1; k > i; k--) {
+        budget -= gap + 20;
+      }
+      const maxEnd = budget;
+      if (start >= maxEnd) {
+        start = Math.max(cursor + (result.length > 0 ? gap : 0), maxEnd - 20);
+      }
+      duration = Math.min(duration, Math.max(20, maxEnd - start));
+    }
+
+    const scheduled = {
+      ...item,
+      time: minutesToTime(start),
+      endTime: minutesToTime(start + duration),
+    };
+    result.push(scheduled);
+    cursor = parseTimeToMinutes(scheduled.endTime);
+  }
+
+  for (const item of optional) {
+    const travel = nextTravel();
+    const trial = scheduleOne(item, cursor + travel, plan);
+    const trialEnd = parseTimeToMinutes(trial.endTime);
+    const trialDinner = dinnerStartFromCursor(
+      trialEnd + defaultTravelMin(plan),
+      plan,
+      hasGrocery,
+      dinnerMin,
+    );
+    if (trialDinner <= latestDinnerStart) {
+      result.push(trial);
+      cursor = trialEnd;
+    }
+  }
+
+  const eveningTravel = result.length > 0 ? defaultTravelMin(plan) : 0;
+  let endCursor = cursor + eveningTravel;
+
+  const groceryLead = hasGrocery
+    ? GROCERY_DURATION_MIN + defaultTravelMin(plan) * 2
+    : defaultTravelMin(plan);
+  const latestItemEnd = latestDinnerStart - groceryLead;
+
+  if (endCursor > latestItemEnd && result.length > 0) {
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    const minDuration = last.type === "activity" ? 45 : 20;
+    const shortenedEnd = Math.max(parseTimeToMinutes(last.time) + minDuration, latestItemEnd);
+    if (shortenedEnd < parseTimeToMinutes(last.endTime)) {
+      result[lastIdx] = { ...last, endTime: minutesToTime(shortenedEnd) };
+      cursor = shortenedEnd;
+      endCursor = shortenedEnd + eveningTravel;
+    }
+  }
+
+  if (hasGrocery) {
+    const travel = defaultTravelMin(plan);
+    let groceryStart = endCursor + travel;
+    const latestGroceryStart = dinnerMin - GROCERY_DURATION_MIN - travel;
+    if (groceryStart > latestGroceryStart) {
+      groceryStart = Math.max(endCursor + travel, latestGroceryStart);
     }
 
     result.push({
@@ -231,15 +342,24 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       time: minutesToTime(groceryStart),
       endTime: minutesToTime(groceryStart + GROCERY_DURATION_MIN),
     });
-    dinnerStart = Math.max(minMin, groceryStart + GROCERY_DURATION_MIN + travel);
+    endCursor = groceryStart + GROCERY_DURATION_MIN + travel;
   }
 
-  dinnerStart = Math.min(Math.max(dinnerStart, minMin), maxMin - dinnerDuration);
+  let dinnerStart = Math.max(dinnerMin, endCursor);
+  let dinnerEnd = dinnerStart + dinnerDuration;
+  if (dinnerEnd > dinnerMax) {
+    dinnerEnd = dinnerMax;
+    dinnerStart = Math.max(dinnerMin, dinnerEnd - dinnerDuration);
+  }
+  if (dinnerStart < endCursor) {
+    dinnerStart = endCursor;
+    dinnerEnd = Math.min(dinnerStart + dinnerDuration, dinnerMax);
+  }
 
   const anchoredDinners = dinnerItems.map((d) => ({
     ...d,
     time: minutesToTime(dinnerStart),
-    endTime: minutesToTime(dinnerStart + defaultDurationMin("meal", plan)),
+    endTime: minutesToTime(dinnerEnd),
   }));
 
   return [...result, ...anchoredDinners];

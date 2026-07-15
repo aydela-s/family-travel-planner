@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampLunchStart,
   dinnerDefaultTime,
   dinnerTimeWindow,
   groceryLocationNearRoute,
@@ -44,6 +45,18 @@ describe("meal timing business rules", () => {
 
     it("uses the older-kid lunch window for adults only", () => {
       expect(lunchDefaultTime(plan([]))).toBe("12:30");
+    });
+
+    it("never schedules lunch before the cursor", () => {
+      expect(clampLunchStart(13 * 60, plan([4]))).toBe(13 * 60);
+    });
+
+    it("pulls lunch into the window when cursor allows", () => {
+      expect(clampLunchStart(11 * 60, plan([4]))).toBe(11 * 60 + 30);
+    });
+
+    it("keeps a late cursor when the window has already passed", () => {
+      expect(clampLunchStart(13 * 60, plan([4]))).toBe(13 * 60);
     });
   });
 
