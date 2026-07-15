@@ -24,7 +24,7 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
 
       <div>
         <p className={labelClassName}>Trip dates</p>
-        <div className="mt-2 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
+        <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
             <label htmlFor="tripStartDate" className="text-xs font-medium text-slate-500">
               From
