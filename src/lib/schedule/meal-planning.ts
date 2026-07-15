@@ -1,7 +1,9 @@
+import { isOptionalActivity } from "@/lib/planning-engine/day-intent";
 import {
   dinnerTimeWindow,
   lunchTimeWindow,
 } from "@/lib/planning-engine/meal-timing";
+import { SlotKind } from "@/lib/planning-engine/types";
 import { TripPlan } from "@/types/trip-plan";
 import { ActivityType } from "@/types/itinerary";
 import { getNapWindow, napDurationMin, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
@@ -19,6 +21,7 @@ type RawActivity = {
   title: string;
   type: ActivityType;
   notes?: string;
+  slotKind?: SlotKind;
 };
 
 const GROCERY = /\bgrocery\b/i;
@@ -85,6 +88,7 @@ export function resolveGroceryMealConflicts(activities: RawActivity[], plan: Tri
         title: "Grocery stop for dinner ingredients",
         type: "activity",
         notes: "Pick up ingredients before heading back to cook dinner.",
+        slotKind: "grocery",
       });
     }
   } else {
@@ -172,13 +176,6 @@ export function validateMealPlan(activities: RawActivity[], plan: TripPlan): str
   return issues;
 }
 
-function isOptionalEveningSlot(a: RawActivity): boolean {
-  return (
-    /\bevening stroll\b/i.test(a.title) ||
-    (a.type === "rest" && /stroll|evening/i.test(a.title))
-  );
-}
-
 function dinnerStartFromCursor(
   cursor: number,
   plan: TripPlan,
@@ -215,7 +212,7 @@ function scheduleOne<T extends RawActivity>(
 
 /**
  * Linear day scheduler — walks activities in list order (no nap-bucket drops).
- * Dinner and grocery are anchored to the evening; optional evening stroll may be skipped.
+ * Dinner and grocery are anchored to the evening; optional intents may be skipped.
  */
 export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { endTime?: string }>(
   activities: T[],
@@ -230,8 +227,8 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
   const groceryItems = ordered.filter(isGroceryActivity);
   const daySequence = ordered.filter((a) => !isDinnerMeal(a) && !isGroceryActivity(a));
 
-  const required = daySequence.filter((a) => !isOptionalEveningSlot(a));
-  const optional = daySequence.filter(isOptionalEveningSlot);
+  const required = daySequence.filter((a) => !isOptionalActivity(a));
+  const optional = daySequence.filter(isOptionalActivity);
 
   const napWindow = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
   const { minMin: dinnerMin, maxMin: dinnerMax } = dinnerTimeWindow(plan);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planTrip } from "@/lib/planning-engine";
+import { buildDayIntents } from "@/lib/planning-engine/skeleton-builder";
 import { TravelStyle, TripPlan } from "@/types/trip-plan";
 
 /**
@@ -42,11 +42,17 @@ const FAMILY_PROFILES: FamilyProfile[] = [
   { name: "older kids (10, 16)", children: [10, 16] },
 ];
 
-/** Number of day-1 activity slots (the same "Activity" cards shown in the UI). */
+const ACTIVITY_INTENT_KINDS = new Set([
+  "morning_activity",
+  "afternoon_activity",
+  "extra_activity",
+]);
+
+/** Activity intents in the day skeleton — structure before optional drops at schedule time. */
 function activityCount(children: number[], travelStyle: TravelStyle): number {
   const plan: TripPlan = { ...BASE_PLAN, children, travelStyle };
-  const { raw } = planTrip(plan);
-  return raw.days[0].activities.filter((a) => a.type === "activity").length;
+  const intents = buildDayIntents(plan, 1, 4);
+  return intents.filter((i) => ACTIVITY_INTENT_KINDS.has(i.kind)).length;
 }
 
 describe("travel style intensity — activity slot counts (FAM-5)", () => {

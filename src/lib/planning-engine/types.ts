@@ -31,16 +31,24 @@ export type SlotKind =
   | "evening_rest"
   | "dinner";
 
-export type SkeletonSlot = {
+export type SlotPriority = "core" | "optional";
+
+/** Ordered day intent — skeleton slot with explicit drop priority. */
+export type DayIntent = {
   kind: SlotKind;
   defaultTime: string;
+  priority: SlotPriority;
 };
+
+/** @deprecated Use DayIntent — kept for call-site compatibility. */
+export type SkeletonSlot = DayIntent;
 
 export type RawActivity = {
   time: string;
   title: string;
   type: ActivityType;
   notes?: string;
+  slotKind?: SlotKind;
 };
 
 export type DayLandmarkContext = {

@@ -81,6 +81,7 @@ export type RawItinerary = {
       title: string;
       type: ActivityType;
       notes?: string;
+      slotKind?: import("@/lib/planning-engine/types").SlotKind;
     }[];
   }[];
 };

@@ -16,7 +16,7 @@ import {
   lunchLabel,
   slotActivityType,
 } from "@/lib/planning-engine/meal-planner";
-import { DayLandmarkContext, RawActivity, SkeletonSlot } from "@/lib/planning-engine/types";
+import { DayLandmarkContext, RawActivity, DayIntent } from "@/lib/planning-engine/types";
 import { TripPlan } from "@/types/trip-plan";
 
 export function buildLandmarkContext(
@@ -40,7 +40,7 @@ export function buildLandmarkContext(
 }
 
 function fillSlot(
-  slot: SkeletonSlot,
+  slot: DayIntent,
   plan: TripPlan,
   ctx: DayLandmarkContext,
   day: number,
@@ -49,30 +49,34 @@ function fillSlot(
 ): RawActivity {
   const type = slotActivityType(slot.kind);
   const intensity = getIntensityConfig(plan);
+  const tagged = (activity: Omit<RawActivity, "slotKind">): RawActivity => ({
+    ...activity,
+    slotKind: slot.kind,
+  });
 
   switch (slot.kind) {
     case "breakfast": {
       const meal = breakfastLabel(plan, ctx.morning.name);
-      return { time: slot.defaultTime, title: meal.title, type, notes: meal.notes };
+      return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
     }
     case "morning_activity": {
       const base = suggestActivityTitle(ctx.morning.name, plan, "morning");
       const notes = activityNoteForFamily(plan, day);
-      return {
+      return tagged({
         time: slot.defaultTime,
         title: activityTitlePrefix(adjustment, base),
         type,
         notes: adjustment.summaryNote
           ? `${notes} Tailored to your request: ${adjustment.summaryNote}`
           : notes,
-      };
+      });
     }
     case "lunch": {
       const meal = lunchLabel(plan, ctx.lunch.name);
-      return { time: slot.defaultTime, title: meal.title, type, notes: meal.notes };
+      return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
     }
     case "midday_rest":
-      return {
+      return tagged({
         time: slot.defaultTime,
         title: intensity.longBreak
           ? `Slow midday break near ${ctx.afternoon.name}`
@@ -81,16 +85,16 @@ function fillSlot(
         notes: intensity.longBreak
           ? "Extra downtime for a relaxed family pace."
           : "Stretch, shade, and recharge before the afternoon.",
-      };
+      });
     case "afternoon_rest":
-      return {
+      return tagged({
         time: slot.defaultTime,
         title: "Free time & low-key exploring",
         type,
         notes: "Unstructured time — no rushing between stops.",
-      };
+      });
     case "afternoon_activity":
-      return {
+      return tagged({
         time: slot.defaultTime,
         title: activityTitlePrefix(
           adjustment,
@@ -103,46 +107,46 @@ function fillSlot(
             : plan.walkingLimit === "low"
               ? "Short walks, stroller-friendly routes."
               : "Light exploring between stops.",
-      };
+      });
     case "calm_activity":
-      return {
+      return tagged({
         time: slot.defaultTime,
         title: `Calm family time near ${ctx.afternoon.name}`,
         type: "rest",
         notes: "Low-key exploring, shade, and room to breathe — relaxed pace.",
-      };
+      });
     case "extra_activity":
-      return {
+      return tagged({
         time: slot.defaultTime,
         title: suggestActivityTitle(ctx.extra?.name ?? ctx.afternoon.name, plan, "afternoon"),
         type,
         notes: "Extra stop for a packed day — still family-friendly pacing.",
-      };
+      });
     case "grocery":
-      return {
+      return tagged({
         time: slot.defaultTime,
         title: "Grocery stop for dinner ingredients",
         type,
         notes: "Pick up ingredients on your way back to the rental to cook dinner.",
-      };
+      });
     case "evening_rest":
-      return {
+      return tagged({
         time: slot.defaultTime,
         title: day === totalDays ? "Pack up & unwind" : `Evening stroll near ${ctx.dinner.name}`,
         type,
         notes: "No overpacking — room to breathe.",
-      };
+      });
     case "dinner": {
       const meal = dinnerLabel(plan, ctx.dinner.name, day, adjustment);
-      return { time: slot.defaultTime, title: meal.title, type, notes: meal.notes };
+      return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
     }
     default:
-      return { time: slot.defaultTime, title: "Family time", type: "rest" };
+      return tagged({ time: slot.defaultTime, title: "Family time", type: "rest" });
   }
 }
 
 export function fillDaySkeleton(
-  slots: SkeletonSlot[],
+  slots: DayIntent[],
   plan: TripPlan,
   ctx: DayLandmarkContext,
   day: number,

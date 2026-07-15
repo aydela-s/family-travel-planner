@@ -4,9 +4,14 @@ import {
   shouldCookDinnerAtHome,
 } from "@/lib/planning-engine/meal-planner";
 import { dinnerDefaultTime, lunchDefaultTime } from "@/lib/planning-engine/meal-timing";
+import { priorityForSlotKind } from "@/lib/planning-engine/day-intent";
 import { AdjustmentContext, intensityForDay } from "@/lib/planning-engine/day-adjustment";
-import { SkeletonSlot } from "@/lib/planning-engine/types";
+import { DayIntent } from "@/lib/planning-engine/types";
 import { TripPlan } from "@/types/trip-plan";
+
+function intent(kind: DayIntent["kind"], defaultTime: string): DayIntent {
+  return { kind, defaultTime, priority: priorityForSlotKind(kind) };
+}
 
 function includeNapForDay(plan: TripPlan, adjustment?: AdjustmentContext): boolean {
   if (adjustment?.skipNap) return false;
@@ -21,46 +26,49 @@ export function buildDaySkeleton(
   day: number,
   _totalDays: number,
   adjustment?: AdjustmentContext,
-): SkeletonSlot[] {
+): DayIntent[] {
   const intensity = intensityForDay(plan, adjustment);
-  const slots: SkeletonSlot[] = [];
+  const slots: DayIntent[] = [];
 
   if (requiresBreakfastSlot(plan)) {
-    slots.push({ kind: "breakfast", defaultTime: "08:30" });
+    slots.push(intent("breakfast", "08:30"));
   }
 
-  slots.push({ kind: "morning_activity", defaultTime: "10:00" });
-  slots.push({ kind: "lunch", defaultTime: lunchDefaultTime(plan) });
+  slots.push(intent("morning_activity", "10:00"));
+  slots.push(intent("lunch", lunchDefaultTime(plan)));
 
   if (!includeNapForDay(plan, adjustment)) {
-    slots.push({ kind: "midday_rest", defaultTime: "13:30" });
+    slots.push(intent("midday_rest", "13:30"));
   }
 
   if (intensity.restBlocks >= 2) {
-    slots.push({ kind: "afternoon_rest", defaultTime: "15:00" });
+    slots.push(intent("afternoon_rest", "15:00"));
   }
 
   if (intensity.style === "relaxed" || adjustment?.relaxedDay) {
     if (!adjustment?.removeActivity) {
-      slots.push({ kind: "calm_activity", defaultTime: "15:30" });
+      slots.push(intent("calm_activity", "15:30"));
     }
   } else if (intensity.includeAfternoonActivity) {
-    slots.push({ kind: "afternoon_activity", defaultTime: "15:30" });
+    slots.push(intent("afternoon_activity", "15:30"));
   }
 
   if (intensity.includeExtraActivity) {
-    slots.push({ kind: "extra_activity", defaultTime: "16:15" });
+    slots.push(intent("extra_activity", "16:15"));
   }
 
   if (shouldCookDinnerAtHome(plan, day, adjustment)) {
-    slots.push({ kind: "grocery", defaultTime: "17:00" });
-    slots.push({ kind: "dinner", defaultTime: dinnerDefaultTime(plan) });
+    slots.push(intent("grocery", "17:00"));
+    slots.push(intent("dinner", dinnerDefaultTime(plan)));
   } else {
     if (!intensity.longBreak) {
-      slots.push({ kind: "evening_rest", defaultTime: "17:15" });
+      slots.push(intent("evening_rest", "17:15"));
     }
-    slots.push({ kind: "dinner", defaultTime: dinnerDefaultTime(plan) });
+    slots.push(intent("dinner", dinnerDefaultTime(plan)));
   }
 
   return slots;
 }
+
+/** Alias for intent-based skeleton API. */
+export const buildDayIntents = buildDaySkeleton;
