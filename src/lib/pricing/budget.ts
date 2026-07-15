@@ -1,3 +1,4 @@
+import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
 import { CityConfig } from "@/config/city-pricing";
 import { accommodationPlanningTips, estimateAccommodationFoodCosts } from "@/lib/pricing/accommodation";
 import { budgetStyleNote } from "@/lib/pricing/budget-style";
@@ -71,11 +72,7 @@ export function maybeAddAccommodationGroceryStop(
     timeOfDay: "afternoon",
     notes: "Pick up ingredients before heading back to cook dinner.",
     activityCost: 0,
-    location: {
-      name: "Neighborhood supermarket",
-      lat: city.lat + 0.012,
-      lng: city.lng - 0.008,
-    },
+    location: groceryLocationNearRoute(activities, insertAt, city),
   };
   return [...activities.slice(0, insertAt), grocery, ...activities.slice(insertAt)];
 }

@@ -63,7 +63,7 @@ function processRawActivities(
   fixed = resolveGroceryMealConflicts(fixed, plan);
 
   let scheduled = rescheduleActivitiesWithMealAnchors(fixed, plan);
-  scheduled = anchorDinnerTimes(scheduled);
+  scheduled = anchorDinnerTimes(scheduled, plan);
 
   return scheduled.map(({ endTime: _e, ...rest }) => rest);
 }
@@ -138,7 +138,7 @@ function processEnrichedActivities(
     plan,
   );
   fixed = rescheduleActivitiesWithMealAnchors(fixed, plan, travelGaps);
-  fixed = anchorDinnerTimes(fixed);
+  fixed = anchorDinnerTimes(fixed, plan);
 
   return fixed.map((a) => ({
     ...(activities.find((o) => o.title === a.title && o.type === a.type) ?? {}),
@@ -191,7 +191,7 @@ export function validateRawDay(
     issues.push({ code: "overlap", message: "Activities overlap in the schedule" });
   }
 
-  for (const msg of validateMealPlan(activities)) {
+  for (const msg of validateMealPlan(activities, plan)) {
     issues.push({ code: "meal_conflict", message: msg });
   }
 

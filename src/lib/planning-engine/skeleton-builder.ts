@@ -3,6 +3,7 @@ import {
   requiresBreakfastSlot,
   shouldCookDinnerAtHome,
 } from "@/lib/planning-engine/meal-planner";
+import { dinnerDefaultTime, lunchDefaultTime } from "@/lib/planning-engine/meal-timing";
 import { AdjustmentContext, intensityForDay } from "@/lib/planning-engine/day-adjustment";
 import { SkeletonSlot } from "@/lib/planning-engine/types";
 import { TripPlan } from "@/types/trip-plan";
@@ -29,7 +30,7 @@ export function buildDaySkeleton(
   }
 
   slots.push({ kind: "morning_activity", defaultTime: "10:00" });
-  slots.push({ kind: "lunch", defaultTime: "12:30" });
+  slots.push({ kind: "lunch", defaultTime: lunchDefaultTime(plan) });
 
   if (!includeNapForDay(plan, adjustment)) {
     slots.push({ kind: "midday_rest", defaultTime: "13:30" });
@@ -53,12 +54,12 @@ export function buildDaySkeleton(
 
   if (shouldCookDinnerAtHome(plan, day, adjustment)) {
     slots.push({ kind: "grocery", defaultTime: "17:00" });
-    slots.push({ kind: "dinner", defaultTime: "18:45" });
+    slots.push({ kind: "dinner", defaultTime: dinnerDefaultTime(plan) });
   } else {
     if (!intensity.longBreak) {
       slots.push({ kind: "evening_rest", defaultTime: "17:15" });
     }
-    slots.push({ kind: "dinner", defaultTime: "18:45" });
+    slots.push({ kind: "dinner", defaultTime: dinnerDefaultTime(plan) });
   }
 
   return slots;

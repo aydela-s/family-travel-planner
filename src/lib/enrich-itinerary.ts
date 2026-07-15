@@ -11,6 +11,8 @@ import { getDirections, estimateDailyTransport, formatTransportDisplay } from "@
 import { buildStaticMapUrl } from "@/lib/maps/static-map";
 import { normalizeRawItinerary } from "@/lib/itinerary";
 import { pickLandmarkForFamily } from "@/lib/schedule/family-profile";
+import { isGroceryActivity } from "@/lib/schedule/meal-planning";
+import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
 import { finalizeEnrichedDay, prepareItineraryForEnrich, scheduleEnrichedActivities, validateEnrichedDay } from "@/lib/schedule/fix-itinerary";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
 import { maybeAddAccommodationGroceryStop, summarizeDailyCost, type DaySpendSummary } from "@/lib/pricing/budget";
@@ -102,6 +104,15 @@ async function enrichDay(
 
     return act;
   });
+
+  for (let i = 0; i < activities.length; i++) {
+    if (isGroceryActivity(activities[i])) {
+      activities[i] = {
+        ...activities[i],
+        location: groceryLocationNearRoute(activities, i, city),
+      };
+    }
+  }
 
   const locActivities = activities.filter((a) => a.location);
   const routeSegments: RouteSegment[] = [];
