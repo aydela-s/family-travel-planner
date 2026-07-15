@@ -1,4 +1,3 @@
-import { getTripDateContext, tripLengthHint } from "@/lib/planning-engine/trip-date-context";
 import { ageAwareTravelerHints } from "@/lib/schedule/family-profile";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -187,11 +186,4 @@ export const destinationSuggestions = [
 
 export function getTravelerHints(children: number[]) {
   return ageAwareTravelerHints(children);
-}
-
-export function getTripLengthHint(plan: TripPlan) {
-  if (!plan.startDate || !plan.endDate) return null;
-  const context = getTripDateContext(plan.startDate, plan.endDate);
-  if (!context) return null;
-  return tripLengthHint(context);
 }
