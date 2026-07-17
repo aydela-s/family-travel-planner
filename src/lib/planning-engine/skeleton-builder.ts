@@ -13,10 +13,19 @@ function intent(kind: DayIntent["kind"], defaultTime: string): DayIntent {
   return { kind, defaultTime, priority: priorityForSlotKind(kind) };
 }
 
+function morningDefaultTime(plan: TripPlan): string {
+  return requiresBreakfastSlot(plan) ? "10:00" : "08:30";
+}
+
+function isRelaxedStyle(intensity: ReturnType<typeof intensityForDay>, adjustment?: AdjustmentContext): boolean {
+  return intensity.style === "relaxed" || Boolean(adjustment?.relaxedDay);
+}
+
 function includeNapForDay(plan: TripPlan, adjustment?: AdjustmentContext): boolean {
   if (adjustment?.skipNap) return false;
   return shouldIncludeNaps(plan);
 }
+
 /**
  * P1 daily structure — deterministic skeleton by travel style.
  * Nap is inserted during schedule fix; not part of the skeleton list.
@@ -28,24 +37,25 @@ export function buildDaySkeleton(
   adjustment?: AdjustmentContext,
 ): DayIntent[] {
   const intensity = intensityForDay(plan, adjustment);
+  const relaxed = isRelaxedStyle(intensity, adjustment);
   const slots: DayIntent[] = [];
 
   if (requiresBreakfastSlot(plan)) {
-    slots.push(intent("breakfast", "08:30"));
+    slots.push(intent("breakfast", "08:00"));
   }
 
-  slots.push(intent("morning_activity", "10:00"));
+  slots.push(intent("morning_activity", morningDefaultTime(plan)));
   slots.push(intent("lunch", lunchDefaultTime(plan)));
 
   if (!includeNapForDay(plan, adjustment)) {
     slots.push(intent("midday_rest", "13:30"));
   }
 
-  if (intensity.restBlocks >= 2) {
+  if (intensity.restBlocks >= 2 && !relaxed) {
     slots.push(intent("afternoon_rest", "15:00"));
   }
 
-  if (intensity.style === "relaxed" || adjustment?.relaxedDay) {
+  if (relaxed) {
     if (!adjustment?.removeActivity) {
       slots.push(intent("calm_activity", "15:30"));
     }
@@ -61,9 +71,6 @@ export function buildDaySkeleton(
     slots.push(intent("grocery", "17:00"));
     slots.push(intent("dinner", dinnerDefaultTime(plan)));
   } else {
-    if (!intensity.longBreak) {
-      slots.push(intent("evening_rest", "17:15"));
-    }
     slots.push(intent("dinner", dinnerDefaultTime(plan)));
   }
 

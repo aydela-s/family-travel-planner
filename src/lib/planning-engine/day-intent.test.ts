@@ -116,20 +116,18 @@ describe("optional intent scheduling", () => {
     expect(parseTimeToMinutes(dinner!.time)).toBeGreaterThanOrEqual(dinnerTimeWindow(plan).minMin);
   });
 
-  it("keeps optional intents when the day has room", () => {
+  it("keeps optional extra activity when the packed day has room", () => {
     const plan = basePlan({
       children: [12, 15],
-      travelStyle: "relaxed",
+      travelStyle: "packed",
       accommodationType: "hotel_no_breakfast",
     });
 
     const { raw } = planTrip(plan);
-    const hadEveningRest = raw.days[0].activities.some((a) => a.slotKind === "evening_rest");
-    const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
+    expect(raw.days[0].activities.some((a) => a.slotKind === "extra_activity")).toBe(true);
 
-    if (hadEveningRest) {
-      expect(scheduled.some((a) => a.slotKind === "evening_rest")).toBe(true);
-    }
+    const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
+    expect(scheduled.some((a) => a.slotKind === "extra_activity")).toBe(true);
     expect(validateDaySchedule(scheduled, plan)).toEqual([]);
   });
 });
