@@ -13,12 +13,14 @@ import { buildStaticMapUrl } from "@/lib/maps/static-map";
 import { normalizeRawItinerary } from "@/lib/itinerary";
 import { pickLandmarkForFamily } from "@/lib/schedule/family-profile";
 import { isGroceryActivity } from "@/lib/schedule/meal-planning";
+import { validateActivityOpeningHours } from "@/lib/schedule/landmark-hours";
 import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
 import {
   prepareItineraryForEnrich,
   rescheduleEnrichedActivities,
   validateEnrichedDay,
 } from "@/lib/schedule/fix-itinerary";
+import { itemDurationMin } from "@/lib/schedule/timeline";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
 import { maybeAddAccommodationGroceryStop, summarizeDailyCost, type DaySpendSummary } from "@/lib/pricing/budget";
 import { familyActivityCost } from "@/lib/pricing/activity-cost";
@@ -139,6 +141,14 @@ async function enrichDay(
   const scheduledActivities = rescheduleEnrichedActivities(located, plan, segmentDurations).map(
     normalizeActivity,
   );
+
+  for (const v of validateActivityOpeningHours(scheduledActivities, city.landmarks, (a) =>
+    itemDurationMin(a, plan),
+  )) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`[schedule:hours] ${v.code}: ${v.message}`);
+    }
+  }
 
   const summary = summarizeDailyCost(scheduledActivities, lockedDailyTransport, city, plan);
   const costBreakdown = buildCostBreakdown(summary, city.currency);

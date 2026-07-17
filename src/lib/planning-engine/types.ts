@@ -1,4 +1,4 @@
-import { CityConfig } from "@/config/city-pricing";
+import { Landmark } from "@/config/city-pricing";
 import { AdjustActionId } from "@/lib/planning-engine/adjust-types";
 import { ActivityType, ItineraryDay, RawItinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
@@ -52,11 +52,11 @@ export type RawActivity = {
 };
 
 export type DayLandmarkContext = {
-  morning: CityConfig["landmarks"][0];
-  afternoon: CityConfig["landmarks"][0];
-  lunch: CityConfig["landmarks"][0];
-  dinner: CityConfig["landmarks"][0];
-  extra?: CityConfig["landmarks"][0];
+  morning: Landmark;
+  afternoon: Landmark;
+  lunch: Landmark;
+  dinner: Landmark;
+  extra?: Landmark;
   dayOffset: number;
 };
 
