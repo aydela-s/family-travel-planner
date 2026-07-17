@@ -1,4 +1,4 @@
-import { CityConfig, Landmark } from "@/config/city-pricing";
+import { CityConfig, Landmark, LandmarkAgeTag } from "@/config/city-pricing";
 import { haversineKm } from "@/lib/maps/directions";
 import { landmarksForStyle } from "@/lib/pricing/budget-style";
 import { TripPlan } from "@/types/trip-plan";
@@ -17,6 +17,13 @@ export type FamilyAgeProfile = {
 /** Prefer same-day picks within this radius of earlier stops (km). */
 export const SAME_DAY_CLUSTER_KM = 5;
 
+/**
+ * Age bands match the product spec:
+ * - toddler: 0–3
+ * - young child: 4–7
+ * - tween: 8–12
+ * - teen: 13+
+ */
 export function getFamilyAgeProfile(plan: TripPlan): FamilyAgeProfile {
   const ages = plan.children;
   if (ages.length === 0) {
@@ -37,7 +44,7 @@ export function getFamilyAgeProfile(plan: TripPlan): FamilyAgeProfile {
   const bands = new Set(
     ages.map((age) => {
       if (age <= 3) return "toddler";
-      if (age <= 8) return "young";
+      if (age <= 7) return "young";
       if (age <= 12) return "tween";
       return "teen";
     }),
@@ -47,28 +54,63 @@ export function getFamilyAgeProfile(plan: TripPlan): FamilyAgeProfile {
     youngest,
     oldest,
     hasToddler: ages.some((a) => a <= 3),
-    hasYoungChild: ages.some((a) => a >= 4 && a <= 8),
-    hasTween: ages.some((a) => a >= 9 && a <= 12),
+    hasYoungChild: ages.some((a) => a >= 4 && a <= 7),
+    hasTween: ages.some((a) => a >= 8 && a <= 12),
     hasTeen: ages.some((a) => a >= 13),
     isMixedAges: bands.size > 1,
     ageSummary: youngest === oldest ? `age ${youngest}` : `ages ${youngest}–${oldest}`,
   };
 }
 
-const TODDLER_FOCUS = /\b(playground|toddler|baby|stroller|nursery)\b/i;
-const MIXED_APPEAL = /\b(museum|zoo|aquarium|park|garden|cove|midway|tower|beach|historic|natural|science|interactive)\b/i;
-const TEEN_APPEAL = /\b(museum|midway|uss|adventure|sports|tower|historic|science)\b/i;
+const TITLE_EXPLORE = /\b(museum|zoo|aquarium|park|garden|cove|midway|tower|beach|historic|natural|science|interactive)\b/i;
+const TITLE_TEEN = /\b(museum|midway|uss|adventure|sports|tower|historic|science)\b/i;
 
-function landmarkAgeScore(name: string, profile: FamilyAgeProfile): number {
-  let score = 10;
-  if (TODDLER_FOCUS.test(name)) {
-    score = profile.hasToddler && !profile.isMixedAges ? 20 : profile.hasToddler ? 8 : 2;
+function hasTag(landmark: Landmark, tag: LandmarkAgeTag): boolean {
+  return landmark.ageTags.includes(tag);
+}
+
+/** Score a landmark for the family's age bands using catalog ageTags. */
+export function landmarkAgeScore(landmark: Landmark, profile: FamilyAgeProfile): number {
+  if (!profile.hasToddler && !profile.hasYoungChild && !profile.hasTween && !profile.hasTeen) {
+    return 10 + landmark.ageTags.length;
   }
-  if (MIXED_APPEAL.test(name)) score += 15;
-  if (profile.hasTeen && TEEN_APPEAL.test(name)) score += 12;
-  if (profile.hasTween && MIXED_APPEAL.test(name)) score += 8;
-  if (profile.isMixedAges && MIXED_APPEAL.test(name)) score += 10;
-  if (profile.hasToddler && !profile.isMixedAges && TODDLER_FOCUS.test(name)) score += 5;
+
+  let score = 10;
+
+  if (profile.hasToddler) {
+    if (hasTag(landmark, "toddler")) score += 22;
+    else if (hasTag(landmark, "child")) score += 6;
+    else score -= 8;
+  }
+
+  if (profile.hasYoungChild) {
+    if (hasTag(landmark, "child")) score += 18;
+    else if (hasTag(landmark, "toddler") || hasTag(landmark, "tween")) score += 8;
+  }
+
+  if (profile.hasTween) {
+    // Spec: mix of child + teen activities for 8–12.
+    if (hasTag(landmark, "tween")) score += 14;
+    if (hasTag(landmark, "child")) score += 8;
+    if (hasTag(landmark, "teen")) score += 8;
+  }
+
+  if (profile.hasTeen) {
+    if (hasTag(landmark, "teen")) score += 18;
+    else if (hasTag(landmark, "tween")) score += 6;
+    else if (!hasTag(landmark, "toddler")) score += 2;
+  }
+
+  if (profile.isMixedAges) {
+    const relevant: LandmarkAgeTag[] = [];
+    if (profile.hasToddler) relevant.push("toddler");
+    if (profile.hasYoungChild) relevant.push("child");
+    if (profile.hasTween) relevant.push("tween");
+    if (profile.hasTeen) relevant.push("teen");
+    const overlap = relevant.filter((t) => hasTag(landmark, t)).length;
+    score += overlap * 6;
+  }
+
   return score;
 }
 
@@ -99,10 +141,8 @@ function proximityBonus(candidate: Landmark, alreadyPicked: Landmark[]): number 
   if (alreadyPicked.length === 0) return 0;
   const dist = minDistanceKmToPicked(candidate, alreadyPicked);
   if (dist <= SAME_DAY_CLUSTER_KM) {
-    // Closer within the cluster window scores higher.
     return (SAME_DAY_CLUSTER_KM - dist) * 8;
   }
-  // Heavy penalty for zigzagging far across the city.
   return -(dist - SAME_DAY_CLUSTER_KM) * 12;
 }
 
@@ -117,25 +157,18 @@ export function pickLandmarkForFamily(
   const rotation = (dayNumber - 1) * 3 + slotIndex;
   const pickedNames = new Set(alreadyPicked.map((l) => l.name));
 
-  // Slot 0 is each day's main activity — under "balanced," this is the one
-  // slot allowed to reach into the paid/premium tier ("one major paid
-  // attraction per day"). Other slots stay in the cheap/free tier.
   const stylePool = landmarksForStyle(city.landmarks, (l) => l.adultPrice, plan.budgetStyle, {
     allowPremiumPick: slotIndex === 0,
   });
 
   let pool = stylePool.filter((l) => !pickedNames.has(l.name));
   if (pool.length === 0) {
-    // Style pool exhausted — use any unused city landmark before reusing.
     pool = city.landmarks.filter((l) => !pickedNames.has(l.name));
   }
   if (pool.length === 0) {
     pool = stylePool.length > 0 ? stylePool : city.landmarks;
   }
 
-  // If later slots have no in-cluster option left in the style pool, expand to
-  // any unused city landmark within the cluster radius (avoids zigzagging when
-  // the cheap tier only has two far-apart free stops).
   if (alreadyPicked.length > 0) {
     const inCluster = pool.filter((l) => minDistanceKmToPicked(l, alreadyPicked) <= SAME_DAY_CLUSTER_KM);
     if (inCluster.length === 0) {
@@ -153,10 +186,10 @@ export function pickLandmarkForFamily(
   }
 
   const ranked = [...pool]
-    .map((landmark) => ({
-      landmark,
-      score: landmarkAgeScore(landmark.name, profile) + proximityBonus(landmark, alreadyPicked),
-      dist: minDistanceKmToPicked(landmark, alreadyPicked),
+    .map((lm) => ({
+      landmark: lm,
+      score: landmarkAgeScore(lm, profile) + proximityBonus(lm, alreadyPicked),
+      dist: minDistanceKmToPicked(lm, alreadyPicked),
     }))
     .sort((a, b) => b.score - a.score || a.dist - b.dist || b.landmark.adultPrice - a.landmark.adultPrice);
 
@@ -165,7 +198,6 @@ export function pickLandmarkForFamily(
     if (clustered.length > 0) {
       return clustered[rotation % clustered.length].landmark;
     }
-    // Nothing in cluster — nearest remaining stop, no random far rotation.
     return ranked[0].landmark;
   }
 
@@ -203,10 +235,10 @@ export function suggestActivityTitle(
   const profile = getFamilyAgeProfile(plan);
   const prefix = slot === "morning" ? "Morning:" : "Afternoon:";
 
-  if (MIXED_APPEAL.test(landmarkName)) {
+  if (TITLE_EXPLORE.test(landmarkName)) {
     return `${prefix} Explore ${landmarkName}`;
   }
-  if (profile.hasTeen && TEEN_APPEAL.test(landmarkName)) {
+  if (profile.hasTeen && TITLE_TEEN.test(landmarkName)) {
     return `${prefix} Visit ${landmarkName}`;
   }
   return `${prefix} Family time at ${landmarkName}`;
