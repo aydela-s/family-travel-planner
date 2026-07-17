@@ -55,9 +55,13 @@ function fillSlot(
 ): RawActivity {
   const type = slotActivityType(slot.kind);
   const intensity = getIntensityConfig(plan);
-  const tagged = (activity: Omit<RawActivity, "slotKind">): RawActivity => ({
+  const tagged = (
+    activity: Omit<RawActivity, "slotKind" | "landmarkIntensity">,
+    landmarkIntensity?: RawActivity["landmarkIntensity"],
+  ): RawActivity => ({
     ...activity,
     slotKind: slot.kind,
+    ...(landmarkIntensity ? { landmarkIntensity } : {}),
   });
 
   switch (slot.kind) {
@@ -68,30 +72,39 @@ function fillSlot(
     case "morning_activity": {
       const base = suggestActivityTitle(ctx.morning.name, plan, "morning");
       const notes = activityNoteForFamily(plan, day);
-      return tagged({
-        time: slot.defaultTime,
-        title: activityTitlePrefix(adjustment, base),
-        type,
-        notes: adjustment.summaryNote
-          ? `${notes} Tailored to your request: ${adjustment.summaryNote}`
-          : notes,
-      });
+      return tagged(
+        {
+          time: slot.defaultTime,
+          title: activityTitlePrefix(adjustment, base),
+          type,
+          notes: adjustment.summaryNote
+            ? `${notes} Tailored to your request: ${adjustment.summaryNote}`
+            : notes,
+        },
+        ctx.morning.intensity,
+      );
     }
     case "lunch": {
       const meal = lunchLabel(plan, ctx.lunch.name);
       return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
     }
-    case "midday_rest":
+    case "midday_rest": {
+      const recovery = ctx.morning.intensity === "high";
       return tagged({
         time: slot.defaultTime,
         title: intensity.longBreak
           ? `Slow midday break near ${ctx.afternoon.name}`
-          : `Break at ${ctx.afternoon.name}`,
+          : recovery
+            ? `Recovery break near ${ctx.afternoon.name}`
+            : `Break at ${ctx.afternoon.name}`,
         type,
-        notes: intensity.longBreak
-          ? "Extra downtime for a relaxed family pace."
-          : "Stretch, shade, and recharge before the afternoon.",
+        notes: recovery
+          ? "Extra downtime after a high-energy morning stop."
+          : intensity.longBreak
+            ? "Extra downtime for a relaxed family pace."
+            : "Stretch, shade, and recharge before the afternoon.",
       });
+    }
     case "afternoon_rest":
       return tagged({
         time: slot.defaultTime,
@@ -100,20 +113,23 @@ function fillSlot(
         notes: "Unstructured time — no rushing between stops.",
       });
     case "afternoon_activity":
-      return tagged({
-        time: slot.defaultTime,
-        title: activityTitlePrefix(
-          adjustment,
-          suggestActivityTitle(ctx.afternoon.name, plan, "afternoon"),
-        ),
-        type,
-        notes:
-          ctx.afternoon.adultPrice > 0
-            ? "A worthwhile paid stop — balanced within your daily family budget."
-            : plan.walkingLimit === "low"
-              ? "Short walks, stroller-friendly routes."
-              : "Light exploring between stops.",
-      });
+      return tagged(
+        {
+          time: slot.defaultTime,
+          title: activityTitlePrefix(
+            adjustment,
+            suggestActivityTitle(ctx.afternoon.name, plan, "afternoon"),
+          ),
+          type,
+          notes:
+            ctx.afternoon.adultPrice > 0
+              ? "A worthwhile paid stop — balanced within your daily family budget."
+              : plan.walkingLimit === "low"
+                ? "Short walks, stroller-friendly routes."
+                : "Light exploring between stops.",
+        },
+        ctx.afternoon.intensity,
+      );
     case "calm_activity":
       return tagged({
         time: slot.defaultTime,
@@ -122,12 +138,15 @@ function fillSlot(
         notes: "Low-key exploring, shade, and room to breathe — relaxed pace.",
       });
     case "extra_activity":
-      return tagged({
-        time: slot.defaultTime,
-        title: suggestActivityTitle(ctx.extra?.name ?? ctx.afternoon.name, plan, "afternoon"),
-        type,
-        notes: "Extra stop for a packed day — still family-friendly pacing.",
-      });
+      return tagged(
+        {
+          time: slot.defaultTime,
+          title: suggestActivityTitle(ctx.extra?.name ?? ctx.afternoon.name, plan, "afternoon"),
+          type,
+          notes: "Extra stop for a packed day — still family-friendly pacing.",
+        },
+        (ctx.extra ?? ctx.afternoon).intensity,
+      );
     case "grocery":
       return tagged({
         time: slot.defaultTime,

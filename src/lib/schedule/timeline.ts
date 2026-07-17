@@ -19,6 +19,9 @@ export function minutesToTime(totalMinutes: number): string {
 
 export const GROCERY_DURATION_MIN = 30;
 
+/** Extra rest/nap minutes after a high-intensity activity. */
+export const HIGH_INTENSITY_REST_BONUS_MIN = 15;
+
 /** Extra minutes between stops when the oldest child is 6 or under. */
 export const YOUNG_CHILD_TRAVEL_BUFFER_MIN = 8;
 

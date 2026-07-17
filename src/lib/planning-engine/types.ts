@@ -1,4 +1,4 @@
-import { Landmark } from "@/config/city-pricing";
+import { Landmark, LandmarkIntensity } from "@/config/city-pricing";
 import { AdjustActionId } from "@/lib/planning-engine/adjust-types";
 import { ActivityType, ItineraryDay, RawItinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
@@ -49,6 +49,8 @@ export type RawActivity = {
   type: ActivityType;
   notes?: string;
   slotKind?: SlotKind;
+  /** Set on activity slots from the landmark catalog — drives recovery rest. */
+  landmarkIntensity?: LandmarkIntensity;
 };
 
 export type DayLandmarkContext = {

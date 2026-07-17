@@ -5,8 +5,15 @@ import {
   isDinnerMeal,
   rescheduleActivitiesWithMealAnchors,
 } from "@/lib/schedule/meal-planning";
-import { activitiesOverlap, defaultTravelMin, parseTimeToMinutes } from "@/lib/schedule/timeline";
+import {
+  activitiesOverlap,
+  defaultTravelMin,
+  HIGH_INTENSITY_REST_BONUS_MIN,
+  parseTimeToMinutes,
+} from "@/lib/schedule/timeline";
 import { TripPlan } from "@/types/trip-plan";
+import { ActivityType } from "@/types/itinerary";
+import { LandmarkIntensity } from "@/config/city-pricing";
 
 function isoDateOffset(days: number): string {
   const date = new Date();
@@ -84,5 +91,75 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
     const { raw } = planTrip(plan);
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
     expect(validateDaySchedule(scheduled, plan)).toEqual([]);
+  });
+});
+
+describe("high-intensity recovery rest — Phase 6", () => {
+  type Raw = {
+    time: string;
+    title: string;
+    type: ActivityType;
+    landmarkIntensity?: LandmarkIntensity;
+  };
+
+  function dayWithMorningIntensity(intensity: LandmarkIntensity): Raw[] {
+    return [
+      { time: "08:00", title: "Breakfast", type: "meal" },
+      {
+        time: "09:00",
+        title: "Morning landmark",
+        type: "activity",
+        landmarkIntensity: intensity,
+      },
+      { time: "12:00", title: "Lunch", type: "meal" },
+      { time: "13:00", title: "Midday break", type: "rest" },
+      { time: "14:30", title: "Afternoon landmark", type: "activity", landmarkIntensity: "low" },
+      { time: "18:30", title: "Dinner", type: "meal" },
+    ];
+  }
+
+  function restDurationMin(
+    scheduled: { type: ActivityType; time: string; endTime: string }[],
+  ): number {
+    const rest = scheduled.find((a) => a.type === "rest");
+    expect(rest).toBeDefined();
+    return parseTimeToMinutes(rest!.endTime) - parseTimeToMinutes(rest!.time);
+  }
+
+  it("lengthens the next rest by 15 minutes after a high-intensity activity", () => {
+    const plan = balancedPlan([8]);
+    const high = rescheduleActivitiesWithMealAnchors(dayWithMorningIntensity("high"), plan);
+    const medium = rescheduleActivitiesWithMealAnchors(dayWithMorningIntensity("medium"), plan);
+
+    expect(restDurationMin(high)).toBe(restDurationMin(medium) + HIGH_INTENSITY_REST_BONUS_MIN);
+  });
+
+  it("lengthens the next nap by 15 minutes after a high-intensity activity", () => {
+    const plan = balancedPlan([3], { napSchedule: "Early afternoon (1–3 PM)" });
+    const base: Raw[] = [
+      { time: "08:00", title: "Breakfast", type: "meal" },
+      {
+        time: "09:00",
+        title: "Morning landmark",
+        type: "activity",
+        landmarkIntensity: "high",
+      },
+      { time: "12:00", title: "Lunch", type: "meal" },
+      { time: "13:00", title: "Nap", type: "nap" },
+      { time: "15:00", title: "Afternoon landmark", type: "activity", landmarkIntensity: "low" },
+      { time: "18:30", title: "Dinner", type: "meal" },
+    ];
+    const lowMorning = base.map((a) =>
+      a.title === "Morning landmark" ? { ...a, landmarkIntensity: "low" as const } : a,
+    );
+
+    const high = rescheduleActivitiesWithMealAnchors(base, plan);
+    const low = rescheduleActivitiesWithMealAnchors(lowMorning, plan);
+    const highNap = high.find((a) => a.type === "nap")!;
+    const lowNap = low.find((a) => a.type === "nap")!;
+    const highDur = parseTimeToMinutes(highNap.endTime) - parseTimeToMinutes(highNap.time);
+    const lowDur = parseTimeToMinutes(lowNap.endTime) - parseTimeToMinutes(lowNap.time);
+
+    expect(highDur).toBe(lowDur + HIGH_INTENSITY_REST_BONUS_MIN);
   });
 });

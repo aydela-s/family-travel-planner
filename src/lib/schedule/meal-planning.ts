@@ -1,3 +1,4 @@
+import { LandmarkIntensity } from "@/config/city-pricing";
 import { isOptionalActivity } from "@/lib/planning-engine/day-intent";
 import {
   dinnerTimeWindow,
@@ -11,6 +12,7 @@ import {
   defaultDurationMin,
   defaultTravelMin,
   GROCERY_DURATION_MIN,
+  HIGH_INTENSITY_REST_BONUS_MIN,
   itemDurationMin,
   minutesToTime,
   parseTimeToMinutes,
@@ -22,6 +24,7 @@ type RawActivity = {
   type: ActivityType;
   notes?: string;
   slotKind?: SlotKind;
+  landmarkIntensity?: LandmarkIntensity;
 };
 
 const GROCERY = /\bgrocery\b/i;
@@ -239,6 +242,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
   const result: (T & { endTime: string })[] = [];
   let cursor = 8 * 60;
   let travelIdx = 0;
+  let needsRecoveryRest = false;
 
   const nextTravel = () => travelAfterEach[travelIdx++] ?? defaultTravelMin(plan);
 
@@ -267,6 +271,10 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     }
 
     let duration = itemDurationMin(item, plan);
+    if (needsRecoveryRest && (item.type === "rest" || item.type === "nap")) {
+      duration += HIGH_INTENSITY_REST_BONUS_MIN;
+      needsRecoveryRest = false;
+    }
     if (lunchIdx > i) {
       const { maxMin: lunchMax } = lunchTimeWindow(plan);
       const gap = defaultTravelMin(plan);
@@ -288,6 +296,10 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     };
     result.push(scheduled);
     cursor = parseTimeToMinutes(scheduled.endTime);
+
+    if (item.type === "activity" && item.landmarkIntensity === "high") {
+      needsRecoveryRest = true;
+    }
   }
 
   for (const item of optional) {

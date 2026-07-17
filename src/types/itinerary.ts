@@ -82,6 +82,7 @@ export type RawItinerary = {
       type: ActivityType;
       notes?: string;
       slotKind?: import("@/lib/planning-engine/types").SlotKind;
+      landmarkIntensity?: import("@/config/city-pricing").LandmarkIntensity;
     }[];
   }[];
 };
