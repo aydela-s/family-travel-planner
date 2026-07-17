@@ -16,6 +16,12 @@ type TimedActivity = {
   location?: { name: string };
 };
 
+/** Planned visit window used when preferring open landmarks. */
+export type VisitWindow = {
+  startMin: number;
+  endMin: number;
+};
+
 /** True when [start, end] fits entirely inside the landmark's open window. */
 export function isWithinOpeningHours(
   startMin: number,
@@ -25,6 +31,10 @@ export function isWithinOpeningHours(
   const open = parseTimeToMinutes(hours.open);
   const close = parseTimeToMinutes(hours.close);
   return startMin >= open && endMin <= close;
+}
+
+export function isLandmarkOpenForVisit(landmark: Landmark, window: VisitWindow): boolean {
+  return isWithinOpeningHours(window.startMin, window.endMin, landmark.openingHours);
 }
 
 export function findLandmarkByName(

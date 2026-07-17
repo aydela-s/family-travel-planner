@@ -13,7 +13,8 @@ function intent(kind: DayIntent["kind"], defaultTime: string): DayIntent {
   return { kind, defaultTime, priority: priorityForSlotKind(kind) };
 }
 
-function morningDefaultTime(plan: TripPlan): string {
+/** Morning activity start — 10:00 with breakfast out, 08:30 when eating at lodging. */
+export function morningActivityDefaultTime(plan: TripPlan): string {
   return requiresBreakfastSlot(plan) ? "10:00" : "08:30";
 }
 
@@ -44,7 +45,7 @@ export function buildDaySkeleton(
     slots.push(intent("breakfast", "08:00"));
   }
 
-  slots.push(intent("morning_activity", morningDefaultTime(plan)));
+  slots.push(intent("morning_activity", morningActivityDefaultTime(plan)));
   slots.push(intent("lunch", lunchDefaultTime(plan)));
 
   if (!includeNapForDay(plan, adjustment)) {

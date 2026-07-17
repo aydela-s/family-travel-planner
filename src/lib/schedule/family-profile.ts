@@ -1,7 +1,10 @@
 import { CityConfig, Landmark, LandmarkAgeTag } from "@/config/city-pricing";
 import { haversineKm } from "@/lib/maps/directions";
 import { landmarksForStyle } from "@/lib/pricing/budget-style";
+import { isLandmarkOpenForVisit, VisitWindow } from "@/lib/schedule/landmark-hours";
 import { TripPlan } from "@/types/trip-plan";
+
+export type { VisitWindow };
 
 export type FamilyAgeProfile = {
   youngest: number | null;
@@ -146,12 +149,43 @@ function proximityBonus(candidate: Landmark, alreadyPicked: Landmark[]): number 
   return -(dist - SAME_DAY_CLUSTER_KM) * 12;
 }
 
+/**
+ * Prefer landmarks open for the planned visit window when alternatives exist.
+ * Widens beyond the budget/cluster pool before accepting a closed fallback.
+ */
+function preferOpenPool(
+  pool: Landmark[],
+  cityLandmarks: Landmark[],
+  pickedNames: Set<string>,
+  alreadyPicked: Landmark[],
+  visitWindow?: VisitWindow,
+): Landmark[] {
+  if (!visitWindow) return pool;
+
+  const openIn = (list: Landmark[]) =>
+    list.filter((l) => isLandmarkOpenForVisit(l, visitWindow));
+
+  const openPool = openIn(pool);
+  if (openPool.length > 0) return openPool;
+
+  let wider = cityLandmarks.filter((l) => !pickedNames.has(l.name));
+  if (alreadyPicked.length > 0) {
+    const nearby = wider.filter(
+      (l) => minDistanceKmToPicked(l, alreadyPicked) <= SAME_DAY_CLUSTER_KM,
+    );
+    if (nearby.length > 0) wider = nearby;
+  }
+  const openWider = openIn(wider);
+  return openWider.length > 0 ? openWider : pool;
+}
+
 export function pickLandmarkForFamily(
   city: CityConfig,
   plan: TripPlan,
   dayNumber: number,
   slotIndex: number,
   alreadyPicked: Landmark[] = [],
+  visitWindow?: VisitWindow,
 ): Landmark {
   const profile = getFamilyAgeProfile(plan);
   const rotation = (dayNumber - 1) * 3 + slotIndex;
@@ -184,6 +218,8 @@ export function pickLandmarkForFamily(
       pool = inCluster;
     }
   }
+
+  pool = preferOpenPool(pool, city.landmarks, pickedNames, alreadyPicked, visitWindow);
 
   const ranked = [...pool]
     .map((lm) => ({

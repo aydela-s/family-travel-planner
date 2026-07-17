@@ -13,14 +13,17 @@ import { buildStaticMapUrl } from "@/lib/maps/static-map";
 import { normalizeRawItinerary } from "@/lib/itinerary";
 import { pickLandmarkForFamily } from "@/lib/schedule/family-profile";
 import { isGroceryActivity } from "@/lib/schedule/meal-planning";
-import { validateActivityOpeningHours } from "@/lib/schedule/landmark-hours";
+import {
+  findLandmarkByName,
+  validateActivityOpeningHours,
+} from "@/lib/schedule/landmark-hours";
 import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
 import {
   prepareItineraryForEnrich,
   rescheduleEnrichedActivities,
   validateEnrichedDay,
 } from "@/lib/schedule/fix-itinerary";
-import { itemDurationMin } from "@/lib/schedule/timeline";
+import { itemDurationMin, parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
 import { maybeAddAccommodationGroceryStop, summarizeDailyCost, type DaySpendSummary } from "@/lib/pricing/budget";
 import { familyActivityCost } from "@/lib/pricing/activity-cost";
@@ -71,6 +74,35 @@ function applyGroceryLocations(activities: ItineraryActivity[], city: CityConfig
   );
 }
 
+/** Surface residual outside-hours visits as activity notes (selection prefers open stops first). */
+function applyOpeningHoursNotes(
+  activities: ItineraryActivity[],
+  issues: ReturnType<typeof validateActivityOpeningHours>,
+  landmarks: Landmark[],
+): ItineraryActivity[] {
+  if (issues.length === 0) return activities;
+
+  const byLandmark = new Map(issues.map((issue) => [issue.landmarkName.toLowerCase(), issue]));
+
+  return activities.map((activity) => {
+    if (activity.type !== "activity") return activity;
+    const name = activity.location?.name;
+    if (!name) return activity;
+    const issue = byLandmark.get(name.toLowerCase());
+    if (!issue) return activity;
+
+    const landmark = findLandmarkByName(landmarks, name);
+    const hours = landmark
+      ? `${landmark.openingHours.open}–${landmark.openingHours.close}`
+      : "listed hours";
+    const tip = `Confirm hours before you go — this visit may fall outside typical open times (${hours}).`;
+    return {
+      ...activity,
+      notes: activity.notes ? `${activity.notes} ${tip}` : tip,
+    };
+  });
+}
+
 async function enrichDay(
   rawDay: RawItinerary["days"][0],
   plan: TripPlan,
@@ -90,7 +122,12 @@ async function enrichDay(
     };
 
     if (a.type === "activity") {
-      const landmark = pickLandmarkForFamily(city, plan, rawDay.day, activitySlot, pickedLandmarks);
+      const startMin = parseTimeToMinutes(a.time);
+      const endMin = startMin + itemDurationMin(a, plan);
+      const landmark = pickLandmarkForFamily(city, plan, rawDay.day, activitySlot, pickedLandmarks, {
+        startMin,
+        endMin,
+      });
       pickedLandmarks.push(landmark);
       activitySlot += 1;
       act.location = landmarkLocation(landmark, activitySlot, rawDay.day);
@@ -147,19 +184,21 @@ async function enrichDay(
     normalizeActivity,
   );
 
-  for (const v of validateActivityOpeningHours(scheduledActivities, city.landmarks, (a) =>
+  const hoursIssues = validateActivityOpeningHours(scheduledActivities, city.landmarks, (a) =>
     itemDurationMin(a, plan),
-  )) {
+  );
+  for (const v of hoursIssues) {
     if (process.env.NODE_ENV === "development") {
       console.warn(`[schedule:hours] ${v.code}: ${v.message}`);
     }
   }
+  const withHoursNotes = applyOpeningHoursNotes(scheduledActivities, hoursIssues, city.landmarks);
 
-  const summary = summarizeDailyCost(scheduledActivities, lockedDailyTransport, city, plan);
+  const summary = summarizeDailyCost(withHoursNotes, lockedDailyTransport, city, plan);
   const costBreakdown = buildCostBreakdown(summary, city.currency);
   const transportCost = costBreakdown.transport;
 
-  const mapLocations = scheduledActivities
+  const mapLocations = withHoursNotes
     .filter((a) => a.location)
     .map((a) => a.location!);
 
@@ -168,7 +207,7 @@ async function enrichDay(
     date,
     weekday: formatDayHeader(date).split(",")[0],
     formattedDate: formatDayHeader(date),
-    activities: scheduledActivities,
+    activities: withHoursNotes,
     costBreakdown,
     accommodationTips: summary.accommodationTips,
     costs: costBreakdown,

@@ -3,8 +3,11 @@ import {
   activityNoteForFamily,
   pickLandmarkForFamily,
   suggestActivityTitle,
+  VisitWindow,
 } from "@/lib/schedule/family-profile";
+import { morningActivityDefaultTime } from "@/lib/planning-engine/skeleton-builder";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
+import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import {
   activityTitlePrefix,
   AdjustmentContext,
@@ -19,6 +22,11 @@ import {
 import { DayLandmarkContext, RawActivity, DayIntent } from "@/lib/planning-engine/types";
 import { TripPlan } from "@/types/trip-plan";
 
+function visitWindowFromTime(startTime: string, durationMin: number): VisitWindow {
+  const startMin = parseTimeToMinutes(startTime);
+  return { startMin, endMin: startMin + durationMin };
+}
+
 export function buildLandmarkContext(
   city: CityConfig,
   plan: TripPlan,
@@ -28,10 +36,14 @@ export function buildLandmarkContext(
 ): DayLandmarkContext {
   const adjustment = getAdjustmentContext(adjustNote, day);
   const offset = day + adjustment.landmarkOffset;
+  const activityMins = getIntensityConfig(plan).activityDurationMin;
+  const morningWindow = visitWindowFromTime(morningActivityDefaultTime(plan), activityMins);
+  const afternoonWindow = visitWindowFromTime("15:30", activityMins);
+  const extraWindow = visitWindowFromTime("16:15", activityMins);
 
-  const morning = pickLandmarkForFamily(city, plan, offset, 0, []);
-  const afternoon = pickLandmarkForFamily(city, plan, offset, 1, [morning]);
-  const extra = pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon]);
+  const morning = pickLandmarkForFamily(city, plan, offset, 0, [], morningWindow);
+  const afternoon = pickLandmarkForFamily(city, plan, offset, 1, [morning], afternoonWindow);
+  const extra = pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon], extraWindow);
   const lunch = pickLandmarkForFamily(city, plan, offset, 3, [morning, afternoon]);
   const dinner = pickLandmarkForFamily(city, plan, offset, 4, [morning, afternoon, lunch]);
 
