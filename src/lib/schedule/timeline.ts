@@ -1,5 +1,6 @@
 import { ActivityType } from "@/types/itinerary";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
+import { getFamilyAgeProfile } from "@/lib/schedule/family-profile";
 import { napDurationMin } from "@/lib/schedule/nap-policy";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -17,6 +18,9 @@ export function minutesToTime(totalMinutes: number): string {
 }
 
 export const GROCERY_DURATION_MIN = 30;
+
+/** Extra minutes between stops when the oldest child is 6 or under. */
+export const YOUNG_CHILD_TRAVEL_BUFFER_MIN = 8;
 
 export function isGroceryTitle(title: string): boolean {
   return /\bgrocery\b/i.test(title);
@@ -51,13 +55,20 @@ export function defaultDurationMin(type: ActivityType, plan: TripPlan): number {
 }
 
 export function defaultTravelMin(plan: TripPlan): number {
+  let base: number;
   if (plan.transportationType === "walking") {
-    return plan.walkingLimit === "low" ? 18 : 12;
+    base = plan.walkingLimit === "low" ? 18 : 12;
+  } else if (plan.transportationType === "taxis" || plan.transportationType === "car-rental") {
+    base = 15;
+  } else {
+    base = 20;
   }
-  if (plan.transportationType === "taxis" || plan.transportationType === "car-rental") {
-    return 15;
+
+  const oldest = getFamilyAgeProfile(plan).oldest;
+  if (oldest !== null && oldest <= 6) {
+    return base + YOUNG_CHILD_TRAVEL_BUFFER_MIN;
   }
-  return 20;
+  return base;
 }
 
 type Schedulable = {

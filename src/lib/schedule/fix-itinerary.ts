@@ -2,7 +2,9 @@ import { TripPlan } from "@/types/trip-plan";
 import { ActivityType, ItineraryActivity, ItineraryDay, RawItinerary, TimeOfDay } from "@/types/itinerary";
 import { getTimeOfDay } from "@/lib/format";
 import { AdjustmentContext, getAdjustmentContext } from "@/lib/planning-engine/day-adjustment";
+import { DayLandmarkContext } from "@/lib/planning-engine/types";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
+import { estimateTravelGapsForDay } from "@/lib/schedule/estimate-travel";
 import { getFamilyAgeProfile } from "@/lib/schedule/family-profile";
 import {
   anchorDinnerTimes,
@@ -41,6 +43,7 @@ function processRawActivities(
   activities: RawActivity[],
   plan: TripPlan,
   adjustment?: AdjustmentContext,
+  landmarkCtx?: DayLandmarkContext,
 ): RawActivity[] {
   let fixed = activities.filter((a) => a.type !== "nap");
 
@@ -63,7 +66,8 @@ function processRawActivities(
 
   fixed = resolveGroceryMealConflicts(fixed, plan);
 
-  let scheduled = rescheduleActivitiesWithMealAnchors(fixed, plan);
+  const travelGaps = landmarkCtx ? estimateTravelGapsForDay(fixed, landmarkCtx, plan) : [];
+  let scheduled = rescheduleActivitiesWithMealAnchors(fixed, plan, travelGaps);
   scheduled = anchorDinnerTimes(scheduled, plan);
 
   for (const v of validateDaySchedule(scheduled, plan)) {
@@ -79,12 +83,13 @@ export function fixRawDayActivities(
   activities: RawActivity[],
   plan: TripPlan,
   adjustment?: AdjustmentContext,
+  landmarkCtx?: DayLandmarkContext,
 ): RawActivity[] {
-  let result = processRawActivities(activities, plan, adjustment);
+  let result = processRawActivities(activities, plan, adjustment, landmarkCtx);
   const issues = validateRawDay(result, plan);
 
   if (issues.length > 0) {
-    result = processRawActivities(result, plan, adjustment);
+    result = processRawActivities(result, plan, adjustment, landmarkCtx);
   }
 
   return result;

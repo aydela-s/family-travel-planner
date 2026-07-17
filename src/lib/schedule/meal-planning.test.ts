@@ -5,7 +5,7 @@ import {
   isDinnerMeal,
   rescheduleActivitiesWithMealAnchors,
 } from "@/lib/schedule/meal-planning";
-import { activitiesOverlap, parseTimeToMinutes } from "@/lib/schedule/timeline";
+import { activitiesOverlap, defaultTravelMin, parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { TripPlan } from "@/types/trip-plan";
 
 function isoDateOffset(days: number): string {
@@ -74,7 +74,9 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
 
     expect(nap).toBeDefined();
     expect(afterNap).toBeDefined();
-    expect(parseTimeToMinutes(afterNap!.time) - parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(25);
+    expect(parseTimeToMinutes(afterNap!.time) - parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(
+      defaultTravelMin(plan),
+    );
   });
 
   it("fixRawDayActivities produces a valid day schedule", () => {

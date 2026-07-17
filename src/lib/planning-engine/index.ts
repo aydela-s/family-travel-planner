@@ -35,7 +35,7 @@ function buildDayActivities(
   const slots = buildDaySkeleton(plan, day, totalDays, adjustment);
   const ctx = buildLandmarkContext(city, plan, day, totalDays, adjustNote);
   const activities = fillDaySkeleton(slots, plan, ctx, day, totalDays, adjustNote);
-  return fixRawDayActivities(activities, plan, adjustment);
+  return fixRawDayActivities(activities, plan, adjustment, ctx);
 }
 
 function applySurgicalAdjust(
