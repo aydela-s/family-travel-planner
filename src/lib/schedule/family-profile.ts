@@ -1,4 +1,5 @@
-import { CityConfig } from "@/config/city-pricing";
+import { CityConfig, Landmark } from "@/config/city-pricing";
+import { haversineKm } from "@/lib/maps/directions";
 import { landmarksForStyle } from "@/lib/pricing/budget-style";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -12,6 +13,9 @@ export type FamilyAgeProfile = {
   isMixedAges: boolean;
   ageSummary: string;
 };
+
+/** Prefer same-day picks within this radius of earlier stops (km). */
+export const SAME_DAY_CLUSTER_KM = 5;
 
 export function getFamilyAgeProfile(plan: TripPlan): FamilyAgeProfile {
   const ages = plan.children;
@@ -68,14 +72,50 @@ function landmarkAgeScore(name: string, profile: FamilyAgeProfile): number {
   return score;
 }
 
+/** Minimum km from a candidate to any already-picked same-day landmark. */
+export function minDistanceKmToPicked(candidate: Landmark, alreadyPicked: Landmark[]): number {
+  if (alreadyPicked.length === 0) return 0;
+  return Math.min(
+    ...alreadyPicked.map((p) => haversineKm(candidate.lat, candidate.lng, p.lat, p.lng)),
+  );
+}
+
+/** Max pairwise distance among a set of landmarks (km). */
+export function maxPairwiseDistanceKm(landmarks: Landmark[]): number {
+  if (landmarks.length < 2) return 0;
+  let max = 0;
+  for (let i = 0; i < landmarks.length; i++) {
+    for (let j = i + 1; j < landmarks.length; j++) {
+      max = Math.max(
+        max,
+        haversineKm(landmarks[i].lat, landmarks[i].lng, landmarks[j].lat, landmarks[j].lng),
+      );
+    }
+  }
+  return max;
+}
+
+function proximityBonus(candidate: Landmark, alreadyPicked: Landmark[]): number {
+  if (alreadyPicked.length === 0) return 0;
+  const dist = minDistanceKmToPicked(candidate, alreadyPicked);
+  if (dist <= SAME_DAY_CLUSTER_KM) {
+    // Closer within the cluster window scores higher.
+    return (SAME_DAY_CLUSTER_KM - dist) * 8;
+  }
+  // Heavy penalty for zigzagging far across the city.
+  return -(dist - SAME_DAY_CLUSTER_KM) * 12;
+}
+
 export function pickLandmarkForFamily(
   city: CityConfig,
   plan: TripPlan,
   dayNumber: number,
   slotIndex: number,
-): CityConfig["landmarks"][0] {
+  alreadyPicked: Landmark[] = [],
+): Landmark {
   const profile = getFamilyAgeProfile(plan);
   const rotation = (dayNumber - 1) * 3 + slotIndex;
+  const pickedNames = new Set(alreadyPicked.map((l) => l.name));
 
   // Slot 0 is each day's main activity — under "balanced," this is the one
   // slot allowed to reach into the paid/premium tier ("one major paid
@@ -84,9 +124,50 @@ export function pickLandmarkForFamily(
     allowPremiumPick: slotIndex === 0,
   });
 
-  const ranked = [...stylePool]
-    .map((landmark) => ({ landmark, score: landmarkAgeScore(landmark.name, profile) }))
-    .sort((a, b) => b.score - a.score || b.landmark.adultPrice - a.landmark.adultPrice);
+  let pool = stylePool.filter((l) => !pickedNames.has(l.name));
+  if (pool.length === 0) {
+    // Style pool exhausted — use any unused city landmark before reusing.
+    pool = city.landmarks.filter((l) => !pickedNames.has(l.name));
+  }
+  if (pool.length === 0) {
+    pool = stylePool.length > 0 ? stylePool : city.landmarks;
+  }
+
+  // If later slots have no in-cluster option left in the style pool, expand to
+  // any unused city landmark within the cluster radius (avoids zigzagging when
+  // the cheap tier only has two far-apart free stops).
+  if (alreadyPicked.length > 0) {
+    const inCluster = pool.filter((l) => minDistanceKmToPicked(l, alreadyPicked) <= SAME_DAY_CLUSTER_KM);
+    if (inCluster.length === 0) {
+      const nearby = city.landmarks.filter(
+        (l) =>
+          !pickedNames.has(l.name) &&
+          minDistanceKmToPicked(l, alreadyPicked) <= SAME_DAY_CLUSTER_KM,
+      );
+      if (nearby.length > 0) {
+        pool = nearby;
+      }
+    } else {
+      pool = inCluster;
+    }
+  }
+
+  const ranked = [...pool]
+    .map((landmark) => ({
+      landmark,
+      score: landmarkAgeScore(landmark.name, profile) + proximityBonus(landmark, alreadyPicked),
+      dist: minDistanceKmToPicked(landmark, alreadyPicked),
+    }))
+    .sort((a, b) => b.score - a.score || a.dist - b.dist || b.landmark.adultPrice - a.landmark.adultPrice);
+
+  if (alreadyPicked.length > 0) {
+    const clustered = ranked.filter((r) => r.dist <= SAME_DAY_CLUSTER_KM);
+    if (clustered.length > 0) {
+      return clustered[rotation % clustered.length].landmark;
+    }
+    // Nothing in cluster — nearest remaining stop, no random far rotation.
+    return ranked[0].landmark;
+  }
 
   return ranked[rotation % ranked.length].landmark;
 }

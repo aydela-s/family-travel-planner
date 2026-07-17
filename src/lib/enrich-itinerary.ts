@@ -1,4 +1,4 @@
-import { CityConfig, PRICING_DISCLAIMER } from "@/config/city-pricing";
+import { CityConfig, Landmark, PRICING_DISCLAIMER } from "@/config/city-pricing";
 import { detectCity } from "@/lib/city-detect";
 import {
   addDays,
@@ -34,16 +34,7 @@ import {
   RawItinerary,
 } from "@/types/itinerary";
 
-function pickLandmarkForActivity(
-  city: CityConfig,
-  plan: TripPlan,
-  dayNumber: number,
-  slotIndex: number,
-): CityConfig["landmarks"][0] {
-  return pickLandmarkForFamily(city, plan, dayNumber, slotIndex);
-}
-
-function landmarkLocation(landmark: CityConfig["landmarks"][0], slotIndex: number, day: number): ActivityLocation {
+function landmarkLocation(landmark: Landmark, slotIndex: number, day: number): ActivityLocation {
   const offset = (slotIndex * 0.006 + day * 0.003) % 0.015;
   return {
     name: landmark.name,
@@ -88,6 +79,7 @@ async function enrichDay(
 ): Promise<ItineraryDay> {
   const date = addDays(plan.startDate, dayIndex);
   let activitySlot = 0;
+  const pickedLandmarks: Landmark[] = [];
 
   const activities: ItineraryActivity[] = rawDay.activities.map((a) => {
     const timeOfDay = getTimeOfDay(a.time);
@@ -98,12 +90,19 @@ async function enrichDay(
     };
 
     if (a.type === "activity") {
-      const landmark = pickLandmarkForActivity(city, plan, rawDay.day, activitySlot);
+      const landmark = pickLandmarkForFamily(city, plan, rawDay.day, activitySlot, pickedLandmarks);
+      pickedLandmarks.push(landmark);
       activitySlot += 1;
       act.location = landmarkLocation(landmark, activitySlot, rawDay.day);
       act.activityCost = familyActivityCost(landmark.adultPrice, plan.adults, plan.children);
     } else if (a.type === "meal") {
-      const mealLandmark = city.landmarks[(rawDay.day + activitySlot) % city.landmarks.length];
+      const mealLandmark = pickLandmarkForFamily(
+        city,
+        plan,
+        rawDay.day,
+        10 + activitySlot,
+        pickedLandmarks,
+      );
       act.location = {
         name: `${mealLandmark.name} area`,
         lat: mealLandmark.lat + 0.004,
@@ -111,7 +110,13 @@ async function enrichDay(
       };
       act.activityCost = 0;
     } else {
-      const restLandmark = city.landmarks[(rawDay.day + activitySlot + 1) % city.landmarks.length];
+      const restLandmark = pickLandmarkForFamily(
+        city,
+        plan,
+        rawDay.day,
+        20 + activitySlot,
+        pickedLandmarks,
+      );
       act.location = landmarkLocation(restLandmark, activitySlot + 2, rawDay.day);
       act.activityCost = 0;
     }

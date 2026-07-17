@@ -29,12 +29,18 @@ export function buildLandmarkContext(
   const adjustment = getAdjustmentContext(adjustNote, day);
   const offset = day + adjustment.landmarkOffset;
 
+  const morning = pickLandmarkForFamily(city, plan, offset, 0, []);
+  const afternoon = pickLandmarkForFamily(city, plan, offset, 1, [morning]);
+  const extra = pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon]);
+  const lunch = pickLandmarkForFamily(city, plan, offset, 3, [morning, afternoon]);
+  const dinner = pickLandmarkForFamily(city, plan, offset, 4, [morning, afternoon, lunch]);
+
   return {
-    morning: pickLandmarkForFamily(city, plan, offset, 0),
-    afternoon: pickLandmarkForFamily(city, plan, offset, 1),
-    lunch: city.landmarks[(day + Math.floor(totalDays / 2) + adjustment.landmarkOffset) % city.landmarks.length],
-    dinner: city.landmarks[(day + 2 + adjustment.landmarkOffset) % city.landmarks.length],
-    extra: pickLandmarkForFamily(city, plan, offset, 2),
+    morning,
+    afternoon,
+    lunch,
+    dinner,
+    extra,
     dayOffset: adjustment.landmarkOffset,
   };
 }
