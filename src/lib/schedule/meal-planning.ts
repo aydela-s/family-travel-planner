@@ -8,6 +8,7 @@ import { SlotKind } from "@/lib/planning-engine/types";
 import { TripPlan } from "@/types/trip-plan";
 import { ActivityType } from "@/types/itinerary";
 import { getNapWindow, napDurationMin, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
+import { PACKED_LONGER_ACTIVITY_MIN } from "@/lib/schedule/travel-style";
 import {
   defaultDurationMin,
   defaultTravelMin,
@@ -35,6 +36,63 @@ const RETURN_HOME = /\breturn to|back to (your )?(rental|accommodation|stay|hote
 
 export function isGroceryActivity(a: RawActivity): boolean {
   return GROCERY.test(a.title) || GROCERY.test(a.notes ?? "");
+}
+
+function isLengthenablePackedActivity(a: RawActivity): boolean {
+  return a.type === "activity" && !isGroceryActivity(a);
+}
+
+function packedActivityDuration(
+  item: RawActivity,
+  plan: TripPlan,
+  fewerLonger: boolean,
+): number {
+  const base = itemDurationMin(item, plan);
+  if (fewerLonger && isLengthenablePackedActivity(item)) {
+    return Math.max(base, PACKED_LONGER_ACTIVITY_MIN);
+  }
+  return base;
+}
+
+/** Expand packed activities to the longer duration and shift following items. */
+export function applyPackedFewerLonger<T extends RawActivity & { endTime: string }>(
+  scheduled: T[],
+  plan: TripPlan,
+): T[] {
+  if (scheduled.length === 0) return scheduled;
+  const gap = defaultTravelMin(plan);
+  const out = scheduled.map((item) => ({ ...item }));
+
+  for (let i = 0; i < out.length; i++) {
+    const item = out[i];
+    if (isLengthenablePackedActivity(item)) {
+      const start = parseTimeToMinutes(item.time);
+      const current = parseTimeToMinutes(item.endTime) - start;
+      if (current < PACKED_LONGER_ACTIVITY_MIN) {
+        out[i] = {
+          ...item,
+          endTime: minutesToTime(start + PACKED_LONGER_ACTIVITY_MIN),
+        };
+      }
+    }
+
+    if (i + 1 < out.length) {
+      const prevEnd = parseTimeToMinutes(out[i].endTime);
+      const next = out[i + 1];
+      const nextStart = parseTimeToMinutes(next.time);
+      const nextDur = parseTimeToMinutes(next.endTime) - nextStart;
+      if (nextStart < prevEnd + gap) {
+        const newStart = prevEnd + gap;
+        out[i + 1] = {
+          ...next,
+          time: minutesToTime(newStart),
+          endTime: minutesToTime(newStart + nextDur),
+        };
+      }
+    }
+  }
+
+  return out;
 }
 
 export function isDinnerMeal(a: RawActivity): boolean {
@@ -234,6 +292,13 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
   const optional = daySequence.filter(isOptionalActivity);
 
   const napWindow = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
+  // Nap-heavy packed days choose fewer/longer up front (keep skeleton extra for FAM-5).
+  const packedFewerLongerUpFront =
+    plan.travelStyle === "packed" && Boolean(napWindow);
+  const optionalToPlace = packedFewerLongerUpFront
+    ? optional.filter((a) => a.slotKind !== "extra_activity")
+    : optional;
+
   const { minMin: dinnerMin, maxMin: dinnerMax } = dinnerTimeWindow(plan);
   const dinnerDuration = defaultDurationMin("meal", plan);
   const latestDinnerStart = dinnerMax - dinnerDuration;
@@ -270,7 +335,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       start = cursor + travel;
     }
 
-    let duration = itemDurationMin(item, plan);
+    let duration = packedActivityDuration(item, plan, packedFewerLongerUpFront);
     if (needsRecoveryRest && (item.type === "rest" || item.type === "nap")) {
       duration += HIGH_INTENSITY_REST_BONUS_MIN;
       needsRecoveryRest = false;
@@ -302,7 +367,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     }
   }
 
-  for (const item of optional) {
+  for (const item of optionalToPlace) {
     const travel = nextTravel();
     const trial = scheduleOne(item, cursor + travel, plan);
     const trialEnd = parseTimeToMinutes(trial.endTime);
@@ -315,6 +380,21 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     if (trialDinner <= latestDinnerStart) {
       result.push(trial);
       cursor = trialEnd;
+    }
+  }
+
+  // Dinner-tight drop (no naps): lengthen remaining stops after the extra was skipped.
+  // Nap-heavy packed days already used longer durations in the required loop.
+  if (
+    plan.travelStyle === "packed" &&
+    !packedFewerLongerUpFront &&
+    !result.some((a) => a.slotKind === "extra_activity")
+  ) {
+    const lengthened = applyPackedFewerLonger(result, plan);
+    result.length = 0;
+    result.push(...lengthened);
+    if (result.length > 0) {
+      cursor = parseTimeToMinutes(result[result.length - 1].endTime);
     }
   }
 

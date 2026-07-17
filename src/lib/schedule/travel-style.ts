@@ -1,5 +1,8 @@
 import { TripPlan, TravelStyle } from "@/types/trip-plan";
 
+/** When packed drops to fewer stops, stretch remaining activities to this length. */
+export const PACKED_LONGER_ACTIVITY_MIN = 105;
+
 export type IntensityConfig = {
   style: TravelStyle | "";
   maxActivities: number;
@@ -31,6 +34,8 @@ export function getIntensityConfig(plan: TripPlan): IntensityConfig {
     // Packed must always schedule more activities than balanced, for every
     // family — age-appropriateness of the extra stop is handled by
     // pickLandmarkForFamily's age scoring, not by dropping the slot.
+    // When the optional extra is skipped at schedule time (naps / dinner),
+    // remaining activities lengthen to PACKED_LONGER_ACTIVITY_MIN.
     return {
       style,
       maxActivities: 3,
