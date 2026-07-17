@@ -4,7 +4,11 @@ import { getTimeOfDay } from "@/lib/format";
 import { AdjustmentContext, getAdjustmentContext } from "@/lib/planning-engine/day-adjustment";
 import { DayLandmarkContext } from "@/lib/planning-engine/types";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
-import { estimateTravelGapsForDay } from "@/lib/schedule/estimate-travel";
+import {
+  applyTravelThreshold,
+  estimateTravelGapsForDay,
+  estimateTravelMinBetween,
+} from "@/lib/schedule/estimate-travel";
 import { getFamilyAgeProfile } from "@/lib/schedule/family-profile";
 import {
   anchorDinnerTimes,
@@ -127,7 +131,8 @@ export function travelGapsFromSegments(
     const from = activities[i].location;
     const to = activities[i + 1].location;
     if (from && to && segIdx < segmentDurations.length) {
-      gaps.push(Math.max(segmentDurations[segIdx], 10));
+      const expected = estimateTravelMinBetween(from, to, plan);
+      gaps.push(applyTravelThreshold(expected, segmentDurations[segIdx]));
       segIdx += 1;
     } else {
       gaps.push(defaultTravelMin(plan));

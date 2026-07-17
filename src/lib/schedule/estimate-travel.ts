@@ -12,6 +12,14 @@ type ActivityRef = {
   slotKind?: SlotKind;
 };
 
+/** Map/enrich travel must exceed expected by this ratio to trigger a traffic pad. */
+export const TRAVEL_THRESHOLD_RATIO = 1.5;
+
+/** Extra pad applied when the threshold fires (stand-in for traffic delay). */
+export const TRAVEL_TRAFFIC_BUFFER = 1.15;
+
+export const MIN_SEGMENT_TRAVEL_MIN = 10;
+
 /** Estimate travel minutes from straight-line distance (same formula as maps/directions fallback). */
 export function estimateTravelMinBetween(
   from: Located,
@@ -28,6 +36,18 @@ export function estimateTravelMinBetween(
 
   // Never schedule less travel than the age/transport base gap.
   return Math.max(defaultTravelMin(plan), fromDistance);
+}
+
+/**
+ * When enrich/map travel ≫ the haversine estimate, pad the gap as a traffic buffer.
+ * Otherwise keep the measured segment (floored).
+ */
+export function applyTravelThreshold(expectedMin: number, actualMin: number): number {
+  const actual = Math.max(actualMin, MIN_SEGMENT_TRAVEL_MIN);
+  if (actual > expectedMin * TRAVEL_THRESHOLD_RATIO) {
+    return Math.ceil(actual * TRAVEL_TRAFFIC_BUFFER);
+  }
+  return actual;
 }
 
 function landmarkForSlot(kind: SlotKind | undefined, ctx: DayLandmarkContext): Landmark | null {

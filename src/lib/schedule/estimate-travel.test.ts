@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import { CITY_CONFIGS } from "@/config/city-pricing";
 import { buildLandmarkContext } from "@/lib/planning-engine/slot-filler";
 import {
+  applyTravelThreshold,
   estimateTravelGapsForDay,
   estimateTravelMinBetween,
+  TRAVEL_THRESHOLD_RATIO,
+  TRAVEL_TRAFFIC_BUFFER,
 } from "@/lib/schedule/estimate-travel";
 import {
   defaultTravelMin,
@@ -94,5 +97,22 @@ describe("haversine travel estimates — Phase 4", () => {
     const zoo = sanDiego.landmarks.find((l) => l.name === "San Diego Zoo")!;
     const estimate = estimateTravelMinBetween(balboa, zoo, plan);
     expect(estimate).toBeGreaterThanOrEqual(defaultTravelMin(plan));
+  });
+});
+
+describe("travel threshold buffer — P0", () => {
+  it("pads the gap when map travel exceeds the estimate by the threshold ratio", () => {
+    const expected = 20;
+    const actual = Math.ceil(expected * TRAVEL_THRESHOLD_RATIO) + 1;
+    expect(applyTravelThreshold(expected, actual)).toBe(Math.ceil(actual * TRAVEL_TRAFFIC_BUFFER));
+  });
+
+  it("does not pad when map travel is within the estimate threshold", () => {
+    expect(applyTravelThreshold(20, 25)).toBe(25);
+    expect(applyTravelThreshold(20, 30)).toBe(30);
+  });
+
+  it("floors very short segments to the minimum travel minutes", () => {
+    expect(applyTravelThreshold(20, 5)).toBe(10);
   });
 });

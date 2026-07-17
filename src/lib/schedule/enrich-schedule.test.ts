@@ -34,35 +34,60 @@ function airbnbCookPlan(): TripPlan {
 
 describe("enrich scheduling — Phase B", () => {
   it("maps one segment duration per consecutive located activity pair", () => {
+    const plan = airbnbCookPlan();
     const activities: ItineraryActivity[] = [
       {
         time: "10:00",
         title: "Morning",
         type: "activity",
         timeOfDay: "morning",
-        location: { name: "A", lat: 1, lng: 1 },
+        location: { name: "A", lat: 48.86, lng: 2.34 },
       },
       {
         time: "12:00",
         title: "Lunch",
         type: "meal",
         timeOfDay: "afternoon",
-        location: { name: "B", lat: 2, lng: 2 },
+        location: { name: "B", lat: 48.861, lng: 2.341 },
       },
       {
         time: "15:00",
         title: "Grocery stop for dinner ingredients",
         type: "activity",
         timeOfDay: "afternoon",
-        location: { name: "C", lat: 3, lng: 3 },
+        location: { name: "C", lat: 48.862, lng: 2.342 },
       },
     ];
 
-    const gaps = travelGapsFromSegments(activities, [12, 18], {
-      transportationType: "public-transportation",
-    } as TripPlan);
-
+    // Nearby legs: estimate ≈ defaultTravelMin; short segments stay unpadded.
+    const gaps = travelGapsFromSegments(activities, [12, 18], plan);
     expect(gaps).toEqual([12, 18]);
+  });
+
+  it("applies a traffic pad when enrich segment greatly exceeds the haversine estimate", () => {
+    const plan = airbnbCookPlan();
+    const nearbyA = { name: "A", lat: 48.86, lng: 2.34 };
+    const nearbyB = { name: "B", lat: 48.861, lng: 2.341 };
+    const activities: ItineraryActivity[] = [
+      {
+        time: "10:00",
+        title: "Morning",
+        type: "activity",
+        timeOfDay: "morning",
+        location: nearbyA,
+      },
+      {
+        time: "12:00",
+        title: "Lunch",
+        type: "meal",
+        timeOfDay: "afternoon",
+        location: nearbyB,
+      },
+    ];
+
+    const gaps = travelGapsFromSegments(activities, [45], plan);
+    // Nearby estimate is ~defaultTravelMin (20); 45 > 20*1.5 → ceil(45*1.15)=52
+    expect(gaps[0]).toBe(52);
   });
 
   it("rescheduleEnrichedActivities preserves locations and costs", () => {
