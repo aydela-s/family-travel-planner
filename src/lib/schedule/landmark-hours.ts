@@ -93,9 +93,9 @@ function formatEnd(endMin: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/** Pull landmark name from titles like "Morning: Explore Louvre Museum". */
+/** Pull landmark name from titles like "Explore Louvre Museum". */
 function extractLandmarkFromTitle(title: string): string | null {
-  const colon = title.match(/^(?:Morning|Afternoon):\s+(?:Explore|Visit|Family time at)\s+(.+)$/i);
-  if (colon) return colon[1].trim();
+  const match = title.match(/^(?:Explore|Visit|Family time at)\s+(.+)$/i);
+  if (match) return match[1].trim();
   return null;
 }

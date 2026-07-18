@@ -9,6 +9,12 @@ export function formatTripDate(isoDate: string): string {
   });
 }
 
+/** Inclusive trip range for itinerary header (FAM-37). */
+export function formatTripDateRange(startIso: string, endIso: string): string {
+  if (startIso === endIso) return formatTripDate(startIso);
+  return `${formatTripDate(startIso)} – ${formatTripDate(endIso)}`;
+}
+
 export function formatDayHeader(isoDate: string): string {
   const date = new Date(`${isoDate}T12:00:00`);
   return date.toLocaleDateString("en-US", {
@@ -47,9 +53,9 @@ export function formatTimeOfDayLabel(period: TimeOfDay): string {
   return period.charAt(0).toUpperCase() + period.slice(1);
 }
 
-/** Remove time-of-day words from titles that conflict with scheduled time */
+/** Strip conflicting time-of-day words; do not add Morning:/Afternoon: prefixes (FAM-18). */
 export function alignTitleWithTimeOfDay(title: string, period: TimeOfDay): string {
-  let t = title;
+  let t = title.replace(/^(morning|afternoon|evening):\s*/i, "").trim();
   const strip = (words: string[]) => {
     for (const w of words) {
       t = t.replace(new RegExp(`\\b${w}\\b`, "gi"), "").replace(/\s+/g, " ").trim();
@@ -64,11 +70,7 @@ export function alignTitleWithTimeOfDay(title: string, period: TimeOfDay): strin
     strip(["afternoon", "evening", "dinner", "sunset"]);
   }
 
-  if (!t) return title;
-  const prefix =
-    period === "morning" ? "Morning:" : period === "afternoon" ? "Afternoon:" : "Evening:";
-  if (/^(morning|afternoon|evening):/i.test(t)) return t;
-  return `${prefix} ${t}`;
+  return t || title.replace(/^(morning|afternoon|evening):\s*/i, "").trim() || title;
 }
 
 export function displayLocation(name: string): string {

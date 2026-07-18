@@ -63,7 +63,7 @@ describe("format-labels — locked wording (FAM-17)", () => {
 
   it("locks in the exact wizard-step wording for the remaining transportation options", () => {
     expect(TRANSPORTATION_LABELS.walking).toBe("Walking");
-    expect(TRANSPORTATION_LABELS["car-rental"]).toBe("Car rental");
+    expect(TRANSPORTATION_LABELS["car-rental"]).toBe("Car");
     expect(TRANSPORTATION_LABELS["public-transportation"]).toBe("Public transit");
   });
 

@@ -7,7 +7,7 @@ import { AccommodationType, BudgetStyle, TransportationType } from "@/types/trip
  */
 export const TRANSPORTATION_LABELS: Record<TransportationType, string> = {
   walking: "Walking",
-  "car-rental": "Car rental",
+  "car-rental": "Car",
   taxis: "Taxi",
   "public-transportation": "Public transit",
 };

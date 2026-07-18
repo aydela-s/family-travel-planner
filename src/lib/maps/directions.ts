@@ -100,14 +100,14 @@ export function estimateDailyTransport(
   }
   if (transportType === "car-rental") {
     const fuelCost = estimateFuelCostForDriving(city, totalKm);
-    return { cost: fuelCost, label: `Car rental · est. fuel (${totalKm} km)`, fuelCost };
+    return { cost: fuelCost, label: `Car · est. fuel (${totalKm} km)`, fuelCost };
   }
   if (transportType === "public-transportation") {
     const choice = choosePublicTransitFare(city, plan, segmentCosts.length);
     return { cost: choice.cost, label: choice.label };
   }
   const cost = estimateTaxiDailyCost(segmentCosts);
-  return { cost, label: `Taxi / rideshare` };
+  return { cost, label: "Taxi" };
 }
 
 /** Movement description only — cost comes from costBreakdown.transport */
@@ -119,5 +119,5 @@ export function formatTransportDisplay(
 ): string {
   const costStr =
     transportCost > 0 ? `${currencySymbol}${transportCost.toFixed(2)}` : "Included / walking";
-  return `${movementLabel} · Family transport ${costStr}`;
+  return `${movementLabel} · Transport ${costStr}`;
 }

@@ -36,7 +36,7 @@ const PROFILES: Record<AccommodationType, AccommodationFoodProfile> = {
     preferCooking: false,
     preferRestaurants: true,
     planningTips: [
-      "Try a neighborhood café for breakfast — quick and kid-friendly.",
+      "Try a neighborhood café for breakfast — quick and easy.",
       "Supermarket pastries are a budget-smart breakfast backup.",
     ],
   },

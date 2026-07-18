@@ -171,9 +171,7 @@ export const dietaryQuickPicks = [
   "Vegetarian",
   "Vegan",
   "Gluten-free",
-  "Nut allergy",
   "Dairy-free",
-  "Kid-friendly only",
 ] as const;
 
 export const destinationSuggestions = [

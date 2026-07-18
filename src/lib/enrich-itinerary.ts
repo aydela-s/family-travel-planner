@@ -4,7 +4,7 @@ import {
   addDays,
   alignTitleWithTimeOfDay,
   formatDayHeader,
-  formatTripDate,
+  formatTripDateRange,
   getTimeOfDay,
 } from "@/lib/format";
 import { estimateDailyTransport, formatTransportDisplay } from "@/lib/maps/directions";
@@ -298,7 +298,7 @@ export async function enrichItinerary(
   return {
     destination: plan.destination,
     destinationCity: city.name,
-    tripStartFormatted: formatTripDate(plan.startDate),
+    tripStartFormatted: formatTripDateRange(plan.startDate, plan.endDate),
     currency: city.currency,
     currencySymbol: city.currencySymbol,
     pricingDisclaimer: PRICING_DISCLAIMER,

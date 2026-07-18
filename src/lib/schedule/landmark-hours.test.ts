@@ -37,7 +37,7 @@ describe("landmark opening hours", () => {
         {
           time: "08:00",
           endTime: "09:30",
-          title: "Morning: Explore Louvre Museum",
+          title: "Explore Louvre Museum",
           type: "activity",
           location: { name: "Louvre Museum" },
         },

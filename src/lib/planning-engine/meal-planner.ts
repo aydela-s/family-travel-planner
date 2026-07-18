@@ -43,7 +43,7 @@ export function breakfastLabel(plan: TripPlan, spot: string): { title: string; n
     default:
       return {
         title: `Breakfast near ${spot}`,
-        notes: "Kid-friendly café before the main outing.",
+        notes: "Café stop before the main outing.",
       };
   }
 }

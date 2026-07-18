@@ -266,18 +266,17 @@ export function activityNoteForFamily(plan: TripPlan, day: number): string {
 export function suggestActivityTitle(
   landmarkName: string,
   plan: TripPlan,
-  slot: "morning" | "afternoon",
+  _slot: "morning" | "afternoon",
 ): string {
   const profile = getFamilyAgeProfile(plan);
-  const prefix = slot === "morning" ? "Morning:" : "Afternoon:";
 
   if (TITLE_EXPLORE.test(landmarkName)) {
-    return `${prefix} Explore ${landmarkName}`;
+    return `Explore ${landmarkName}`;
   }
   if (profile.hasTeen && TITLE_TEEN.test(landmarkName)) {
-    return `${prefix} Visit ${landmarkName}`;
+    return `Visit ${landmarkName}`;
   }
-  return `${prefix} Family time at ${landmarkName}`;
+  return `Family time at ${landmarkName}`;
 }
 
 export function ageAwareTravelerHints(children: number[]): string[] {

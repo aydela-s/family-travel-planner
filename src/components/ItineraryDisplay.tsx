@@ -69,30 +69,25 @@ function CostBreakdown({ day, symbol }: { day: ItineraryDay; symbol: string }) {
   return (
     <div className="mt-6 space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">
-            Estimated daily cost
-          </h4>
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">
-            for your whole family
-          </span>
-        </div>
+        <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+          Estimated daily cost
+        </h4>
 
         <dl className="mt-3 space-y-2 text-sm">
           <div className="flex justify-between">
-            <dt className="text-slate-600">🍽️ Food (family)</dt>
+            <dt className="text-slate-600">🍽️ Food</dt>
             <dd className="font-semibold text-slate-900">{formatMoney(c.food, c.currency, symbol)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-slate-600">🚗 Transport (family)</dt>
+            <dt className="text-slate-600">🚗 Transport</dt>
             <dd className="font-semibold text-slate-900">{formatMoney(c.transport, c.currency, symbol)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-slate-600">🎯 Activities (family)</dt>
+            <dt className="text-slate-600">🎯 Activities</dt>
             <dd className="font-semibold text-slate-900">{formatMoney(c.activities, c.currency, symbol)}</dd>
           </div>
           <div className="flex justify-between border-t border-slate-200 pt-2 text-base">
-            <dt className="font-bold text-slate-900">Daily total (family)</dt>
+            <dt className="font-bold text-slate-900">Daily total</dt>
             <dd className="font-bold text-sky-700">{formatMoney(c.total, c.currency, symbol)}</dd>
           </div>
         </dl>
@@ -165,13 +160,12 @@ function DayCard({
 export default function ItineraryDisplay({
   itinerary,
   isDemo = false,
-  isLoading = false,
-  onPlanAnother,
 }: {
   itinerary: Itinerary;
   isDemo?: boolean;
   isLoading?: boolean;
-  onPlanAnother: () => void;
+  /** Kept for call-site compatibility; home link replaces “Plan another trip”. */
+  onPlanAnother?: () => void;
 }) {
   const tripTotal = itinerary.days.reduce((s, d) => s + d.costs.total, 0);
   const symbol = itinerary.currencySymbol;
@@ -201,19 +195,8 @@ export default function ItineraryDisplay({
           {itinerary.pricingDisclaimer}
         </p>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <button
-            type="button"
-            onClick={onPlanAnother}
-            disabled={isLoading}
-            className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-          >
-            Plan another trip
-          </button>
-        </div>
-
         <div className="rounded-2xl bg-gradient-to-r from-sky-600 to-sky-500 px-5 py-4 text-white shadow-lg shadow-sky-200">
-          <p className="text-xs font-semibold uppercase tracking-wider opacity-90">Estimated trip total (family)</p>
+          <p className="text-xs font-semibold uppercase tracking-wider opacity-90">Estimated trip total</p>
           <p className="text-2xl font-bold">{formatMoney(tripTotal, itinerary.currency, symbol)}</p>
         </div>
       </header>

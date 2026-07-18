@@ -4,6 +4,7 @@ import {
   getFamilyAgeProfile,
   landmarkAgeScore,
   pickLandmarkForFamily,
+  suggestActivityTitle,
 } from "@/lib/schedule/family-profile";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -121,5 +122,20 @@ describe("ageTags scoring — Phase 5", () => {
     const pick = pickLandmarkForFamily(paris, plan, 1, 0, []);
     expect(pick.ageTags).toContain("toddler");
     expect(pick.name).toBe("Jardin du Luxembourg");
+  });
+});
+
+describe("suggestActivityTitle — FAM-18", () => {
+  it("does not prefix Morning: or Afternoon:", () => {
+    const plan = planWithChildren([10]);
+    expect(suggestActivityTitle("Louvre Museum", plan, "morning")).toBe(
+      "Explore Louvre Museum",
+    );
+    expect(suggestActivityTitle("Louvre Museum", plan, "afternoon")).toBe(
+      "Explore Louvre Museum",
+    );
+    expect(suggestActivityTitle("Louvre Museum", plan, "morning")).not.toMatch(
+      /^(Morning|Afternoon):/,
+    );
   });
 });
