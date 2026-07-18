@@ -10,8 +10,11 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Family Travel Planner",
-  description: "Plan unforgettable family adventures together",
+  title: "TripNestly — Family Travel Planner",
+  description: "Travel planning for real families",
+  icons: {
+    icon: "/tripnestly-logo.png",
+  },
 };
 
 export default function RootLayout({

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TripNestlyLogo } from "@/components/TripNestlyLogo";
 
 export default function Home() {
   return (
@@ -13,9 +14,10 @@ export default function Home() {
       />
 
       <div className="relative mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 py-16 text-center">
-        <p className="mb-4 inline-flex items-center rounded-full bg-sky-100 px-4 py-1 text-sm font-medium text-sky-800">
-          Adventures made simple
-        </p>
+        <TripNestlyLogo
+          showTagline
+          className="mb-8 h-auto w-[5in] max-w-full"
+        />
 
         <h1 className="max-w-3xl text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl">
           Plan your next family adventure
