@@ -1,24 +1,34 @@
+import { BRAND } from "@/config/brand";
+
 type TripNestlyLogoProps = {
   className?: string;
-  /** Kept for call-site compatibility; both variants use the attached wordmark. */
+  /**
+   * `wordmark` — full Looka PNG (includes baked-in slogan).
+   * `mark` — compact SVG for nav headers and tight spaces.
+   */
   variant?: "wordmark" | "mark";
+  /** @deprecated Logo PNG already includes the slogan; kept for call-site compatibility. */
   showTagline?: boolean;
   title?: string;
 };
 
 /**
- * TripNestly logo — uses the attached Looka/wordmark PNG as-is.
+ * TripNestly brand mark / wordmark.
  */
 export function TripNestlyLogo({
   className,
-  title = "TripNestly",
+  variant = "wordmark",
+  title = BRAND.name,
 }: TripNestlyLogoProps) {
+  if (variant === "mark") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public
+      <img src={BRAND.markSrc} alt={title} className={className} />
+    );
+  }
+
   return (
     // eslint-disable-next-line @next/next/no-img-element -- static brand asset in /public
-    <img
-      src="/tripnestly-logo.png"
-      alt={title}
-      className={className}
-    />
+    <img src={BRAND.logoSrc} alt={`${title} — ${BRAND.slogan}`} className={className} />
   );
 }

@@ -6,6 +6,7 @@ import BackToTopButton from "@/components/BackToTopButton";
 import ItineraryDisplay from "@/components/ItineraryDisplay";
 import LoadingScreen from "@/components/LoadingScreen";
 import { TripNestlyLogo } from "@/components/TripNestlyLogo";
+import { BRAND } from "@/config/brand";
 import { Itinerary } from "@/types/itinerary";
 import { GenerateItineraryOptions } from "@/types/generate";
 import { initialTripPlan, TripPlan } from "@/types/trip-plan";
@@ -229,8 +230,12 @@ export default function TripPlanWizard() {
     return (
       <main className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-amber-50 px-4 py-8 sm:px-6 sm:py-12">
         <div className="mx-auto max-w-2xl">
-          <Link href="/" className="mb-6 inline-flex text-[#6289a8]">
-            <TripNestlyLogo className="h-8 w-auto" />
+          <Link
+            href="/"
+            className="mb-6 inline-flex items-center gap-2.5 text-[#1F5F5A] transition hover:opacity-80"
+          >
+            <TripNestlyLogo variant="mark" className="h-9 w-9" />
+            <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
           </Link>
           <div className="rounded-3xl border border-white/80 bg-white/90 p-6 shadow-xl shadow-sky-100/50 backdrop-blur sm:p-10">
             <LoadingScreen message={loadingMessage} />
@@ -244,8 +249,12 @@ export default function TripPlanWizard() {
     return (
       <main className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-amber-50 px-4 py-8 sm:px-6 sm:py-12">
         <div className="mx-auto max-w-3xl">
-          <Link href="/" className="inline-flex text-[#6289a8] transition hover:opacity-80">
-            <TripNestlyLogo className="h-8 w-auto" />
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2.5 text-[#1F5F5A] transition hover:opacity-80"
+          >
+            <TripNestlyLogo variant="mark" className="h-9 w-9" />
+            <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
           </Link>
 
           <div className="relative mt-6 rounded-3xl border border-white/80 bg-white/90 p-6 shadow-xl shadow-sky-100/50 backdrop-blur sm:p-10">
@@ -265,8 +274,12 @@ export default function TripPlanWizard() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-amber-50 px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-2xl">
-        <Link href="/" className="inline-flex text-[#6289a8] transition hover:opacity-80">
-          <TripNestlyLogo className="h-8 w-auto" />
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2.5 text-[#1F5F5A] transition hover:opacity-80"
+        >
+          <TripNestlyLogo variant="mark" className="h-9 w-9" />
+          <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
         </Link>
 
         <div

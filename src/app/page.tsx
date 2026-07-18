@@ -1,55 +1,41 @@
 import Link from "next/link";
 import { TripNestlyLogo } from "@/components/TripNestlyLogo";
+import { BRAND } from "@/config/brand";
 
 export default function Home() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-sky-50 via-white to-amber-50">
+    <main className="relative min-h-screen overflow-hidden bg-[#F7F5F2]">
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-24 right-0 h-96 w-96 rounded-full bg-sky-200/40 blur-3xl"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_0%,rgba(91,168,163,0.22),transparent_55%),radial-gradient(ellipse_at_90%_10%,rgba(232,155,140,0.18),transparent_45%),radial-gradient(ellipse_at_50%_100%,rgba(31,95,90,0.08),transparent_50%)]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute bottom-0 left-0 h-80 w-80 rounded-full bg-amber-200/40 blur-3xl"
+        className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:linear-gradient(rgba(31,95,90,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(31,95,90,0.04)_1px,transparent_1px)] [background-size:48px_48px]"
       />
 
-      <div className="relative mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 py-16 text-center">
-        <TripNestlyLogo
-          showTagline
-          className="mb-8 h-auto w-[5in] max-w-full"
-        />
+      <div className="relative mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center px-6 py-16 text-center">
+        <div className="animate-fade-in">
+          <TripNestlyLogo className="mx-auto h-auto w-[min(100%,22rem)] sm:w-[26rem]" />
+        </div>
 
-        <h1 className="max-w-3xl text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl">
+        <h1 className="animate-fade-in mt-10 max-w-2xl text-3xl font-semibold tracking-tight text-[#1F5F5A] sm:text-4xl [animation-delay:120ms]">
           Plan your next family adventure
         </h1>
 
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-600">
-          Organize destinations, activities, and travel dates in one place so
-          everyone in the family stays excited and on the same page.
+        <p className="animate-fade-in mt-4 max-w-xl text-base leading-relaxed text-[#3D6F6B] sm:text-lg [animation-delay:220ms]">
+          Destinations, days, and details in one nest — built around how real families
+          actually travel.
         </p>
 
         <Link
           href="/plan"
-          className="mt-10 inline-flex items-center justify-center rounded-full bg-sky-600 px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-sky-600/25 transition hover:bg-sky-700 hover:shadow-xl hover:shadow-sky-600/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
+          className="animate-fade-in mt-10 inline-flex items-center justify-center rounded-full bg-[#1F5F5A] px-8 py-3.5 text-base font-semibold text-white transition hover:bg-[#174A46] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1F5F5A] [animation-delay:320ms]"
         >
           Plan my trip
         </Link>
 
-        <div className="mt-16 grid w-full max-w-3xl gap-4 sm:grid-cols-3">
-          {[
-            { title: "Pick destinations", detail: "Save places everyone wants to visit" },
-            { title: "Build itineraries", detail: "Map out days with kid-friendly stops" },
-            { title: "Travel together", detail: "Share plans and keep the whole crew aligned" },
-          ].map((item) => (
-            <div
-              key={item.title}
-              className="rounded-2xl border border-white/70 bg-white/70 p-5 text-left shadow-sm backdrop-blur"
-            >
-              <h2 className="font-semibold text-slate-900">{item.title}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.detail}</p>
-            </div>
-          ))}
-        </div>
+        <p className="animate-fade-in sr-only">{BRAND.slogan}</p>
       </div>
     </main>
   );

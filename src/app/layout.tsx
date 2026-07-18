@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
+import { BRAND } from "@/config/brand";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -10,10 +11,15 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "TripNestly — Family Travel Planner",
-  description: "Travel planning for real families",
+  title: {
+    default: `${BRAND.name} — ${BRAND.taglineSentence}`,
+    template: `%s · ${BRAND.name}`,
+  },
+  description: BRAND.taglineSentence,
+  applicationName: BRAND.name,
   icons: {
-    icon: "/tripnestly-logo.png",
+    icon: [{ url: BRAND.faviconSrc, type: "image/svg+xml" }],
+    apple: BRAND.markSrc,
   },
 };
 
