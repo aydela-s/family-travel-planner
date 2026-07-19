@@ -110,14 +110,17 @@ export function estimateDailyTransport(
   return { cost, label: "Taxi" };
 }
 
-/** Movement description only — cost comes from costBreakdown.transport */
+/**
+ * Movement line for the day card (FAM-38): "{label}: {cost}" — no "Transport" suffix.
+ * UI already prefixes with "Movement:".
+ */
 export function formatTransportDisplay(
-  transportType: string,
+  _transportType: string,
   movementLabel: string,
   transportCost: number,
   currencySymbol: string,
 ): string {
   const costStr =
     transportCost > 0 ? `${currencySymbol}${transportCost.toFixed(2)}` : "Included / walking";
-  return `${movementLabel} · Transport ${costStr}`;
+  return `${movementLabel}: ${costStr}`;
 }
