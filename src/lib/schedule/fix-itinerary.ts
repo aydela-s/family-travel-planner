@@ -59,7 +59,7 @@ function processRawActivities(
       fixed.splice(insertAt, 0, {
         time: "13:30",
         title: "Midday break",
-        type: "rest",
+        type: "activity",
         notes: "Nap skipped for this day per your adjustment.",
       });
     }

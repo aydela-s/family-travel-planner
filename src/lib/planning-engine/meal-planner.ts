@@ -119,8 +119,19 @@ export function dinnerLabel(
 
 export function slotActivityType(kind: SlotKind): "meal" | "activity" | "rest" | "nap" {
   if (kind === "breakfast" || kind === "lunch" || kind === "dinner") return "meal";
-  if (kind === "morning_activity" || kind === "afternoon_activity" || kind === "extra_activity" || kind === "calm_activity" || kind === "grocery") {
+  if (
+    kind === "morning_activity" ||
+    kind === "afternoon_activity" ||
+    kind === "extra_activity" ||
+    kind === "calm_activity" ||
+    kind === "grocery" ||
+    kind === "afternoon_rest" ||
+    kind === "evening_rest" ||
+    kind === "midday_rest" ||
+    kind === "return_home"
+  ) {
     return "activity";
   }
-  return "rest";
+  // Free-time / recovery slots that aren't naps are activities (FAM-14).
+  return "activity";
 }

@@ -98,11 +98,16 @@ export function summarizeDailyCost(
   transportCost: number,
   city: CityConfig,
   plan: TripPlan,
+  day: number = 1,
 ): DaySpendSummary {
   const food = roundMoney(estimateMealCosts(activities, city, plan), city.currency);
   const transport = roundMoney(transportCost, city.currency);
   const activitiesCost = roundMoney(sumActivityCosts(activities), city.currency);
   const total = roundMoney(food + transport + activitiesCost, city.currency);
+
+  const landmarkNames = activities
+    .filter((a) => a.type === "activity" && a.location?.name)
+    .map((a) => a.location!.name);
 
   return {
     food,
@@ -110,6 +115,11 @@ export function summarizeDailyCost(
     activities: activitiesCost,
     total,
     note: budgetStyleNote(plan.budgetStyle),
-    accommodationTips: accommodationPlanningTips(plan),
+    accommodationTips: accommodationPlanningTips(plan, day, {
+      landmarkNames,
+      cookingDinner: activities.some((a) =>
+        /\bcook dinner|dinner at your (rental|stay|airbnb)\b/i.test(a.title),
+      ),
+    }),
   };
 }

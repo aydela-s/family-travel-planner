@@ -12,8 +12,8 @@ const typeConfig: Record<
   meal: { icon: "🍽️", label: "Meal", dot: "bg-amber-500", card: "border-amber-200/80 bg-amber-50/50" },
   activity: { icon: "🎯", label: "Activity", dot: "bg-sky-500", card: "border-sky-100 bg-white" },
   rest: { icon: "☕", label: "Rest", dot: "bg-emerald-500", card: "border-emerald-100 bg-emerald-50/40" },
-  nap: { icon: "😴", label: "Nap", dot: "bg-violet-500 animate-pulse-soft", card: "border-violet-200 bg-violet-50/70" },
-  travel: { icon: "🚶", label: "Travel", dot: "bg-slate-400", card: "border-slate-100 bg-slate-50/60" },
+  nap: { icon: "😴", label: "Rest", dot: "bg-violet-500 animate-pulse-soft", card: "border-violet-200 bg-violet-50/70" },
+  travel: { icon: "🚶", label: "Activity", dot: "bg-slate-400", card: "border-slate-100 bg-slate-50/60" },
 };
 
 function TimelineItem({ activity, currencySymbol }: { activity: ItineraryActivity; currencySymbol: string }) {

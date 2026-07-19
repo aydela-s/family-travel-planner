@@ -28,6 +28,6 @@ export function isOptionalActivity(a: IntentTagged): boolean {
   if (a.slotKind) return isOptionalSlotKind(a.slotKind);
   return (
     /\bevening stroll\b/i.test(a.title) ||
-    (a.type === "rest" && /stroll|evening/i.test(a.title))
+    ((a.type === "rest" || a.type === "activity") && /stroll|evening/i.test(a.title))
   );
 }

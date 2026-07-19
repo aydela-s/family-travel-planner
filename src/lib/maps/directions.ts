@@ -100,7 +100,13 @@ export function estimateDailyTransport(
   }
   if (transportType === "car-rental") {
     const fuelCost = estimateFuelCostForDriving(city, totalKm);
-    return { cost: fuelCost, label: `Car · est. fuel (${totalKm} km)`, fuelCost };
+    const roundedKm = Math.round(totalKm);
+    return {
+      cost: fuelCost,
+      label: `Car · est. fuel (${roundedKm} km)`,
+      fuelCost,
+      distanceKm: roundedKm,
+    };
   }
   if (transportType === "public-transportation") {
     const choice = choosePublicTransitFare(city, plan, segmentCosts.length);

@@ -146,7 +146,7 @@ function fillSlot(
       return tagged({
         time: slot.defaultTime,
         title: `Calm family time near ${ctx.afternoon.name}`,
-        type: "rest",
+        type,
         notes: "Low-key exploring, shade, and room to breathe — relaxed pace.",
       });
     case "extra_activity":
@@ -178,7 +178,7 @@ function fillSlot(
       return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
     }
     default:
-      return tagged({ time: slot.defaultTime, title: "Family time", type: "rest" });
+      return tagged({ time: slot.defaultTime, title: "Family time", type: "activity" });
   }
 }
 

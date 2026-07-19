@@ -10,8 +10,20 @@ export function parseTimeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
+/** Snap clock times to friendly increments (FAM-12). */
+export const TIME_SNAP_MINUTES = 15;
+
+export function snapMinutes(
+  totalMinutes: number,
+  step: number = TIME_SNAP_MINUTES,
+): number {
+  if (step <= 1) return Math.round(totalMinutes);
+  return Math.round(totalMinutes / step) * step;
+}
+
 export function minutesToTime(totalMinutes: number): string {
-  const clamped = Math.max(6 * 60, Math.min(22 * 60, totalMinutes));
+  const snapped = snapMinutes(totalMinutes);
+  const clamped = Math.max(6 * 60, Math.min(22 * 60, snapped));
   const h = Math.floor(clamped / 60);
   const m = clamped % 60;
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
@@ -35,6 +47,13 @@ export function itemDurationMin(
 ): number {
   if (item.type === "activity" && (isGroceryTitle(item.title) || /\bpicnic supplies\b/i.test(item.title))) {
     return GROCERY_DURATION_MIN;
+  }
+  // FAM-14: strolls/breaks display as activity but keep rest-length timing.
+  if (
+    item.type === "activity" &&
+    /\b(stroll|break|free time|calm family|pack up|low-key exploring)\b/i.test(item.title)
+  ) {
+    return defaultDurationMin("rest", plan);
   }
   return defaultDurationMin(item.type, plan);
 }
@@ -110,15 +129,16 @@ export function rescheduleActivities<T extends Schedulable>(
     }
 
     const duration = itemDurationMin(item, plan);
-    const end = cursor + duration;
+    const start = snapMinutes(cursor);
+    const end = start + duration;
 
     result.push({
       ...item,
-      time: minutesToTime(cursor),
+      time: minutesToTime(start),
       endTime: minutesToTime(end),
     });
 
-    cursor = end;
+    cursor = snapMinutes(end);
   }
 
   return result;

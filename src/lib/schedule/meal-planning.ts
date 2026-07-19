@@ -336,7 +336,14 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     }
 
     let duration = packedActivityDuration(item, plan, packedFewerLongerUpFront);
-    if (needsRecoveryRest && (item.type === "rest" || item.type === "nap")) {
+    if (
+      needsRecoveryRest &&
+      (item.type === "nap" ||
+        item.type === "rest" ||
+        item.slotKind === "afternoon_rest" ||
+        item.slotKind === "midday_rest" ||
+        /\b(break|free time)\b/i.test(item.title))
+    ) {
       duration += HIGH_INTENSITY_REST_BONUS_MIN;
       needsRecoveryRest = false;
     }

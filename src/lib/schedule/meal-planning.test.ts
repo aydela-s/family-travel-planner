@@ -10,6 +10,7 @@ import {
   defaultTravelMin,
   HIGH_INTENSITY_REST_BONUS_MIN,
   parseTimeToMinutes,
+  TIME_SNAP_MINUTES,
 } from "@/lib/schedule/timeline";
 import { TripPlan } from "@/types/trip-plan";
 import { ActivityType } from "@/types/itinerary";
@@ -82,7 +83,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
     expect(nap).toBeDefined();
     expect(afterNap).toBeDefined();
     expect(parseTimeToMinutes(afterNap!.time) - parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(
-      defaultTravelMin(plan),
+      defaultTravelMin(plan) + TIME_SNAP_MINUTES,
     );
   });
 

@@ -75,7 +75,7 @@ describe("packed fewer/longer activities — P1", () => {
     expect(activityDurationMin(morning)).toBe(PACKED_LONGER_ACTIVITY_MIN);
     expect(activityDurationMin(afternoon)).toBe(PACKED_LONGER_ACTIVITY_MIN);
     expect(parseTimeToMinutes(afternoon.time)).toBeGreaterThanOrEqual(
-      parseTimeToMinutes(scheduled[1].endTime) + 20,
+      parseTimeToMinutes(scheduled[1].endTime) + 20 - 15,
     );
   });
 

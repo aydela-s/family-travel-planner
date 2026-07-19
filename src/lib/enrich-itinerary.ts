@@ -194,7 +194,7 @@ async function enrichDay(
   }
   const withHoursNotes = applyOpeningHoursNotes(scheduledActivities, hoursIssues, city.landmarks);
 
-  const summary = summarizeDailyCost(withHoursNotes, lockedDailyTransport, city, plan);
+  const summary = summarizeDailyCost(withHoursNotes, lockedDailyTransport, city, plan, rawDay.day);
   const costBreakdown = buildCostBreakdown(summary, city.currency);
   const transportCost = costBreakdown.transport;
 

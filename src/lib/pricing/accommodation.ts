@@ -145,8 +145,63 @@ export function estimateAccommodationFoodCosts(
   return total;
 }
 
-export function accommodationPlanningTips(plan: TripPlan): string[] {
-  return getAccommodationProfile(plan.accommodationType).planningTips.slice(0, 3);
+const BUDGET_ONLY_TIP = /\b(pastries|budget-smart|budget|affordable|low-key spot|keeping .+ simple)\b/i;
+
+export type DayTipContext = {
+  landmarkNames?: string[];
+  cookingDinner?: boolean;
+};
+
+function tipsForBudgetStyle(plan: TripPlan): string[] {
+  const tips = getAccommodationProfile(plan.accommodationType).planningTips;
+  if (plan.budgetStyle === "splurge") {
+    return tips.filter((tip) => !BUDGET_ONLY_TIP.test(tip));
+  }
+  return tips;
+}
+
+/**
+ * Per-day tips (FAM-6): rotate base tips, respect budgetStyle, and add day context
+ * so consecutive days are not identical copies.
+ */
+export function accommodationPlanningTips(
+  plan: TripPlan,
+  day: number = 1,
+  context: DayTipContext = {},
+): string[] {
+  const base = tipsForBudgetStyle(plan);
+  const contextual: string[] = [];
+
+  if (context.cookingDinner) {
+    contextual.push("Cooking tonight — grab any missing ingredients before heading back.");
+  }
+
+  const landmark = context.landmarkNames?.find(Boolean);
+  if (landmark) {
+    contextual.push(
+      day % 2 === 0
+        ? `Around ${landmark}: leave buffer time if queues run long.`
+        : `Today’s stops near ${landmark} — keep water and a light snack handy.`,
+    );
+  }
+
+  if (plan.travelStyle === "packed" && day > 1) {
+    contextual.push("Packed day — protect one short reset so the evening stays enjoyable.");
+  } else if (plan.travelStyle === "relaxed") {
+    contextual.push("Relaxed pace — it’s fine to linger or skip a stop if energy dips.");
+  }
+
+  const rotated =
+    base.length === 0
+      ? []
+      : [...base.slice((day - 1) % base.length), ...base.slice(0, (day - 1) % base.length)];
+
+  const merged: string[] = [];
+  for (const tip of [...contextual, ...rotated]) {
+    if (!merged.includes(tip)) merged.push(tip);
+    if (merged.length >= 3) break;
+  }
+  return merged;
 }
 
 /** @deprecated Use getAccommodationLabel from @/lib/format-labels directly — kept for the one remaining (dead) caller in itinerary.ts */
