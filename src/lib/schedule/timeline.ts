@@ -31,6 +31,9 @@ export function minutesToTime(totalMinutes: number): string {
 
 export const GROCERY_DURATION_MIN = 30;
 
+/** Minimum gap after grocery before cook-at-home dinner (get back + unpack). */
+export const GROCERY_TO_DINNER_BUFFER_MIN = 30;
+
 /** Extra rest/nap minutes after a high-intensity activity. */
 export const HIGH_INTENSITY_REST_BONUS_MIN = 15;
 

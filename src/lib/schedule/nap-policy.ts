@@ -1,5 +1,6 @@
 import { TripPlan } from "@/types/trip-plan";
 import { ActivityType } from "@/types/itinerary";
+import { isNoNapSelection } from "@/lib/planning-engine/nap-options";
 
 export function hasChildren(plan: TripPlan): boolean {
   return plan.children.length > 0;
@@ -7,8 +8,7 @@ export function hasChildren(plan: TripPlan): boolean {
 
 export function wantsNoNaps(plan: TripPlan): boolean {
   if (!hasChildren(plan)) return true;
-  const schedule = plan.napSchedule.trim().toLowerCase();
-  return schedule.includes("no nap") || schedule === "no naps needed";
+  return isNoNapSelection(plan.napSchedule);
 }
 
 /** True only when children exist AND user wants nap/rest periods in the plan */
@@ -106,26 +106,105 @@ function minutesToTime(totalMinutes: number): string {
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
 }
 
+function meridiemToMinutes(
+  hour: number,
+  minute: number,
+  meridiem: string | undefined,
+): number {
+  let h = hour;
+  const mer = meridiem?.replace(/\./g, "").toLowerCase();
+  if (mer?.startsWith("p") && h < 12) h += 12;
+  if (mer?.startsWith("a") && h === 12) h = 0;
+  return h * 60 + minute;
+}
+
+/**
+ * Parse free-text nap windows like "12-2 PM", "12:00-14:00", "1–3 PM" (FAM-40).
+ * Returns null when the text can't be interpreted as a time range.
+ */
+export function parseNapWindow(text: string): NapWindow | null {
+  const s = text.trim().toLowerCase();
+  if (!s || isNoNapSelection(s)) return null;
+
+  // Legacy chip / test labels
+  if (s.includes("morning nap") || (s.includes("~9") && s.includes("11"))) {
+    return { startMin: 9 * 60, endMin: 11 * 60, label: "morning nap window" };
+  }
+  if (
+    (s.includes("afternoon nap") || s.includes("early afternoon")) &&
+    s.includes("1") &&
+    s.includes("3")
+  ) {
+    return { startMin: 13 * 60, endMin: 15 * 60, label: "afternoon nap window" };
+  }
+
+  const range = s.match(
+    /(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?\s*(?:[-–—]|to)\s*(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i,
+  );
+  if (!range) return null;
+
+  const h1 = Number(range[1]);
+  const m1 = Number(range[2] ?? "0");
+  let mer1 = range[3];
+  const h2 = Number(range[4]);
+  const m2 = Number(range[5] ?? "0");
+  let mer2 = range[6];
+
+  if (h1 > 23 || h2 > 23 || m1 > 59 || m2 > 59) return null;
+
+  // 24h style: "12:00-14:00"
+  if (!mer1 && !mer2 && (h1 > 12 || h2 > 12 || (range[2] != null && range[5] != null))) {
+    const startMin = h1 * 60 + m1;
+    const endMin = h2 * 60 + m2;
+    if (endMin <= startMin) return null;
+    const label = startMin < 12 * 60 ? "morning nap window" : "afternoon nap window";
+    return { startMin, endMin, label };
+  }
+
+  if (!mer1 && mer2) mer1 = mer2;
+  if (!mer2 && mer1) mer2 = mer1;
+  if (!mer1 && !mer2) {
+    // Bare "9-11" → AM; bare "1-3" / "12-2" → PM afternoon nap convention
+    if (h1 <= 11 && h2 <= 11 && h1 < h2 && h1 >= 7 && h2 <= 11) {
+      mer1 = "am";
+      mer2 = "am";
+    } else {
+      mer1 = "pm";
+      mer2 = "pm";
+    }
+  }
+
+  let startMin = meridiemToMinutes(h1, m1, mer1);
+  let endMin = meridiemToMinutes(h2, m2, mer2);
+
+  // "9-2 PM" → 9 AM to 2 PM
+  if (endMin <= startMin && mer2?.replace(/\./g, "").toLowerCase().startsWith("p") && h1 <= 11) {
+    startMin = meridiemToMinutes(h1, m1, "am");
+  }
+
+  if (endMin <= startMin) return null;
+
+  const label = startMin < 12 * 60 ? "morning nap window" : "afternoon nap window";
+  return { startMin, endMin, label };
+}
+
 /** Resolve nap window from user preference — overrides defaults */
 export function getNapWindow(plan: TripPlan): NapWindow | null {
   if (!shouldIncludeNaps(plan)) return null;
 
-  const s = plan.napSchedule.trim().toLowerCase();
+  const parsed = parseNapWindow(plan.napSchedule);
+  if (parsed) return parsed;
 
-  if (s.includes("morning nap") || (s.includes("9") && s.includes("11"))) {
-    return { startMin: 9 * 60, endMin: 11 * 60, label: "morning nap window" };
-  }
-  if (s.includes("afternoon nap") || (s.includes("1") && s.includes("3"))) {
-    return { startMin: 13 * 60, endMin: 15 * 60, label: "afternoon nap window" };
-  }
-
+  // Fallback when text is free-form but has no parseable range
   return { startMin: 13 * 60, endMin: 15 * 60, label: "afternoon nap window" };
 }
 
 export function napDurationMin(plan: TripPlan): number {
   const window = getNapWindow(plan);
   if (!window) return 75;
-  return Math.max(60, window.endMin - window.startMin);
+  // Cap nap block so a wide typed window doesn't consume the whole afternoon
+  const span = window.endMin - window.startMin;
+  return Math.min(90, Math.max(60, span));
 }
 
 export function createNapActivity(plan: TripPlan): RawActivity {

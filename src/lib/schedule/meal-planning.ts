@@ -13,6 +13,7 @@ import {
   defaultDurationMin,
   defaultTravelMin,
   GROCERY_DURATION_MIN,
+  GROCERY_TO_DINNER_BUFFER_MIN,
   HIGH_INTENSITY_REST_BONUS_MIN,
   itemDurationMin,
   minutesToTime,
@@ -247,12 +248,13 @@ function dinnerStartFromCursor(
 
   if (hasGrocery) {
     const travel = defaultTravelMin(plan);
+    const groceryDinnerGap = Math.max(travel, GROCERY_TO_DINNER_BUFFER_MIN);
     let groceryStart = cursor + travel;
-    const latestGroceryStart = minMin - GROCERY_DURATION_MIN - travel;
+    const latestGroceryStart = minMin - GROCERY_DURATION_MIN - groceryDinnerGap;
     if (groceryStart > latestGroceryStart) {
       groceryStart = Math.max(cursor + travel, latestGroceryStart);
     }
-    dinnerStart = Math.max(minMin, groceryStart + GROCERY_DURATION_MIN + travel);
+    dinnerStart = Math.max(minMin, groceryStart + GROCERY_DURATION_MIN + groceryDinnerGap);
   }
 
   return dinnerStart;
@@ -409,7 +411,9 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
   let endCursor = cursor + eveningTravel;
 
   const groceryLead = hasGrocery
-    ? GROCERY_DURATION_MIN + defaultTravelMin(plan) * 2
+    ? GROCERY_DURATION_MIN +
+      defaultTravelMin(plan) +
+      Math.max(defaultTravelMin(plan), GROCERY_TO_DINNER_BUFFER_MIN)
     : defaultTravelMin(plan);
   const latestItemEnd = latestDinnerStart - groceryLead;
 
@@ -427,8 +431,9 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
 
   if (hasGrocery) {
     const travel = defaultTravelMin(plan);
+    const groceryDinnerGap = Math.max(travel, GROCERY_TO_DINNER_BUFFER_MIN);
     let groceryStart = endCursor + travel;
-    const latestGroceryStart = dinnerMin - GROCERY_DURATION_MIN - travel;
+    const latestGroceryStart = dinnerMin - GROCERY_DURATION_MIN - groceryDinnerGap;
     if (groceryStart > latestGroceryStart) {
       groceryStart = Math.max(endCursor + travel, latestGroceryStart);
     }
@@ -438,7 +443,9 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       time: minutesToTime(groceryStart),
       endTime: minutesToTime(groceryStart + GROCERY_DURATION_MIN),
     });
-    endCursor = groceryStart + GROCERY_DURATION_MIN + travel;
+    // Use snapped grocery end so the dinner buffer survives time rounding.
+    const groceryEnd = parseTimeToMinutes(result[result.length - 1].endTime);
+    endCursor = groceryEnd + groceryDinnerGap;
   }
 
   let dinnerStart = Math.max(dinnerMin, endCursor);

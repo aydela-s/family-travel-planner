@@ -1,6 +1,7 @@
 import { StepProps, TripPlan } from "@/types/trip-plan";
 import { todayIso } from "@/lib/planning-engine/date-validation";
-import { labelClassName, StepIntro } from "../shared";
+import { tripLengthHint } from "@/lib/planning-engine/trip-date-context";
+import { DynamicHint, labelClassName, StepIntro } from "../shared";
 
 const dateInputClassName =
   "w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100";
@@ -13,6 +14,10 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
     formData.endDate !== "" &&
     formData.endDate < formData.startDate;
   const endMin = formData.startDate && formData.startDate >= today ? formData.startDate : today;
+  const lengthHint =
+    formData.startDate && formData.endDate && !endBeforeStart && !startInPast
+      ? tripLengthHint(formData.startDate, formData.endDate)
+      : null;
 
   return (
     <div className="space-y-6">
@@ -85,6 +90,8 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
           </p>
         )}
       </div>
+
+      {lengthHint && <DynamicHint>{lengthHint}</DynamicHint>}
     </div>
   );
 }

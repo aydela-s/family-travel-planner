@@ -93,6 +93,22 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
     expect(validateDaySchedule(scheduled, plan)).toEqual([]);
   });
+
+  it("keeps a buffer between grocery and cook-at-home dinner", () => {
+    const plan = balancedPlan([5, 10], {
+      accommodationType: "airbnb_with_kitchen",
+      napSchedule: "No naps needed",
+    });
+    const { raw } = planTrip(plan);
+    const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
+    const grocery = scheduled.find((a) => /grocery/i.test(a.title));
+    const dinner = scheduled.find((a) => isDinnerMeal(a));
+    expect(grocery).toBeDefined();
+    expect(dinner).toBeDefined();
+    const gap =
+      parseTimeToMinutes(dinner!.time) - parseTimeToMinutes(grocery!.endTime!);
+    expect(gap).toBeGreaterThanOrEqual(30);
+  });
 });
 
 describe("high-intensity recovery rest — Phase 6", () => {
