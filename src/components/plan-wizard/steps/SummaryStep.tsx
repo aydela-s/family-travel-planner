@@ -1,4 +1,5 @@
 import { getAccommodationLabel, getBudgetStyleLabelPlain, getTransportationLabel } from "@/lib/format-labels";
+import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { StepProps, TripPlan } from "@/types/trip-plan";
 import { StepIntro } from "../shared";
 
@@ -26,6 +27,10 @@ export default function SummaryStep({ formData }: StepProps) {
       : ""
   }`;
 
+  const stayAddressValue = isStayNotBookedYet(formData)
+    ? "Not booked yet (city center)"
+    : formData.stayAddress || "—";
+
   const sections: { label: string; value: string }[] = [
     { label: "Destination", value: formData.destination || "—" },
     {
@@ -36,18 +41,19 @@ export default function SummaryStep({ formData }: StepProps) {
           : "—",
     },
     { label: "Travelers", value: travelers },
+    { label: "Accommodation", value: getAccommodationLabel(formData.accommodationType) },
+    { label: "Stay address", value: stayAddressValue },
+    { label: "Getting around", value: getTransportationLabel(formData.transportationType) },
     {
       label: "Travel style",
       value: `${formatLabel(formData.travelStyle)} pace`,
     },
-    { label: "Getting around", value: getTransportationLabel(formData.transportationType) },
-    { label: "Accommodation", value: getAccommodationLabel(formData.accommodationType) },
-    { label: "Food notes", value: formData.dietaryRestrictions || "Nothing specific" },
     ...(formData.children.length > 0
       ? [{ label: "Nap schedule", value: formData.napSchedule || "Flexible" }]
       : []),
+    { label: "Dietary", value: formData.dietaryRestrictions || "Nothing specific" },
     {
-      label: "Budget style",
+      label: "Budget",
       value: getBudgetStyleLabelPlain(formData.budgetStyle),
     },
     {

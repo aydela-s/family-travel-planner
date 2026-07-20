@@ -4,7 +4,7 @@ import { accommodationPlanningTips, estimateAccommodationFoodCosts } from "@/lib
 import { budgetStyleNote } from "@/lib/pricing/budget-style";
 import { hasCookDinnerAtHome } from "@/lib/schedule/meal-planning";
 import { TripPlan } from "@/types/trip-plan";
-import { ItineraryActivity } from "@/types/itinerary";
+import { ActivityLocation, ItineraryActivity } from "@/types/itinerary";
 
 function roundMoney(amount: number, currency: string): number {
   if (currency === "JPY") return Math.round(amount);
@@ -48,6 +48,7 @@ export function maybeAddAccommodationGroceryStop(
   activities: ItineraryActivity[],
   plan: TripPlan,
   city: CityConfig,
+  home?: ActivityLocation | null,
 ): ItineraryActivity[] {
   if (plan.accommodationType !== "airbnb_with_kitchen") return activities;
   if (activities.some((a) => a.title.toLowerCase().includes("grocery"))) return activities;
@@ -72,7 +73,7 @@ export function maybeAddAccommodationGroceryStop(
     timeOfDay: "afternoon",
     notes: "Pick up ingredients before heading back to cook dinner.",
     activityCost: 0,
-    location: groceryLocationNearRoute(activities, insertAt, city),
+    location: groceryLocationNearRoute(activities, insertAt, city, home),
   };
   return [...activities.slice(0, insertAt), grocery, ...activities.slice(insertAt)];
 }

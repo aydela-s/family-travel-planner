@@ -22,6 +22,7 @@ export const ACCOMMODATION_LABELS: Record<AccommodationType, string> = {
   airbnb_with_kitchen: "Rental with kitchen",
   airbnb_no_kitchen: "Rental without kitchen",
   staying_with_family_or_friends: "With family or friends",
+  dont_know_yet: "I don’t know yet",
   "": "Not specified",
 };
 

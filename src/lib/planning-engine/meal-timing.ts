@@ -93,6 +93,7 @@ export function groceryLocationNearRoute(
   activities: Array<{ location?: ActivityLocation }>,
   groceryIndex: number,
   city: CityConfig,
+  home?: ActivityLocation | null,
 ): ActivityLocation {
   const before = activities.slice(0, groceryIndex).filter((a) => a.location);
   const anchor = before[before.length - 1]?.location;
@@ -101,6 +102,13 @@ export function groceryLocationNearRoute(
       name: `Supermarket near ${anchor.name}`,
       lat: anchor.lat + 0.003,
       lng: anchor.lng + 0.002,
+    };
+  }
+  if (home) {
+    return {
+      name: `Supermarket near ${home.name}`,
+      lat: home.lat + 0.004,
+      lng: home.lng - 0.003,
     };
   }
   return {

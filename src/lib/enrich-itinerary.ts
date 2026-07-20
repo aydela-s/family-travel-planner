@@ -19,6 +19,10 @@ import {
 } from "@/lib/schedule/landmark-hours";
 import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
 import {
+  activityUsesStayHome,
+  stayHomeLocation,
+} from "@/lib/planning-engine/stay-home";
+import {
   prepareItineraryForEnrich,
   rescheduleEnrichedActivities,
   validateEnrichedDay,
@@ -66,10 +70,14 @@ function buildCostBreakdown(summary: DaySpendSummary, currency: string): DayCost
   };
 }
 
-function applyGroceryLocations(activities: ItineraryActivity[], city: CityConfig): ItineraryActivity[] {
+function applyGroceryLocations(
+  activities: ItineraryActivity[],
+  city: CityConfig,
+  home: ActivityLocation | null,
+): ItineraryActivity[] {
   return activities.map((activity, i) =>
     isGroceryActivity(activity)
-      ? { ...activity, location: groceryLocationNearRoute(activities, i, city) }
+      ? { ...activity, location: groceryLocationNearRoute(activities, i, city, home) }
       : activity,
   );
 }
@@ -121,6 +129,13 @@ async function enrichDay(
       title: alignTitleWithTimeOfDay(a.title, timeOfDay),
     };
 
+    const home = stayHomeLocation(plan);
+    if (home && activityUsesStayHome(act)) {
+      act.location = home;
+      act.activityCost = 0;
+      return act;
+    }
+
     if (a.type === "activity") {
       const startMin = parseTimeToMinutes(a.time);
       const endMin = startMin + itemDurationMin(a, plan);
@@ -161,8 +176,9 @@ async function enrichDay(
     return act;
   });
 
-  const withGroceryStop = maybeAddAccommodationGroceryStop(activities, plan, city);
-  const located = applyGroceryLocations(withGroceryStop, city);
+  const home = stayHomeLocation(plan);
+  const withGroceryStop = maybeAddAccommodationGroceryStop(activities, plan, city, home);
+  const located = applyGroceryLocations(withGroceryStop, city, home);
 
   const { routeSegments, totalKm, segmentCosts, segmentDurations } = await buildRouteSegments(
     located,

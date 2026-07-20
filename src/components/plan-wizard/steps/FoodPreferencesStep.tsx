@@ -1,6 +1,8 @@
+import StayAddressField from "@/components/StayAddressField";
 import { AccommodationType, StepProps } from "@/types/trip-plan";
 import { ACCOMMODATION_LABELS } from "@/lib/format-labels";
-import { dietaryQuickPicks, FieldHint, inputClassName, OptionCard, OptionalLabel, SelectChip, StepIntro } from "../shared";
+import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
+import { FieldHint, OptionCard, StepIntro } from "../shared";
 
 const accommodationOptions: {
   value: AccommodationType;
@@ -38,38 +40,28 @@ const accommodationOptions: {
     description: "Many meals may be covered by your hosts",
     emoji: "👨‍👩‍👧",
   },
+  {
+    value: "dont_know_yet",
+    label: ACCOMMODATION_LABELS.dont_know_yet,
+    description: "We’ll plan around the city center for now",
+    emoji: "🤷",
+  },
 ];
 
 export default function FoodPreferencesStep({ formData, updateFormData }: StepProps) {
-  function toggleDietaryPick(pick: string) {
-    const current = formData.dietaryRestrictions;
-    const parts = current
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    const next = parts.includes(pick)
-      ? parts.filter((p) => p !== pick)
-      : [...parts, pick];
-
-    updateFormData({ dietaryRestrictions: next.join(", ") });
-  }
-
-  const selectedPicks = dietaryQuickPicks.filter((pick) =>
-    formData.dietaryRestrictions.toLowerCase().includes(pick.toLowerCase()),
-  );
+  const stayUnknown = isStayNotBookedYet(formData);
 
   return (
     <div className="space-y-6">
       <StepIntro
-        emoji="🍕"
-        title="Where are you staying — and anything about food?"
-        subtitle="Your accommodation shapes meal costs and how we plan groceries vs. restaurants."
+        emoji="🏨"
+        title="Where are you staying?"
+        subtitle="Pick your stay type and hotel or address — or choose “I don’t know yet” if you haven’t booked."
       />
 
       <div>
         <p className="text-sm font-semibold text-slate-800">Accommodation type</p>
-        <FieldHint>This directly affects your daily food budget and meal suggestions.</FieldHint>
+        <FieldHint>This shapes meal costs and groceries vs restaurants.</FieldHint>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {accommodationOptions.map((option) => (
             <OptionCard
@@ -77,39 +69,45 @@ export default function FoodPreferencesStep({ formData, updateFormData }: StepPr
               selected={formData.accommodationType === option.value}
               label={`${option.emoji} ${option.label}`}
               description={option.description}
-              onClick={() => updateFormData({ accommodationType: option.value })}
+              onClick={() =>
+                updateFormData(
+                  option.value === "dont_know_yet"
+                    ? {
+                        accommodationType: option.value,
+                        stayAddress: "",
+                        stayPlaceId: "",
+                        stayLat: null,
+                        stayLng: null,
+                      }
+                    : { accommodationType: option.value },
+                )
+              }
             />
           ))}
         </div>
       </div>
 
       <div>
-        <p className="text-sm font-semibold text-slate-800">Quick dietary picks</p>
-        <FieldHint>Tap anything that applies — you can add more detail below.</FieldHint>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {dietaryQuickPicks.map((pick) => (
-            <SelectChip
-              key={pick}
-              selected={selectedPicks.includes(pick)}
-              onClick={() => toggleDietaryPick(pick)}
-            >
-              {pick}
-            </SelectChip>
-          ))}
+        <p className="text-sm font-semibold text-slate-800">Stay name or address</p>
+        <div className="mt-2">
+          <StayAddressField
+            value={formData.stayAddress ?? ""}
+            disabled={stayUnknown}
+            onChange={(stayAddress) =>
+              updateFormData({
+                stayAddress,
+                stayPlaceId: "",
+                stayLat: null,
+                stayLng: null,
+              })
+            }
+          />
         </div>
-      </div>
-
-      <div>
-        <OptionalLabel htmlFor="dietaryRestrictions">Tell us more</OptionalLabel>
-        <textarea
-          id="dietaryRestrictions"
-          rows={3}
-          placeholder="e.g. one child only eats plain pasta, we love taco spots..."
-          value={formData.dietaryRestrictions}
-          onChange={(e) => updateFormData({ dietaryRestrictions: e.target.value })}
-          className={inputClassName}
-        />
-        <FieldHint>Skip this if the quick picks cover it — totally fine.</FieldHint>
+        {stayUnknown && (
+          <p className="mt-2 text-sm text-slate-500">
+            We’ll plan around the city center until you have a stay locked in.
+          </p>
+        )}
       </div>
     </div>
   );

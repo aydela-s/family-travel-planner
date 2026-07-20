@@ -16,6 +16,7 @@ export type AccommodationType =
   | "airbnb_with_kitchen"
   | "airbnb_no_kitchen"
   | "staying_with_family_or_friends"
+  | "dont_know_yet"
   | "";
 
 export type TripPlan = {
@@ -28,6 +29,11 @@ export type TripPlan = {
   walkingLimit: WalkingLimit | "";
   transportationType: TransportationType | "";
   accommodationType: AccommodationType;
+  /** Formatted stay address from Places (FAM-24). Optional for older plans/tests. */
+  stayAddress?: string;
+  stayPlaceId?: string;
+  stayLat?: number | null;
+  stayLng?: number | null;
   dietaryRestrictions: string;
   napSchedule: string;
   budgetStyle: BudgetStyle | "";
@@ -44,6 +50,10 @@ export const initialTripPlan: TripPlan = {
   walkingLimit: "",
   transportationType: "",
   accommodationType: "",
+  stayAddress: "",
+  stayPlaceId: "",
+  stayLat: null,
+  stayLng: null,
   dietaryRestrictions: "",
   napSchedule: "",
   budgetStyle: "",

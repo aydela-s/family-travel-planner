@@ -2,24 +2,61 @@
 
 import { StepProps } from "@/types/trip-plan";
 import { NO_NAPS_NEEDED } from "@/lib/planning-engine/nap-options";
-import { SelectChip, StepIntro, inputClassName } from "../shared";
+import { dietaryQuickPicks, FieldHint, inputClassName, SelectChip, StepIntro } from "../shared";
 
 export default function NapScheduleStep({ formData, updateFormData }: StepProps) {
   const noChildren = formData.children.length === 0;
   const noNaps = formData.napSchedule.trim().toLowerCase().includes("no nap");
   const freeText = noNaps ? "" : formData.napSchedule;
 
+  function toggleDietaryPick(pick: string) {
+    const current = formData.dietaryRestrictions;
+    const parts = current
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const next = parts.includes(pick)
+      ? parts.filter((p) => p !== pick)
+      : [...parts, pick];
+
+    updateFormData({ dietaryRestrictions: next.join(", ") });
+  }
+
+  const selectedPicks = dietaryQuickPicks.filter((pick) =>
+    formData.dietaryRestrictions.toLowerCase().includes(pick.toLowerCase()),
+  );
+
+  const foodSection = (
+    <div>
+      <p className="text-sm font-semibold text-slate-800">Quick dietary picks</p>
+      <FieldHint>Tap anything that applies.</FieldHint>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {dietaryQuickPicks.map((pick) => (
+          <SelectChip
+            key={pick}
+            selected={selectedPicks.includes(pick)}
+            onClick={() => toggleDietaryPick(pick)}
+          >
+            {pick}
+          </SelectChip>
+        ))}
+      </div>
+    </div>
+  );
+
   if (noChildren) {
     return (
       <div className="space-y-6">
         <StepIntro
-          emoji="😴"
-          title="Nap schedule"
-          subtitle="No children selected — naps won't appear in your itinerary."
+          emoji="🍽️"
+          title="Anything about food?"
+          subtitle="Naps aren’t needed for an adults-only trip — tell us about dietary needs instead."
         />
         <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm leading-relaxed text-slate-600">
           You&apos;re traveling with adults only. We&apos;ll skip nap breaks and keep the pace flexible.
         </p>
+        {foodSection}
       </div>
     );
   }
@@ -28,8 +65,8 @@ export default function NapScheduleStep({ formData, updateFormData }: StepProps)
     <div className="space-y-6">
       <StepIntro
         emoji="😴"
-        title="Any nap rhythms to plan around?"
-        subtitle="Type a window like 12-2 PM, or skip naps entirely."
+        title="Naps & food"
+        subtitle="Set a nap window if you need one, plus any dietary preferences for meal planning."
       />
 
       <div>
@@ -60,6 +97,8 @@ export default function NapScheduleStep({ formData, updateFormData }: StepProps)
           {NO_NAPS_NEEDED}
         </SelectChip>
       </div>
+
+      {foodSection}
     </div>
   );
 }

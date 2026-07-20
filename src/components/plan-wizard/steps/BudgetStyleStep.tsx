@@ -31,7 +31,7 @@ export default function BudgetStyleStep({ formData, updateFormData }: StepProps)
   return (
     <div className="space-y-6">
       <StepIntro
-        emoji="💳"
+        emoji="💰"
         title="How would you like to spend on this trip?"
         subtitle="This shapes the kinds of activities and restaurants we pick — not a dollar amount."
       />

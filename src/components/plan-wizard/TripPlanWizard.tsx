@@ -12,6 +12,8 @@ import { GenerateItineraryOptions } from "@/types/generate";
 import { initialTripPlan, TripPlan } from "@/types/trip-plan";
 import { getDatesValidationError } from "@/lib/planning-engine/date-validation";
 import { isValidNapSelection } from "@/lib/planning-engine/nap-options";
+import { resolveStayFromText } from "@/lib/planning-engine/resolve-stay";
+import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import StepTransition from "./StepTransition";
 import ActivityInterestsStep from "./steps/ActivityInterestsStep";
 import BudgetStyleStep from "./steps/BudgetStyleStep";
@@ -44,32 +46,34 @@ const steps = [
       plan.adults >= 1 && plan.children.every((age) => age >= 0 && age <= 17),
   },
   {
-    title: "Travel style",
-    component: TravelStyleStep,
-    validate: (plan: TripPlan) => plan.travelStyle !== "",
+    title: "Stay",
+    component: FoodPreferencesStep,
+    validate: (plan: TripPlan) =>
+      plan.accommodationType !== "" &&
+      (isStayNotBookedYet(plan) || (plan.stayAddress ?? "").trim().length >= 2),
   },
   {
-    title: "Transportation",
+    title: "Getting Around",
     component: TransportationStep,
     validate: (plan: TripPlan) => plan.transportationType !== "",
   },
   {
-    title: "Food & stay",
-    component: FoodPreferencesStep,
-    validate: (plan: TripPlan) => plan.accommodationType !== "",
+    title: "Travel Style",
+    component: TravelStyleStep,
+    validate: (plan: TripPlan) => plan.travelStyle !== "",
   },
   {
-    title: "Nap schedule",
+    title: "Naps & Food",
     component: NapScheduleStep,
     validate: () => true,
   },
   {
-    title: "Budget Style",
+    title: "Budget",
     component: BudgetStyleStep,
     validate: (plan: TripPlan) => plan.budgetStyle !== "",
   },
   {
-    title: "Activity interests",
+    title: "Interests",
     component: ActivityInterestsStep,
     validate: (plan: TripPlan) => plan.interests.length > 0,
   },
@@ -118,18 +122,34 @@ export default function TripPlanWizard() {
   function getStepError(plan: TripPlan): string | null {
     const step = steps[stepIndex];
     if (step.title === "Dates") return getDatesValidationError(plan);
-    if (step.title === "Nap schedule" && plan.children.length > 0 && !isValidNapSelection(plan.napSchedule, true)) {
+    if (step.title === "Stay") {
+      if (plan.accommodationType === "") {
+        return "Choose how you’re staying so we can plan meals and groceries.";
+      }
+      if (!isStayNotBookedYet(plan) && (plan.stayAddress ?? "").trim().length < 2) {
+        return "Type your hotel name or stay address, or choose “I don’t know yet”.";
+      }
+    }
+    if (step.title === "Naps & Food" && plan.children.length > 0 && !isValidNapSelection(plan.napSchedule, true)) {
       return "Please choose a nap preference for your trip.";
     }
     if (!step.validate(plan)) return "Almost there — just fill in what's missing and we'll keep going.";
     return null;
   }
 
-  function goNext() {
+  async function goNext() {
     const stepError = getStepError(formData);
     if (stepError) {
       setError(stepError);
       return;
+    }
+
+    if (steps[stepIndex].title === "Stay") {
+      setError("");
+      const resolved = await resolveStayFromText(formData);
+      if (resolved) {
+        setFormData({ ...formData, ...resolved });
+      }
     }
 
     if (!isLastStep) {
@@ -141,7 +161,7 @@ export default function TripPlanWizard() {
   }
 
   async function callGenerateApi(params: GenerateParams = {}) {
-    const plan = { ...formData, ...params.planOverride };
+    let plan = { ...formData, ...params.planOverride };
     const demo = params.demo ?? useDemoNext;
 
     setIsLoading(true);
@@ -149,6 +169,12 @@ export default function TripPlanWizard() {
     setError("");
 
     try {
+      const resolved = await resolveStayFromText(plan);
+      if (resolved) {
+        plan = { ...plan, ...resolved };
+        setFormData((current) => ({ ...current, ...resolved }));
+      }
+
       const response = await fetch("/api/generate-itinerary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -234,7 +260,7 @@ export default function TripPlanWizard() {
             href="/"
             className="mb-6 inline-flex items-center gap-2.5 text-[#1F5F5A] transition hover:opacity-80"
           >
-            <TripNestlyLogo variant="mark" className="h-9 w-9" />
+            <TripNestlyLogo variant="mark" className="h-10 w-auto shrink-0" />
             <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
           </Link>
           <div className="rounded-3xl border border-white/80 bg-white/90 p-6 shadow-xl shadow-sky-100/50 backdrop-blur sm:p-10">
@@ -253,7 +279,7 @@ export default function TripPlanWizard() {
             href="/"
             className="inline-flex items-center gap-2.5 text-[#1F5F5A] transition hover:opacity-80"
           >
-            <TripNestlyLogo variant="mark" className="h-9 w-9" />
+            <TripNestlyLogo variant="mark" className="h-10 w-auto shrink-0" />
             <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
           </Link>
 
@@ -278,7 +304,7 @@ export default function TripPlanWizard() {
           href="/"
           className="inline-flex items-center gap-2.5 text-[#1F5F5A] transition hover:opacity-80"
         >
-          <TripNestlyLogo variant="mark" className="h-9 w-9" />
+          <TripNestlyLogo variant="mark" className="h-10 w-auto shrink-0" />
           <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
         </Link>
 

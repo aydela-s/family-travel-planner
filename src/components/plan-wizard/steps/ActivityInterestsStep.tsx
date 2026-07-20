@@ -12,7 +12,7 @@ export default function ActivityInterestsStep({ formData, updateFormData }: Step
   return (
     <div className="space-y-6">
       <StepIntro
-        emoji="🎯"
+        emoji="❤️"
         title="What sounds fun to your crew?"
         subtitle="Pick everything that gets a 'yes!' — we'll blend them into one great day."
       />

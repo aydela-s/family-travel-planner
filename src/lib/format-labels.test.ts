@@ -28,6 +28,7 @@ const ALL_ACCOMMODATION_TYPES: AccommodationType[] = [
   "airbnb_with_kitchen",
   "airbnb_no_kitchen",
   "staying_with_family_or_friends",
+  "dont_know_yet",
 ];
 
 describe("format-labels — exhaustiveness (FAM-17)", () => {

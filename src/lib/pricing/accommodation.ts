@@ -77,6 +77,18 @@ const PROFILES: Record<AccommodationType, AccommodationFoodProfile> = {
       "Offer to pick up groceries or contribute to shared meals.",
     ],
   },
+  dont_know_yet: {
+    breakfastMultiplier: 1,
+    lunchMultiplier: 1,
+    dinnerMultiplier: 1,
+    preferGroceryStops: false,
+    preferCooking: false,
+    preferRestaurants: true,
+    planningTips: [
+      "Stay isn’t booked yet — we planned meals around cafés and restaurants near city center.",
+      "Once you book, you can adjust breakfast and cook nights to match your stay.",
+    ],
+  },
   "": {
     breakfastMultiplier: 1,
     lunchMultiplier: 1,

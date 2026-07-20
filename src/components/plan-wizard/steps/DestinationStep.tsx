@@ -6,7 +6,7 @@ export default function DestinationStep({ formData, updateFormData }: StepProps)
   return (
     <div className="space-y-6">
       <StepIntro
-        emoji="🗺️"
+        emoji="🌍"
         title="Where are you headed?"
         subtitle="Start typing — we'll suggest cities and normalize the name for pricing."
       />

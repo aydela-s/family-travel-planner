@@ -3,6 +3,7 @@ import { enrichItinerary, isDemoMode } from "@/lib/enrich-itinerary";
 import { isValidTripPlan, normalizeRawItinerary } from "@/lib/itinerary";
 import { planTrip } from "@/lib/planning-engine";
 import { AdjustActionId } from "@/lib/planning-engine/adjust-types";
+import { resolveStayOntoPlan } from "@/lib/planning-engine/resolve-stay";
 import { Itinerary, RawItinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -50,10 +51,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid TripPlan data." }, { status: 400 });
     }
 
-    const plan = extractTripPlan(body);
+    let plan = extractTripPlan(body);
     if (!plan.accommodationType) {
       plan.accommodationType = "";
     }
+    plan = await resolveStayOntoPlan(plan);
 
     const useDemo = body.demo === true || isDemoMode();
 

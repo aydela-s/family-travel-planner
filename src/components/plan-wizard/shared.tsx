@@ -157,14 +157,20 @@ export function CounterControl({
 }
 
 export const activityInterestOptions = [
-  { label: "Museums & culture", emoji: "🏛️" },
-  { label: "Parks & nature", emoji: "🌳" },
-  { label: "Beaches & water", emoji: "🏖️" },
-  { label: "Food & restaurants", emoji: "🍽️" },
+  { label: "Parks & Gardens", emoji: "🌳" },
+  { label: "Beaches & Waterfronts", emoji: "🌊" },
+  { label: "Nature & Scenic Views", emoji: "🌿" },
+  { label: "History & Landmarks", emoji: "🏛️" },
+  { label: "Museums & Art", emoji: "🎨" },
+  { label: "Playgrounds", emoji: "🛝" },
+  { label: "Zoos & Aquariums", emoji: "🦁" },
+  { label: "Theme Parks", emoji: "🎢" },
+  { label: "Interactive Museums", emoji: "🧪" },
+  { label: "Food Markets", emoji: "🥕" },
   { label: "Shopping", emoji: "🛍️" },
-  { label: "Theme parks", emoji: "🎢" },
-  { label: "Sports & adventure", emoji: "⚽" },
-  { label: "Relaxation", emoji: "☀️" },
+  { label: "Shows & Entertainment", emoji: "🎭" },
+  { label: "Sports & Recreation", emoji: "⚽" },
+  { label: "Spas", emoji: "🧖" },
 ] as const;
 
 export const dietaryQuickPicks = [
