@@ -3,9 +3,11 @@ import {
   ACCOMMODATION_LABELS,
   getAccommodationLabel,
   getTransportationLabel,
+  getTravelStyleLabel,
   TRANSPORTATION_LABELS,
+  TRAVEL_STYLE_LABELS,
 } from "@/lib/format-labels";
-import { AccommodationType, TransportationType } from "@/types/trip-plan";
+import { AccommodationType, TransportationType, TravelStyle } from "@/types/trip-plan";
 
 /**
  * Regression coverage for FAM-17 ("Summary page doesn't use same
@@ -14,6 +16,8 @@ import { AccommodationType, TransportationType } from "@/types/trip-plan";
  * anymore — but nothing stops someone from adding a new enum value without
  * a label, or reverting the locked-in wording. This guards both.
  */
+
+const ALL_TRAVEL_STYLES: TravelStyle[] = ["relaxed", "balanced", "packed"];
 
 const ALL_TRANSPORTATION_TYPES: TransportationType[] = [
   "walking",
@@ -32,6 +36,14 @@ const ALL_ACCOMMODATION_TYPES: AccommodationType[] = [
 ];
 
 describe("format-labels — exhaustiveness (FAM-17)", () => {
+  it.each(ALL_TRAVEL_STYLES)(
+    "every TravelStyle has a non-empty label — %s",
+    (style) => {
+      expect(TRAVEL_STYLE_LABELS[style]).toBeTruthy();
+      expect(getTravelStyleLabel(style)).toBe(TRAVEL_STYLE_LABELS[style]);
+    },
+  );
+
   it.each(ALL_TRANSPORTATION_TYPES)(
     "every TransportationType has a non-empty label — %s",
     (type) => {

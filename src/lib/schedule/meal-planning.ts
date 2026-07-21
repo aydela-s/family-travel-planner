@@ -39,12 +39,10 @@ const RETURN_HOME = /\breturn to|back to (your )?(rental|accommodation|stay|hote
 export const MIN_LUNCH_DURATION_MIN = 40;
 /** How far a typed nap may slip later so lunch still fits. */
 export const NAP_START_SLIP_MAX_MIN = 30;
-/** Earliest lunch may start when pushed forward of a midday nap. */
-const LUNCH_EARLIEST_MIN = 11 * 60;
 
 /**
- * Prefer the typed nap start; if lunch needs ≥40 min before it, push lunch earlier
- * and/or slip the nap by up to 30 minutes.
+ * Prefer the typed nap start; if a full lunch (≥40 min) cannot begin at the
+ * age-based lunch window start before that nap, slip the nap by up to 30 minutes.
  */
 export function resolveNapStartAroundLunch(opts: {
   preferredNapStart: number;
@@ -55,7 +53,9 @@ export function resolveNapStartAroundLunch(opts: {
   const { preferredNapStart, lunchBeforeNap, travelMin, lunchWindowMin } = opts;
   if (!lunchBeforeNap) return preferredNapStart;
 
-  const lunchFloor = Math.min(lunchWindowMin, LUNCH_EARLIEST_MIN);
+  // Use the real lunch-window floor — not an earlier absolute clock — so we
+  // don't keep a noon nap when toddler lunch can't start until 11:30.
+  const lunchFloor = lunchWindowMin;
   const needLunchStart = preferredNapStart - travelMin - MIN_LUNCH_DURATION_MIN;
   if (needLunchStart >= lunchFloor) {
     return preferredNapStart;
@@ -71,7 +71,21 @@ export function isGroceryActivity(a: RawActivity): boolean {
 }
 
 function isLengthenablePackedActivity(a: RawActivity): boolean {
-  return a.type === "activity" && !isGroceryActivity(a);
+  if (a.type !== "activity" || isGroceryActivity(a)) return false;
+  // Rest / calm slots are typed as activity for display (FAM-14) but must stay short.
+  if (
+    a.slotKind === "midday_rest" ||
+    a.slotKind === "afternoon_rest" ||
+    a.slotKind === "evening_rest" ||
+    a.slotKind === "calm_activity" ||
+    a.slotKind === "return_home"
+  ) {
+    return false;
+  }
+  if (/\b(stroll|break|free time|calm family|pack up|low-key exploring)\b/i.test(a.title)) {
+    return false;
+  }
+  return true;
 }
 
 function packedActivityDuration(
@@ -207,7 +221,7 @@ export function resolveGroceryMealConflicts(activities: RawActivity[], plan: Tri
   return result;
 }
 
-/** Forward-only safety net — never move dinner earlier than already scheduled. */
+/** Keep dinner inside its window without overlapping the previous item. */
 export function anchorDinnerTimes<T extends RawActivity & { endTime?: string }>(
   activities: T[],
   plan: TripPlan,
@@ -215,19 +229,49 @@ export function anchorDinnerTimes<T extends RawActivity & { endTime?: string }>(
   const { minMin, maxMin } = dinnerTimeWindow(plan);
   const dinnerDuration = defaultDurationMin("meal", plan);
   const latestStart = maxMin - dinnerDuration;
+  const dinnerIdx = activities.findIndex(isDinnerMeal);
+  if (dinnerIdx < 0) return activities;
 
-  return activities.map((a) => {
-    if (!isDinnerMeal(a)) return a;
-    const start = parseTimeToMinutes(a.time);
-    if (start >= minMin && start <= latestStart) return a;
+  const dinner = activities[dinnerIdx];
+  let start = parseTimeToMinutes(dinner.time);
 
-    const anchored = start < minMin ? minMin : latestStart;
-    return {
-      ...a,
-      time: minutesToTime(anchored),
-      endTime: minutesToTime(anchored + dinnerDuration),
-    };
-  });
+  if (start < minMin) start = minMin;
+  if (start > latestStart) start = latestStart;
+
+  const prev = dinnerIdx > 0 ? activities[dinnerIdx - 1] : null;
+  if (prev) {
+    const prevEnd = prev.endTime
+      ? parseTimeToMinutes(prev.endTime)
+      : parseTimeToMinutes(prev.time) + defaultDurationMin(prev.type, plan);
+    // Never pull dinner into the previous stop (packed days were overlapping here).
+    start = Math.max(start, prevEnd);
+  }
+
+  let end = start + dinnerDuration;
+  if (end > maxMin) {
+    end = maxMin;
+    // Prefer a shorter dinner over overlapping the prior activity.
+    if (start > end - 20) {
+      start = Math.min(start, Math.max(minMin, end - 20));
+      if (prev) {
+        const prevEnd = prev.endTime
+          ? parseTimeToMinutes(prev.endTime)
+          : parseTimeToMinutes(prev.time) + defaultDurationMin(prev.type, plan);
+        start = Math.max(start, prevEnd);
+      }
+      end = Math.max(start + 20, Math.min(start + dinnerDuration, maxMin));
+    }
+  }
+
+  return activities.map((a, i) =>
+    i === dinnerIdx
+      ? {
+          ...a,
+          time: minutesToTime(start),
+          endTime: minutesToTime(end),
+        }
+      : a,
+  );
 }
 
 export function validateMealPlan(activities: RawActivity[], plan: TripPlan): string[] {
@@ -325,12 +369,9 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
   const optional = daySequence.filter(isOptionalActivity);
 
   const napWindow = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
-  // Nap-heavy packed days choose fewer/longer up front (keep skeleton extra for FAM-5).
-  const packedFewerLongerUpFront =
-    plan.travelStyle === "packed" && Boolean(napWindow);
-  const optionalToPlace = packedFewerLongerUpFront
-    ? optional.filter((a) => a.slotKind !== "extra_activity")
-    : optional;
+  // Always try the packed extra; lengthen remaining stops only if it does not fit.
+  // Pre-dropping the extra made packed+nap schedules look identical to balanced.
+  const optionalToPlace = optional;
 
   const { minMin: dinnerMin, maxMin: dinnerMax } = dinnerTimeWindow(plan);
   const dinnerDuration = defaultDurationMin("meal", plan);
@@ -365,25 +406,24 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     if (item.type === "nap" && napWindow && resolvedNapStart != null) {
       start = resolvedNapStart;
       if (cursor + travel > resolvedNapStart) {
-        const latestStart = Math.max(resolvedNapStart, napWindow.endMin - 60);
+        const napLen = napDurationMin(plan);
+        const latestStart = Math.max(resolvedNapStart, napWindow.endMin - napLen);
         start = Math.min(Math.max(cursor + travel, resolvedNapStart), latestStart);
       }
     } else if (isDaytimeMeal(item)) {
       const { maxMin: lunchMax, minMin } = lunchTimeWindow(plan);
       const natural = cursor + travel;
-      // When nap follows, start lunch early enough for a full 40-minute meal.
+      // When nap follows, start lunch early enough for a full 40-minute meal —
+      // but stay inside the age-based lunch window.
       if (napRequiredIdx > i && resolvedNapStart != null) {
         const gap = defaultTravelMin(plan);
         const latestLunchStart = resolvedNapStart - gap - MIN_LUNCH_DURATION_MIN;
-        const earliest = Math.min(minMin, LUNCH_EARLIEST_MIN);
-        start = Math.min(Math.max(natural, earliest), latestLunchStart);
-        if (start > latestLunchStart) start = latestLunchStart;
-        if (start < earliest) start = earliest;
+        start = Math.min(Math.max(natural, minMin), Math.max(minMin, latestLunchStart));
+        if (start > latestLunchStart && latestLunchStart >= minMin) start = latestLunchStart;
       } else {
+        // After a morning nap (or no nap ahead), stay inside the lunch window —
+        // never let travel push lunch past lunchMax (toddler mornings were landing at 12:15).
         start = Math.min(Math.max(natural, minMin), lunchMax);
-        if (start < natural) {
-          start = natural;
-        }
       }
     } else if (result.length === 0) {
       start = Math.max(cursor, parseTimeToMinutes(item.time));
@@ -391,7 +431,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       start = cursor + travel;
     }
 
-    let duration = packedActivityDuration(item, plan, packedFewerLongerUpFront);
+    let duration = packedActivityDuration(item, plan, false);
     if (
       needsRecoveryRest &&
       (item.type === "nap" ||
@@ -409,15 +449,19 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       const gap = defaultTravelMin(plan);
       const mustEndBy = resolvedNapStart - gap;
       if (isDaytimeMeal(item)) {
+        const { minMin: lunchMin } = lunchTimeWindow(plan);
         start = Math.min(start, mustEndBy - MIN_LUNCH_DURATION_MIN);
-        start = Math.max(LUNCH_EARLIEST_MIN, start);
+        start = Math.max(lunchMin, start);
         duration = Math.max(
           MIN_LUNCH_DURATION_MIN,
           Math.min(duration, mustEndBy - start),
         );
+        if (start + duration > mustEndBy) {
+          duration = Math.max(20, mustEndBy - start);
+        }
         if (start + MIN_LUNCH_DURATION_MIN > mustEndBy) {
-          start = mustEndBy - MIN_LUNCH_DURATION_MIN;
-          duration = MIN_LUNCH_DURATION_MIN;
+          start = Math.max(lunchMin, mustEndBy - MIN_LUNCH_DURATION_MIN);
+          duration = Math.min(MIN_LUNCH_DURATION_MIN, Math.max(20, mustEndBy - start));
         }
       } else if (start < mustEndBy) {
         duration = Math.min(duration, Math.max(20, mustEndBy - start));
@@ -442,7 +486,11 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     }
 
     if (item.type === "nap" && napWindow) {
-      duration = Math.min(duration, Math.max(60, napWindow.endMin - start));
+      // Stay inside the typed window; only the high-intensity recovery bonus may run past it.
+      const withinWindow = Math.max(45, napWindow.endMin - start);
+      const intended = napDurationMin(plan);
+      const bonus = Math.max(0, duration - intended);
+      duration = Math.min(duration, withinWindow + bonus);
     }
 
     const scheduled = {
@@ -474,11 +522,54 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     }
   }
 
-  // Dinner-tight drop (no naps): lengthen remaining stops after the extra was skipped.
-  // Nap-heavy packed days already used longer durations in the required loop.
+  const eveningTravel = result.length > 0 ? defaultTravelMin(plan) : 0;
+  // Reserve travel (and grocery) after the last stop — do not double-count travel by
+  // comparing lastEnd+travel against latestDinner-travel (that was dropping packed extras).
+  const reservedAfterLast = hasGrocery
+    ? GROCERY_DURATION_MIN +
+      defaultTravelMin(plan) +
+      Math.max(defaultTravelMin(plan), GROCERY_TO_DINNER_BUFFER_MIN)
+    : defaultTravelMin(plan);
+  const latestItemEnd = latestDinnerStart - reservedAfterLast;
+
+  // Trim trailing stops until dinner can start on time with a real meal duration.
+  while (result.length > 0 && cursor > latestItemEnd) {
+    const lastIdx = result.length - 1;
+    const last = result[lastIdx];
+    const lastStart = parseTimeToMinutes(last.time);
+    const minDuration =
+      last.type === "nap"
+        ? 45
+        : last.type === "activity" && isLengthenablePackedActivity(last)
+          ? 45
+          : 20;
+    const shortenedEnd = Math.max(lastStart + minDuration, latestItemEnd);
+    if (shortenedEnd < parseTimeToMinutes(last.endTime)) {
+      result[lastIdx] = { ...last, endTime: minutesToTime(shortenedEnd) };
+      cursor = shortenedEnd;
+      continue;
+    }
+
+    // Drop a packed extra (or other optional) that no longer fits before dinner.
+    if (last.slotKind === "extra_activity" || isOptionalActivity(last)) {
+      result.pop();
+      cursor =
+        result.length > 0 ? parseTimeToMinutes(result[result.length - 1].endTime) : 8 * 60;
+      continue;
+    }
+
+    // Last resort: force-trim the final stop to the dinner boundary (never extend).
+    const lastEnd = parseTimeToMinutes(last.endTime);
+    if (latestItemEnd > lastStart && latestItemEnd < lastEnd) {
+      result[lastIdx] = { ...last, endTime: minutesToTime(latestItemEnd) };
+      cursor = latestItemEnd;
+    }
+    break;
+  }
+
+  // Lengthen remaining stops when packed and the optional extra was skipped (or trimmed off).
   if (
     plan.travelStyle === "packed" &&
-    !packedFewerLongerUpFront &&
     !result.some((a) => a.slotKind === "extra_activity")
   ) {
     const lengthened = applyPackedFewerLonger(result, plan);
@@ -486,30 +577,22 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     result.push(...lengthened);
     if (result.length > 0) {
       cursor = parseTimeToMinutes(result[result.length - 1].endTime);
+      // Re-trim if lengthening pushed past the dinner boundary.
+      while (result.length > 0 && cursor > latestItemEnd) {
+        const lastIdx = result.length - 1;
+        const last = result[lastIdx];
+        const lastStart = parseTimeToMinutes(last.time);
+        const lastEnd = parseTimeToMinutes(last.endTime);
+        if (latestItemEnd > lastStart && latestItemEnd < lastEnd) {
+          result[lastIdx] = { ...last, endTime: minutesToTime(latestItemEnd) };
+          cursor = latestItemEnd;
+        }
+        break;
+      }
     }
   }
 
-  const eveningTravel = result.length > 0 ? defaultTravelMin(plan) : 0;
   let endCursor = cursor + eveningTravel;
-
-  const groceryLead = hasGrocery
-    ? GROCERY_DURATION_MIN +
-      defaultTravelMin(plan) +
-      Math.max(defaultTravelMin(plan), GROCERY_TO_DINNER_BUFFER_MIN)
-    : defaultTravelMin(plan);
-  const latestItemEnd = latestDinnerStart - groceryLead;
-
-  if (endCursor > latestItemEnd && result.length > 0) {
-    const lastIdx = result.length - 1;
-    const last = result[lastIdx];
-    const minDuration = last.type === "activity" ? 45 : 20;
-    const shortenedEnd = Math.max(parseTimeToMinutes(last.time) + minDuration, latestItemEnd);
-    if (shortenedEnd < parseTimeToMinutes(last.endTime)) {
-      result[lastIdx] = { ...last, endTime: minutesToTime(shortenedEnd) };
-      cursor = shortenedEnd;
-      endCursor = shortenedEnd + eveningTravel;
-    }
-  }
 
   if (hasGrocery) {
     const travel = defaultTravelMin(plan);
@@ -530,15 +613,18 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     endCursor = groceryEnd + groceryDinnerGap;
   }
 
-  let dinnerStart = Math.max(dinnerMin, endCursor);
+  let dinnerStart = Math.max(dinnerMin, Math.min(endCursor, latestDinnerStart));
+  if (dinnerStart < endCursor) {
+    // Still overlapping the prior stop — pull dinner forward only after trimming failed.
+    dinnerStart = endCursor;
+  }
   let dinnerEnd = dinnerStart + dinnerDuration;
   if (dinnerEnd > dinnerMax) {
     dinnerEnd = dinnerMax;
-    dinnerStart = Math.max(dinnerMin, dinnerEnd - dinnerDuration);
-  }
-  if (dinnerStart < endCursor) {
-    dinnerStart = endCursor;
-    dinnerEnd = Math.min(dinnerStart + dinnerDuration, dinnerMax);
+    if (dinnerStart > dinnerEnd - 20) {
+      dinnerStart = Math.max(endCursor, dinnerEnd - 20);
+      dinnerEnd = Math.max(dinnerStart + 20, Math.min(dinnerStart + dinnerDuration, dinnerMax));
+    }
   }
 
   const anchoredDinners = dinnerItems.map((d) => ({

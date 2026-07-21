@@ -60,7 +60,7 @@ export default function FoodPreferencesStep({ formData, updateFormData }: StepPr
       />
 
       <div>
-        <p className="text-sm font-semibold text-slate-800">Accommodation type</p>
+        <p className="text-sm font-semibold text-ink">Accommodation type</p>
         <FieldHint>This shapes meal costs and groceries vs restaurants.</FieldHint>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {accommodationOptions.map((option) => (
@@ -88,7 +88,7 @@ export default function FoodPreferencesStep({ formData, updateFormData }: StepPr
       </div>
 
       <div>
-        <p className="text-sm font-semibold text-slate-800">Stay name or address</p>
+        <p className="text-sm font-semibold text-ink">Stay name or address</p>
         <div className="mt-2">
           <StayAddressField
             value={formData.stayAddress ?? ""}
@@ -104,7 +104,7 @@ export default function FoodPreferencesStep({ formData, updateFormData }: StepPr
           />
         </div>
         {stayUnknown && (
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-muted">
             We’ll plan around the city center until you have a stay locked in.
           </p>
         )}

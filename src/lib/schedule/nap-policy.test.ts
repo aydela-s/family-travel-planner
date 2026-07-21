@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isValidNapSelection } from "@/lib/planning-engine/nap-options";
 import {
   getNapWindow,
+  napDurationMin,
   parseNapWindow,
   shouldIncludeNaps,
 } from "@/lib/schedule/nap-policy";
@@ -83,5 +84,13 @@ describe("nap selection — FAM-40", () => {
     const w = getNapWindow(plan("12-2 PM"));
     expect(w?.startMin).toBe(12 * 60);
     expect(w?.endMin).toBe(14 * 60);
+  });
+
+  it("honors a longer typed window end time (12:30-2:30 → 2 hours, not capped at 90)", () => {
+    const p = plan("12:30-2:30");
+    const w = getNapWindow(p);
+    expect(w?.startMin).toBe(12 * 60 + 30);
+    expect(w?.endMin).toBe(14 * 60 + 30);
+    expect(napDurationMin(p)).toBe(120);
   });
 });

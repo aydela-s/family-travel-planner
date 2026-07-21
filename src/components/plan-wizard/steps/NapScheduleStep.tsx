@@ -29,7 +29,7 @@ export default function NapScheduleStep({ formData, updateFormData }: StepProps)
 
   const foodSection = (
     <div>
-      <p className="text-sm font-semibold text-slate-800">Quick dietary picks</p>
+      <p className="text-sm font-semibold text-ink">Quick dietary picks</p>
       <FieldHint>Tap anything that applies.</FieldHint>
       <div className="mt-3 flex flex-wrap gap-2">
         {dietaryQuickPicks.map((pick) => (
@@ -53,7 +53,7 @@ export default function NapScheduleStep({ formData, updateFormData }: StepProps)
           title="Anything about food?"
           subtitle="Naps aren’t needed for an adults-only trip — tell us about dietary needs instead."
         />
-        <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm leading-relaxed text-slate-600">
+        <p className="rounded-2xl border border-border bg-background px-4 py-3.5 text-sm leading-relaxed text-muted">
           You&apos;re traveling with adults only. We&apos;ll skip nap breaks and keep the pace flexible.
         </p>
         {foodSection}
@@ -70,7 +70,7 @@ export default function NapScheduleStep({ formData, updateFormData }: StepProps)
       />
 
       <div>
-        <p className="text-sm font-semibold text-slate-800">Nap window</p>
+        <p className="text-sm font-semibold text-ink">Nap window</p>
         <input
           type="text"
           value={freeText}
@@ -80,7 +80,7 @@ export default function NapScheduleStep({ formData, updateFormData }: StepProps)
           onChange={(e) => updateFormData({ napSchedule: e.target.value })}
           className={`mt-2 ${inputClassName} ${noNaps ? "opacity-50" : ""}`}
         />
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-muted">
           Examples: 12-2 PM, 9-11 AM, 13:00-15:00
         </p>
       </div>

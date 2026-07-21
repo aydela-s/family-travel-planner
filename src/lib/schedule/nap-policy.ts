@@ -212,9 +212,10 @@ export function getNapWindow(plan: TripPlan): NapWindow | null {
 export function napDurationMin(plan: TripPlan): number {
   const window = getNapWindow(plan);
   if (!window) return 75;
-  // Cap nap block so a wide typed window doesn't consume the whole afternoon
+  // Honor the typed window end-to-end. Only clamp extreme free-text spans
+  // (e.g. "9 AM–6 PM") so a nap can't swallow the whole day.
   const span = window.endMin - window.startMin;
-  return Math.min(90, Math.max(60, span));
+  return Math.min(180, Math.max(45, span));
 }
 
 export function createNapActivity(plan: TripPlan): RawActivity {
@@ -238,9 +239,22 @@ export function applyNapTiming(activities: RawActivity[], plan: TripPlan): RawAc
   const withoutNaps = activities.filter((a) => a.type !== "nap");
   const nap = createNapActivity(plan);
 
-  const insertBefore = withoutNaps.findIndex((a) => parseTimeToMinutes(a.time) > window.startMin);
-  const insertAt = insertBefore >= 0 ? insertBefore : withoutNaps.length;
+  let insertAt = withoutNaps.findIndex((a) => parseTimeToMinutes(a.time) > window.startMin);
+  if (insertAt < 0) insertAt = withoutNaps.length;
 
-  const result = [...withoutNaps.slice(0, insertAt), nap, ...withoutNaps.slice(insertAt)];
-  return result;
+  // Midday/afternoon naps belong after lunch. Lunch often defaults to 12:30 while a
+  // typed "12-2" nap starts at 12:00 — inserting by clock alone put the nap before
+  // lunch and caused overlaps once times were resolved.
+  if (window.startMin >= 11 * 60 + 30) {
+    const lunchIdx = withoutNaps.findIndex((a) => {
+      if (a.type !== "meal") return false;
+      const title = a.title.toLowerCase();
+      return !title.includes("breakfast") && !title.includes("dinner");
+    });
+    if (lunchIdx >= 0) {
+      insertAt = Math.max(insertAt, lunchIdx + 1);
+    }
+  }
+
+  return [...withoutNaps.slice(0, insertAt), nap, ...withoutNaps.slice(insertAt)];
 }

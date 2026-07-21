@@ -1,10 +1,25 @@
-import { AccommodationType, BudgetStyle, TransportationType } from "@/types/trip-plan";
+import {
+  AccommodationType,
+  BudgetStyle,
+  TransportationType,
+  TravelStyle,
+} from "@/types/trip-plan";
 
 /**
  * Single source of truth for user-facing labels of these enums.
  * Wizard steps and the Summary review step must both read from here so
  * their wording can never drift apart again (see FAM-17).
  */
+export const TRAVEL_STYLE_LABELS: Record<TravelStyle, string> = {
+  relaxed: "Relaxed",
+  balanced: "Balanced",
+  packed: "Packed",
+};
+
+export function getTravelStyleLabel(style: TravelStyle | ""): string {
+  return style ? TRAVEL_STYLE_LABELS[style] : "—";
+}
+
 export const TRANSPORTATION_LABELS: Record<TransportationType, string> = {
   walking: "Walking",
   "car-rental": "Car",

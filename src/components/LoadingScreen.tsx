@@ -19,7 +19,7 @@ export default function LoadingScreen({ message }: { message?: string }) {
   return (
     <div className="flex min-h-[320px] flex-col items-center justify-center px-6 py-16 text-center">
       <div className="relative mb-8">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-sky-100 border-t-sky-500" />
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-primary-muted border-t-primary" />
         <span className="absolute inset-0 flex items-center justify-center text-xl" aria-hidden>
           ✈️
         </span>
@@ -27,11 +27,11 @@ export default function LoadingScreen({ message }: { message?: string }) {
 
       <p
         key={displayMessage}
-        className="animate-fade-in text-lg font-semibold text-slate-800"
+        className="animate-fade-in text-lg font-semibold text-ink"
       >
         {displayMessage}
       </p>
-      <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500">
+      <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted">
         Building a plan your whole family can actually enjoy...
       </p>
 
@@ -41,8 +41,8 @@ export default function LoadingScreen({ message }: { message?: string }) {
             key={index}
             className={`h-1.5 rounded-full transition-all duration-500 ${
               index === messageIndex && !message
-                ? "w-6 bg-sky-500"
-                : "w-1.5 bg-slate-200"
+                ? "w-6 bg-accent"
+                : "w-1.5 bg-border"
             }`}
           />
         ))}

@@ -82,9 +82,10 @@ export function lunchLabel(plan: TripPlan, spot: string): { title: string; notes
     };
   }
   if (plan.accommodationType === "staying_with_family_or_friends") {
+    const meal = restaurantMealLabel(plan.budgetStyle, spot, "lunch");
     return {
-      title: `Lunch near ${spot}`,
-      notes: "May be shared with hosts — budget extra for treats out.",
+      ...meal,
+      notes: `${meal.notes} May be shared with hosts — budget extra for treats out.`,
     };
   }
   return restaurantMealLabel(plan.budgetStyle, spot, "lunch");

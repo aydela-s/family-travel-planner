@@ -93,38 +93,111 @@ describe("packed fewer/longer activities — P1", () => {
     expect(validateDaySchedule(scheduled, plan)).toEqual([]);
   });
 
-  it("skips the extra and lengthens stops when packed days include naps", () => {
+  it("tries the packed extra after naps, and lengthens only when it cannot fit", () => {
     const plan = packedPlan({
       children: [2, 5],
       napSchedule: "Early afternoon (1–3 PM)",
     });
-    // Skeleton still offers the extra (FAM-5); schedule-time drops it for naps.
+    // Skeleton still offers the extra (FAM-5).
     const intents = buildDayIntents(plan, 1, 2);
     expect(intents.some((i) => i.kind === "extra_activity")).toBe(true);
 
     const { raw } = planTrip(plan);
-    expect(raw.days[0].activities.some((a) => a.slotKind === "extra_activity")).toBe(false);
     expect(raw.days[0].activities.some((a) => a.type === "nap")).toBe(true);
 
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
+    const hasExtra = scheduled.some((a) => a.slotKind === "extra_activity");
     const activities = scheduled.filter(
       (a) => a.type === "activity" && !isGroceryActivity(a),
     );
-    expect(activities.length).toBe(2);
-    for (const activity of activities) {
-      expect(activityDurationMin(activity)).toBeGreaterThanOrEqual(PACKED_LONGER_ACTIVITY_MIN);
+    if (hasExtra) {
+      expect(activities.length).toBeGreaterThanOrEqual(3);
+    } else {
+      expect(activities.length).toBe(2);
+      for (const activity of activities) {
+        expect(activityDurationMin(activity)).toBeGreaterThanOrEqual(PACKED_LONGER_ACTIVITY_MIN);
+      }
     }
     expect(validateDaySchedule(scheduled, plan)).toEqual([]);
   });
 
-  it("does not lengthen balanced days", () => {
-    const plan = packedPlan({ travelStyle: "balanced", children: [10] });
-    const { raw } = planTrip(plan);
-    const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
-    const activities = scheduled.filter(
-      (a) => a.type === "activity" && !isGroceryActivity(a),
+  it("makes packed+nap days differ from balanced when the extra stop fits", () => {
+    const shared = {
+      children: [8],
+      napSchedule: "12-2",
+      accommodationType: "hotel_no_breakfast" as const,
+    };
+    const balanced = packedPlan({ ...shared, travelStyle: "balanced" });
+    const packed = packedPlan({ ...shared, travelStyle: "packed" });
+    const balancedSched = rescheduleActivitiesWithMealAnchors(
+      planTrip(balanced).raw.days[0].activities,
+      balanced,
     );
-    expect(activities.every((a) => activityDurationMin(a) <= 95)).toBe(true);
-    expect(scheduled.some((a) => a.slotKind === "extra_activity")).toBe(false);
+    const packedSched = rescheduleActivitiesWithMealAnchors(
+      planTrip(packed).raw.days[0].activities,
+      packed,
+    );
+    const balancedCount = balancedSched.filter(
+      (a) => a.type === "activity" && !isGroceryActivity(a),
+    ).length;
+    const packedCount = packedSched.filter(
+      (a) => a.type === "activity" && !isGroceryActivity(a),
+    ).length;
+    expect(packedCount).toBeGreaterThan(balancedCount);
+    expect(packedSched.some((a) => a.slotKind === "extra_activity")).toBe(true);
+    expect(validateDaySchedule(balancedSched, balanced)).toEqual([]);
+    expect(validateDaySchedule(packedSched, packed)).toEqual([]);
+  });
+
+  it("does not lengthen midday breaks when packing fewer/longer stops", () => {
+    const plan = packedPlan({ children: [10] });
+    const scheduled = applyPackedFewerLonger(
+      [
+        {
+          time: "13:15",
+          endTime: "13:40",
+          title: "Break at Park",
+          type: "activity" as const,
+          slotKind: "midday_rest" as const,
+        },
+        {
+          time: "14:00",
+          endTime: "15:15",
+          title: "Afternoon",
+          type: "activity" as const,
+          slotKind: "afternoon_activity" as const,
+        },
+      ],
+      plan,
+    );
+
+    const brk = scheduled.find((a) => a.slotKind === "midday_rest")!;
+    const afternoon = scheduled.find((a) => a.slotKind === "afternoon_activity")!;
+    expect(activityDurationMin(brk)).toBe(25);
+    expect(activityDurationMin(afternoon)).toBe(PACKED_LONGER_ACTIVITY_MIN);
+  });
+
+  it("keeps the last packed activity from overlapping dinner after enrich travel times", async () => {
+    const { enrichItinerary } = await import("@/lib/enrich-itinerary");
+    const plan = packedPlan({
+      destination: "Paris",
+      children: [3, 5],
+      napSchedule: "No naps needed",
+      transportationType: "taxis",
+      accommodationType: "hotel_no_breakfast",
+    });
+    const { raw, plan: working } = planTrip(plan);
+    const itinerary = await enrichItinerary(raw, working);
+
+    for (const day of itinerary.days) {
+      expect(validateDaySchedule(day.activities, plan)).toEqual([]);
+      for (let i = 1; i < day.activities.length; i++) {
+        const prev = day.activities[i - 1];
+        const cur = day.activities[i];
+        expect(parseTimeToMinutes(cur.time)).toBeGreaterThanOrEqual(
+          parseTimeToMinutes(prev.endTime ?? prev.time),
+        );
+      }
+    }
   });
 });

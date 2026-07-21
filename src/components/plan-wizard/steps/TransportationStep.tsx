@@ -50,21 +50,21 @@ export default function TransportationStep({ formData, updateFormData }: StepPro
             onClick={() => updateFormData({ transportationType: option.value })}
             className={`rounded-2xl border p-5 text-left transition ${
               formData.transportationType === option.value
-                ? "border-sky-500 bg-sky-50 ring-2 ring-sky-100"
-                : "border-slate-200 bg-white hover:border-sky-200 hover:bg-sky-50/40"
+                ? "border-primary bg-primary-muted ring-2 ring-primary/20"
+                : "border-border bg-surface hover:border-primary/30 hover:bg-primary-muted/50"
             }`}
           >
             <div
               className={`mb-3 inline-flex rounded-xl p-2.5 ${
                 formData.transportationType === option.value
-                  ? "bg-sky-100 text-sky-700"
-                  : "bg-slate-100 text-slate-600"
+                  ? "bg-primary/15 text-primary"
+                  : "bg-background text-muted"
               }`}
             >
               {option.icon}
             </div>
-            <span className="block font-semibold text-slate-900">{option.label}</span>
-            <p className="mt-1 text-sm leading-relaxed text-slate-500">{option.description}</p>
+            <span className="block font-semibold text-ink">{option.label}</span>
+            <p className="mt-1 text-sm leading-relaxed text-muted">{option.description}</p>
           </button>
         ))}
       </div>

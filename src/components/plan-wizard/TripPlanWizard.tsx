@@ -25,6 +25,12 @@ import SummaryStep from "./steps/SummaryStep";
 import TransportationStep from "./steps/TransportationStep";
 import TravelersStep from "./steps/TravelersStep";
 import TravelStyleStep from "./steps/TravelStyleStep";
+import {
+  btnCtaClassName,
+  btnGhostClassName,
+  btnPrimaryClassName,
+  btnSecondaryClassName,
+} from "./shared";
 
 const TOTAL_STEPS = 10;
 
@@ -239,6 +245,28 @@ export default function TripPlanWizard() {
     setError("");
   }
 
+  function applyPlanUpdateFromChips(updates: Partial<TripPlan>) {
+    const nextPlan = { ...formData, ...updates };
+    setFormData(nextPlan);
+    callGenerateApi({
+      planOverride: nextPlan,
+      demo: isDemo,
+      loadingMessage: "Updating your trip…",
+    });
+  }
+
+  function editPlanInWizard(stepIndex: number, updates?: Partial<TripPlan>) {
+    if (updates) {
+      setFormData((current) => ({ ...current, ...updates }));
+    }
+    setItinerary(null);
+    setIsDemo(false);
+    setStepDirection("back");
+    setStepIndex(stepIndex);
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function handleStepKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key !== "Enter" || isLoading) return;
     const target = e.target as HTMLElement;
@@ -254,16 +282,16 @@ export default function TripPlanWizard() {
 
   if (isLoading && !itinerary) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-amber-50 px-4 py-8 sm:px-6 sm:py-12">
+      <main className="min-h-screen bg-background px-4 py-8 sm:px-6 sm:py-12">
         <div className="mx-auto max-w-2xl">
           <Link
             href="/"
-            className="mb-6 inline-flex items-center gap-2.5 text-[#1F5F5A] transition hover:opacity-80"
+            className="mb-6 inline-flex items-center gap-2.5 text-primary transition hover:opacity-80"
           >
             <TripNestlyLogo variant="mark" className="h-10 w-auto shrink-0" />
             <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
           </Link>
-          <div className="rounded-3xl border border-white/80 bg-white/90 p-6 shadow-xl shadow-sky-100/50 backdrop-blur sm:p-10">
+          <div className="rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10">
             <LoadingScreen message={loadingMessage} />
           </div>
         </div>
@@ -273,21 +301,37 @@ export default function TripPlanWizard() {
 
   if (itinerary) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-amber-50 px-4 py-8 sm:px-6 sm:py-12">
+      <main className="min-h-screen bg-background px-4 py-8 sm:px-6 sm:py-12">
         <div className="mx-auto max-w-3xl">
           <Link
             href="/"
-            className="inline-flex items-center gap-2.5 text-[#1F5F5A] transition hover:opacity-80"
+            className="inline-flex items-center gap-2.5 text-primary transition hover:opacity-80"
           >
             <TripNestlyLogo variant="mark" className="h-10 w-auto shrink-0" />
             <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
           </Link>
 
-          <div className="relative mt-6 rounded-3xl border border-white/80 bg-white/90 p-6 shadow-xl shadow-sky-100/50 backdrop-blur sm:p-10">
+          <div className="relative mt-6 rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10">
+            {error && (
+              <p className="mb-4 rounded-2xl border border-error/20 bg-error-muted px-4 py-3.5 text-sm leading-relaxed text-error">
+                {error}
+              </p>
+            )}
             <ItineraryDisplay
+              key={[
+                formData.travelStyle,
+                formData.budgetStyle,
+                formData.napSchedule,
+                formData.transportationType,
+                formData.accommodationType,
+                formData.interests.join("|"),
+              ].join("::")}
               itinerary={itinerary}
+              plan={formData}
               isDemo={isDemo}
               isLoading={isLoading}
+              onApplyPlanUpdate={applyPlanUpdateFromChips}
+              onEditPlanInWizard={editPlanInWizard}
               onPlanAnother={resetWizard}
             />
           </div>
@@ -298,35 +342,35 @@ export default function TripPlanWizard() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-amber-50 px-4 py-8 sm:px-6 sm:py-12">
+    <main className="min-h-screen bg-background px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-2xl">
         <Link
           href="/"
-          className="inline-flex items-center gap-2.5 text-[#1F5F5A] transition hover:opacity-80"
+          className="inline-flex items-center gap-2.5 text-primary transition hover:opacity-80"
         >
           <TripNestlyLogo variant="mark" className="h-10 w-auto shrink-0" />
           <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
         </Link>
 
         <div
-          className="mt-6 rounded-3xl border border-white/80 bg-white/90 p-6 shadow-xl shadow-sky-100/50 backdrop-blur sm:p-10"
+          className="mt-6 rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10"
           onKeyDown={handleStepKeyDown}
         >
           <div className="mb-8">
-            <div className="flex items-center justify-between text-sm text-slate-500">
+            <div className="flex items-center justify-between text-sm text-muted">
               <span className="font-medium">
                 {stepIndex + 1} of {TOTAL_STEPS}
               </span>
-              <span className="font-semibold text-sky-700">{currentStep.title}</span>
+              <span className="font-semibold text-accent">{currentStep.title}</span>
             </div>
-            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
+            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-border/60">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-sky-400 to-sky-600 transition-all duration-500 ease-out"
+                className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>
             {stepIndex === 0 && (
-              <p className="mt-3 text-sm leading-relaxed text-slate-500">
+              <p className="mt-3 text-sm leading-relaxed text-muted">
                 Let&apos;s plan something your whole family will love.
               </p>
             )}
@@ -337,7 +381,7 @@ export default function TripPlanWizard() {
           </StepTransition>
 
           {error && (
-            <p className="mt-6 rounded-2xl border border-red-100 bg-red-50 px-4 py-3.5 text-sm leading-relaxed text-red-700">
+            <p className="mt-6 rounded-2xl border border-error/20 bg-error-muted px-4 py-3.5 text-sm leading-relaxed text-error">
               {error}
             </p>
           )}
@@ -348,7 +392,7 @@ export default function TripPlanWizard() {
                 type="button"
                 onClick={goBack}
                 disabled={isLoading}
-                className="order-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:order-1 sm:flex-1"
+                className={`order-2 sm:order-1 sm:flex-1 ${btnSecondaryClassName}`}
               >
                 Back
               </button>
@@ -360,7 +404,7 @@ export default function TripPlanWizard() {
                   type="button"
                   onClick={() => handleGenerate(false)}
                   disabled={isLoading}
-                  className="w-full rounded-full bg-sky-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-sky-600/30 transition hover:bg-sky-700 hover:shadow-xl disabled:opacity-50"
+                  className={`w-full ${btnCtaClassName}`}
                 >
                   Generate itinerary
                 </button>
@@ -368,7 +412,7 @@ export default function TripPlanWizard() {
                   type="button"
                   onClick={() => handleGenerate(true)}
                   disabled={isLoading}
-                  className="w-full rounded-full border border-amber-200 bg-amber-50 px-6 py-3.5 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
+                  className={`w-full ${btnGhostClassName}`}
                 >
                   Try demo (free, no API key)
                 </button>
@@ -377,7 +421,7 @@ export default function TripPlanWizard() {
               <button
                 type="button"
                 onClick={goNext}
-                className="order-1 w-full rounded-full bg-sky-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/25 transition hover:bg-sky-700 sm:flex-1"
+                className={`order-1 w-full sm:flex-1 ${btnPrimaryClassName}`}
               >
                 Sounds good →
               </button>

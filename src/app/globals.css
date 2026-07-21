@@ -1,23 +1,85 @@
 @import "tailwindcss";
 
+/* TripNestly design tokens */
 :root {
-  --background: #f7f5f2;
-  --foreground: #1f5f5a;
-  --brand-ink: #1f5f5a;
-  --brand-path: #5ba8a3;
-  --brand-accent: #e89b8c;
-  --brand-surface: #f7f5f2;
+  /* Brand */
+  --primary: #016d76;
+  --primary-hover: #015861;
+  --primary-muted: #e6f3f4;
+  --accent: #ff5757;
+  --accent-hover: #e84b4b;
+  --accent-muted: #ffecec;
+  --secondary: #02bbcb;
+  --secondary-muted: #e6f9fb;
+
+  /* Surfaces */
+  --background: #fafbfc;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+
+  /* Text */
+  --text: #1f2937;
+  --text-secondary: #6b7280;
+
+  /* Status */
+  --success: #22c55e;
+  --success-muted: #f0fdf4;
+  --warning: #f59e0b;
+  --warning-muted: #fffbeb;
+  --error: #ef4444;
+  --error-muted: #fef2f2;
+
+  /* Itinerary semantics */
+  --itinerary-activity: #016d76;
+  --itinerary-meal: #ff5757;
+  --itinerary-rest: #02bbcb;
+  --itinerary-transport: #9ca3af;
+  --itinerary-accommodation: #016d76;
+  --itinerary-budget: #22c55e;
+
+  /* Legacy aliases */
+  --foreground: var(--text);
+  --brand-ink: var(--primary);
+  --brand-path: var(--secondary);
+  --brand-accent: var(--accent);
+  --brand-surface: var(--background);
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-foreground: var(--text);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-muted: var(--primary-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-secondary: var(--secondary);
+  --color-secondary-muted: var(--secondary-muted);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--text-secondary);
+  --color-success: var(--success);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-error: var(--error);
+  --color-error-muted: var(--error-muted);
+  --color-itinerary-activity: var(--itinerary-activity);
+  --color-itinerary-meal: var(--itinerary-meal);
+  --color-itinerary-rest: var(--itinerary-rest);
+  --color-itinerary-transport: var(--itinerary-transport);
+  --color-itinerary-accommodation: var(--itinerary-accommodation);
+  --color-itinerary-budget: var(--itinerary-budget);
+  --font-sans: var(--font-poppins);
+  --shadow-card: 0 1px 2px rgb(31 41 55 / 0.04), 0 4px 16px rgb(31 41 55 / 0.06);
+  --shadow-soft: 0 2px 8px rgb(1 109 118 / 0.14);
 }
 
 body {
   background: var(--background);
-  color: var(--foreground);
+  color: var(--text);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }

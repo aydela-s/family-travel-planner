@@ -70,22 +70,22 @@ export default function DestinationAutocomplete({
         }}
         onFocus={() => suggestions.length > 0 && setOpen(true)}
         placeholder="Start typing a city..."
-        className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+        className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3.5 text-ink shadow-sm outline-none transition placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary-muted"
         autoComplete="off"
       />
       {loading && (
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">
           Searching...
         </span>
       )}
       {open && suggestions.length > 0 && (
-        <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white py-2 shadow-xl">
+        <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-border bg-surface py-2 shadow-[var(--shadow-card)]">
           {suggestions.map((s) => (
             <li key={`${s.placeId}-${s.label}`}>
               <button
                 type="button"
                 onClick={() => selectSuggestion(s)}
-                className="w-full px-4 py-2.5 text-left text-sm text-slate-700 transition hover:bg-sky-50"
+                className="w-full px-4 py-2.5 text-left text-sm text-ink transition hover:bg-primary-muted"
               >
                 {s.label}
               </button>

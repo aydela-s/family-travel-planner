@@ -157,6 +157,7 @@ function mergeEnrichedSchedule(
       type: a.type,
       notes: a.notes,
       endTime: a.endTime,
+      slotKind: a.slotKind ?? base.slotKind,
       timeOfDay: getTimeOfDay(a.time) as TimeOfDay,
     };
   });
@@ -168,7 +169,13 @@ export function rescheduleEnrichedActivities(
   plan: TripPlan,
   segmentDurations: number[] = [],
 ): ItineraryActivity[] {
-  const raw = activities.map(({ time, title, type, notes }) => ({ time, title, type, notes }));
+  const raw = activities.map(({ time, title, type, notes, slotKind }) => ({
+    time,
+    title,
+    type,
+    notes,
+    ...(slotKind ? { slotKind } : {}),
+  }));
   const travelGaps = travelGapsFromSegments(activities, segmentDurations, plan);
 
   let scheduled = rescheduleActivitiesWithMealAnchors(raw, plan, travelGaps);

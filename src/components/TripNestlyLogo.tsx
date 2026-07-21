@@ -3,8 +3,8 @@ import { BRAND } from "@/config/brand";
 type TripNestlyLogoProps = {
   className?: string;
   /**
-   * `wordmark` — full Looka PNG (includes baked-in slogan).
-   * `mark` — compact SVG for nav headers and tight spaces.
+   * `wordmark` — full brand PNG.
+   * `mark` — favicon N mark (home → dotted path → pin).
    */
   variant?: "wordmark" | "mark";
   /** @deprecated Logo PNG already includes the slogan; kept for call-site compatibility. */

@@ -4,7 +4,7 @@ import { tripLengthHint } from "@/lib/planning-engine/trip-date-context";
 import { DynamicHint, labelClassName, StepIntro } from "../shared";
 
 const dateInputClassName =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-slate-900 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100";
+  "w-full rounded-xl border border-border bg-surface px-3 py-3 text-ink shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary-muted";
 
 export default function DatesStep({ formData, updateFormData }: StepProps) {
   const today = todayIso();
@@ -31,7 +31,7 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
         <p className={labelClassName}>Trip dates</p>
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
-            <label htmlFor="tripStartDate" className="text-xs font-medium text-slate-500">
+            <label htmlFor="tripStartDate" className="text-xs font-medium text-muted">
               From
             </label>
             <input
@@ -54,12 +54,12 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
             />
           </div>
 
-          <span className="hidden shrink-0 pb-3 text-slate-300 sm:inline" aria-hidden>
+          <span className="hidden shrink-0 pb-3 text-border sm:inline" aria-hidden>
             →
           </span>
 
           <div className="min-w-0 flex-1">
-            <label htmlFor="tripEndDate" className="text-xs font-medium text-slate-500">
+            <label htmlFor="tripEndDate" className="text-xs font-medium text-muted">
               To
             </label>
             <input
@@ -80,12 +80,12 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
         </div>
 
         {startInPast && (
-          <p className="mt-2 text-sm font-medium text-red-600">
+          <p className="mt-2 text-sm font-medium text-error">
             Your trip can&apos;t start in the past — pick today or a future date.
           </p>
         )}
         {endBeforeStart && (
-          <p className="mt-2 text-sm font-medium text-red-600">
+          <p className="mt-2 text-sm font-medium text-error">
             Your last day must be on or after your first day.
           </p>
         )}

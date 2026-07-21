@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Poppins } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { BRAND } from "@/config/brand";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
   description: BRAND.taglineSentence,
   applicationName: BRAND.name,
   icons: {
-    icon: [{ url: BRAND.faviconSrc, type: "image/svg+xml" }],
+    icon: [{ url: BRAND.faviconSrc, type: "image/png" }],
     apple: BRAND.markSrc,
   },
 };
@@ -30,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} antialiased`}>
+      <body className={`${poppins.variable} antialiased`}>
         {children}
         <SpeedInsights />
         <Analytics />

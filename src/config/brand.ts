@@ -5,6 +5,7 @@ export const BRAND = {
   /** Short line for metadata / social when a sentence is needed. */
   taglineSentence: "Travel planning for real families",
   logoSrc: "/tripnestly-logo.png",
-  markSrc: "/tripnestly-mark.svg",
-  faviconSrc: "/favicon.svg",
+  /** Favicon mark used in top-left nav (home → dotted path → pin). */
+  markSrc: "/tripnestly-mark.png",
+  faviconSrc: "/favicon.png",
 } as const;

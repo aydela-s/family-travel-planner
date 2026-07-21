@@ -67,9 +67,9 @@ export default function TravelersStep({ formData, updateFormData }: StepProps) {
           {formData.children.map((age, index) => (
             <div
               key={index}
-              className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4"
+              className="rounded-2xl border border-border bg-background p-4"
             >
-              <p className="mb-3 text-sm font-semibold text-slate-700">Child {index + 1}</p>
+              <p className="mb-3 text-sm font-semibold text-ink">Child {index + 1}</p>
               <div className="flex flex-wrap gap-2">
                 {childAges.map((option) => (
                   <SelectChip

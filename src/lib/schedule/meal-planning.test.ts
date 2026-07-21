@@ -68,6 +68,16 @@ describe("resolveNapStartAroundLunch", () => {
     expect(start - (11 * 60) - MIN_LUNCH_DURATION_MIN).toBeGreaterThanOrEqual(20);
   });
 
+  it("slips a noon nap when toddler lunch cannot start before 11:30", () => {
+    const start = resolveNapStartAroundLunch({
+      preferredNapStart: 12 * 60,
+      lunchBeforeNap: true,
+      travelMin: 15,
+      lunchWindowMin: 11 * 60 + 30,
+    });
+    expect(start).toBe(12 * 60 + 25);
+  });
+
   it("does not slip when lunch is after the nap", () => {
     expect(
       resolveNapStartAroundLunch({
@@ -146,6 +156,36 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
       parseTimeToMinutes(lunch!.endTime!) - parseTimeToMinutes(lunch!.time);
     expect(lunchDur).toBeGreaterThanOrEqual(MIN_LUNCH_DURATION_MIN);
     expect(parseTimeToMinutes(lunch!.endTime!)).toBeLessThanOrEqual(napStart);
+  });
+
+  it("extends nap end time when the typed window is lengthened (12:30-2:30)", () => {
+    const plan = balancedPlan([2, 5], { napSchedule: "12:30-2:30" });
+    const { raw } = planTrip(plan);
+    const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
+    const nap = scheduled.find((a) => a.type === "nap");
+    expect(nap).toBeDefined();
+    const napStart = parseTimeToMinutes(nap!.time);
+    const napEnd = parseTimeToMinutes(nap!.endTime!);
+    expect(napStart).toBeGreaterThanOrEqual(12 * 60 + 30);
+    // May slip later for lunch; always finish by the typed window end.
+    expect(napEnd).toBeLessThanOrEqual(14 * 60 + 30);
+    expect(napEnd - napStart).toBeGreaterThanOrEqual(90);
+  });
+
+  it("keeps lunch from overlapping a 12-2 nap on balanced days", () => {
+    const plan = balancedPlan([3], { napSchedule: "12-2" });
+    const { raw } = planTrip(plan);
+    const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
+    const lunch = scheduled.find(
+      (a) => a.type === "meal" && parseTimeToMinutes(a.time) < 16 * 60,
+    );
+    const nap = scheduled.find((a) => a.type === "nap");
+    expect(lunch).toBeDefined();
+    expect(nap).toBeDefined();
+    expect(parseTimeToMinutes(lunch!.endTime!)).toBeLessThanOrEqual(
+      parseTimeToMinutes(nap!.time),
+    );
+    expect(validateDaySchedule(scheduled, plan)).toEqual([]);
   });
 
   it("fixRawDayActivities produces a valid day schedule", () => {

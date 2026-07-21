@@ -1,21 +1,18 @@
-import { getAccommodationLabel, getBudgetStyleLabelPlain, getTransportationLabel } from "@/lib/format-labels";
+import {
+  getAccommodationLabel,
+  getBudgetStyleLabelPlain,
+  getTransportationLabel,
+  getTravelStyleLabel,
+} from "@/lib/format-labels";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { StepProps, TripPlan } from "@/types/trip-plan";
 import { StepIntro } from "../shared";
 
-function formatLabel(value: string) {
-  if (!value) return "—";
-  return value
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 border-b border-slate-100 py-3.5 last:border-0 sm:flex-row sm:justify-between">
-      <dt className="text-sm font-medium text-slate-500">{label}</dt>
-      <dd className="text-sm font-medium text-slate-900 sm:max-w-[60%] sm:text-right">{value}</dd>
+    <div className="flex flex-col gap-1 border-b border-border py-3.5 last:border-0 sm:flex-row sm:justify-between">
+      <dt className="text-sm font-medium text-muted">{label}</dt>
+      <dd className="text-sm font-medium text-ink sm:max-w-[60%] sm:text-right">{value}</dd>
     </div>
   );
 }
@@ -46,7 +43,7 @@ export default function SummaryStep({ formData }: StepProps) {
     { label: "Getting around", value: getTransportationLabel(formData.transportationType) },
     {
       label: "Travel style",
-      value: `${formatLabel(formData.travelStyle)} pace`,
+      value: `${getTravelStyleLabel(formData.travelStyle)} pace`,
     },
     ...(formData.children.length > 0
       ? [{ label: "Nap schedule", value: formData.napSchedule || "Flexible" }]
@@ -70,13 +67,13 @@ export default function SummaryStep({ formData }: StepProps) {
         subtitle="Give it a quick scan — then we'll cook up your family day plan."
       />
 
-      <dl className="rounded-2xl border border-slate-100 bg-gradient-to-b from-slate-50/80 to-white px-5 shadow-sm">
+      <dl className="rounded-2xl border border-border bg-background px-5 shadow-sm">
         {sections.map((section) => (
           <SummaryRow key={section.label} label={section.label} value={section.value} />
         ))}
       </dl>
 
-      <p className="rounded-2xl border border-sky-100 bg-sky-50/60 px-4 py-3.5 text-center text-sm leading-relaxed text-sky-800">
+      <p className="rounded-2xl border border-secondary/30 bg-secondary-muted px-4 py-3.5 text-center text-sm leading-relaxed text-ink">
         Happy with everything? Hit <strong>Generate itinerary</strong> below — we&apos;ll build
         your day-by-day plan in seconds.
       </p>

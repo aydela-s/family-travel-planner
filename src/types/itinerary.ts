@@ -17,6 +17,7 @@ export type ItineraryActivity = {
   notes?: string;
   location?: ActivityLocation;
   activityCost?: number;
+  slotKind?: import("@/lib/planning-engine/types").SlotKind;
 };
 
 export type DayCostBreakdown = {

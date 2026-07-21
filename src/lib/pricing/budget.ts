@@ -3,7 +3,7 @@ import { CityConfig } from "@/config/city-pricing";
 import { accommodationPlanningTips, estimateAccommodationFoodCosts } from "@/lib/pricing/accommodation";
 import { budgetStyleNote } from "@/lib/pricing/budget-style";
 import { hasCookDinnerAtHome } from "@/lib/schedule/meal-planning";
-import { TripPlan } from "@/types/trip-plan";
+import { BudgetStyle, TripPlan } from "@/types/trip-plan";
 import { ActivityLocation, ItineraryActivity } from "@/types/itinerary";
 
 function roundMoney(amount: number, currency: string): number {
@@ -21,6 +21,18 @@ const MEAL_TIERS = {
   hotelBreakfast: 0.25,
 };
 
+/** Extra food multiplier so Save / Balanced / Splurge still diverge when meal titles look similar. */
+export function budgetStyleFoodFactor(style: BudgetStyle | ""): number {
+  switch (style) {
+    case "save":
+      return 0.8;
+    case "splurge":
+      return 1.25;
+    default:
+      return 1;
+  }
+}
+
 function mealTierFromActivity(activity: ItineraryActivity): keyof typeof MEAL_TIERS {
   const t = activity.title.toLowerCase();
   if (t.includes("top pick")) return "premium";
@@ -36,7 +48,8 @@ export function estimateMealCosts(
   city: CityConfig,
   plan: TripPlan,
 ): number {
-  return estimateAccommodationFoodCosts(activities, city, plan, (a) => MEAL_TIERS[mealTierFromActivity(a)]);
+  const base = estimateAccommodationFoodCosts(activities, city, plan, (a) => MEAL_TIERS[mealTierFromActivity(a)]);
+  return base * budgetStyleFoodFactor(plan.budgetStyle);
 }
 
 function sumActivityCosts(activities: ItineraryActivity[]): number {
