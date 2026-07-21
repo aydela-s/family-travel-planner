@@ -31,4 +31,9 @@ describe("alignTitleWithTimeOfDay — FAM-18", () => {
       "Visit Eiffel Tower",
     );
   });
+
+  it("keeps Nap & Quiet Time intact when afternoon stripping runs", () => {
+    expect(alignTitleWithTimeOfDay("Nap & Quiet Time", "afternoon")).toBe("Nap & Quiet Time");
+    expect(alignTitleWithTimeOfDay("Nap & Quiet Time", "morning")).toBe("Nap & Quiet Time");
+  });
 });

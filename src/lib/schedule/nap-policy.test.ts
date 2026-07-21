@@ -47,6 +47,19 @@ describe("parseNapWindow — FAM-40", () => {
     expect(parseNapWindow("13:00-15:00")?.endMin).toBe(15 * 60);
   });
 
+  it("parses 11:30-1:30 as late morning through early afternoon", () => {
+    const w = parseNapWindow("11:30-1:30");
+    expect(w?.startMin).toBe(11 * 60 + 30);
+    expect(w?.endMin).toBe(13 * 60 + 30);
+    expect(w?.label).toContain("morning");
+  });
+
+  it("parses 11:30-1:30 PM the same way", () => {
+    const w = parseNapWindow("11:30-1:30 PM");
+    expect(w?.startMin).toBe(11 * 60 + 30);
+    expect(w?.endMin).toBe(13 * 60 + 30);
+  });
+
   it("keeps legacy afternoon chip working", () => {
     const w = parseNapWindow("Afternoon nap (1–3 PM)");
     expect(w?.startMin).toBe(13 * 60);

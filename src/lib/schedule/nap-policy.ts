@@ -152,8 +152,10 @@ export function parseNapWindow(text: string): NapWindow | null {
 
   if (h1 > 23 || h2 > 23 || m1 > 59 || m2 > 59) return null;
 
-  // 24h style: "12:00-14:00"
-  if (!mer1 && !mer2 && (h1 > 12 || h2 > 12 || (range[2] != null && range[5] != null))) {
+  // 24h style: "13:00-15:00" / "12:00-14:00" — only when an hour is clearly > 12.
+  // Do NOT treat "11:30-1:30" as 24h just because minutes are present (that broke
+  // cross-noon windows and fell back to the default 1–3 PM slot).
+  if (!mer1 && !mer2 && (h1 > 12 || h2 > 12)) {
     const startMin = h1 * 60 + m1;
     const endMin = h2 * 60 + m2;
     if (endMin <= startMin) return null;
@@ -164,7 +166,7 @@ export function parseNapWindow(text: string): NapWindow | null {
   if (!mer1 && mer2) mer1 = mer2;
   if (!mer2 && mer1) mer2 = mer1;
   if (!mer1 && !mer2) {
-    // Bare "9-11" → AM; bare "1-3" / "12-2" → PM afternoon nap convention
+    // Bare "9-11" / "9:00-11:00" → AM; bare "1-3" / "11:30-1:30" / "12-2" → PM span
     if (h1 <= 11 && h2 <= 11 && h1 < h2 && h1 >= 7 && h2 <= 11) {
       mer1 = "am";
       mer2 = "am";
@@ -177,9 +179,17 @@ export function parseNapWindow(text: string): NapWindow | null {
   let startMin = meridiemToMinutes(h1, m1, mer1);
   let endMin = meridiemToMinutes(h2, m2, mer2);
 
-  // "9-2 PM" → 9 AM to 2 PM
-  if (endMin <= startMin && mer2?.replace(/\./g, "").toLowerCase().startsWith("p") && h1 <= 11) {
+  // "11:30-1:30" / "9-2 PM" → start is morning when end would otherwise precede start
+  if (
+    endMin <= startMin &&
+    h1 <= 11 &&
+    (h2 < h1 || h2 <= 6) &&
+    (mer2?.replace(/\./g, "").toLowerCase().startsWith("p") || !range[6])
+  ) {
     startMin = meridiemToMinutes(h1, m1, "am");
+    if (!mer2 || mer2.replace(/\./g, "").toLowerCase().startsWith("p")) {
+      endMin = meridiemToMinutes(h2, m2, "pm");
+    }
   }
 
   if (endMin <= startMin) return null;
@@ -211,7 +221,7 @@ export function createNapActivity(plan: TripPlan): RawActivity {
   const window = getNapWindow(plan)!;
   return {
     time: minutesToTime(window.startMin),
-    title: window.label.includes("morning") ? "Morning nap & quiet time" : "Afternoon nap & quiet rest",
+    title: "Nap & Quiet Time",
     type: "nap",
     notes: plan.napSchedule || "Protected downtime per your nap preference.",
   };
