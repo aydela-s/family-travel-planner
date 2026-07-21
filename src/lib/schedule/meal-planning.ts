@@ -30,7 +30,8 @@ type RawActivity = {
 };
 
 const GROCERY = /\bgrocery\b/i;
-const RESTAURANT = /\b(restaurant|sit-down|dinner in|lunch in|lunch at|café|cafe)\b/i;
+const RESTAURANT =
+  /\b(restaurant|sit-down|dinner in|lunch in|lunch at|dinner at|breakfast at|café|cafe)\b/i;
 const COOK_DINNER = /\bcook dinner|dinner at your rental|cook at your|cook at accommodation\b/i;
 const PICNIC = /\bpicnic\b/i;
 const RETURN_HOME = /\breturn to|back to (your )?(rental|accommodation|stay|hotel|home)\b/i;

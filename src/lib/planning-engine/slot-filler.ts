@@ -19,6 +19,7 @@ import {
   lunchLabel,
   slotActivityType,
 } from "@/lib/planning-engine/meal-planner";
+import { pickRestaurantForMeal } from "@/lib/planning-engine/restaurant-picker";
 import { DayLandmarkContext, RawActivity, DayIntent } from "@/lib/planning-engine/types";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -60,10 +61,12 @@ export function buildLandmarkContext(
 function fillSlot(
   slot: DayIntent,
   plan: TripPlan,
+  city: CityConfig,
   ctx: DayLandmarkContext,
   day: number,
   totalDays: number,
   adjustment: AdjustmentContext,
+  usedRestaurants: Set<string>,
 ): RawActivity {
   const type = slotActivityType(slot.kind);
   const intensity = getIntensityConfig(plan);
@@ -78,7 +81,14 @@ function fillSlot(
 
   switch (slot.kind) {
     case "breakfast": {
-      const meal = breakfastLabel(plan, ctx.morning.name);
+      const restaurant = pickRestaurantForMeal(city, plan, {
+        meal: "breakfast",
+        day,
+        near: ctx.morning,
+        excludeNames: usedRestaurants,
+      });
+      if (restaurant) usedRestaurants.add(restaurant.name);
+      const meal = breakfastLabel(plan, ctx.morning.name, restaurant);
       return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
     }
     case "morning_activity": {
@@ -97,7 +107,14 @@ function fillSlot(
       );
     }
     case "lunch": {
-      const meal = lunchLabel(plan, ctx.lunch.name);
+      const restaurant = pickRestaurantForMeal(city, plan, {
+        meal: "lunch",
+        day,
+        near: ctx.lunch,
+        excludeNames: usedRestaurants,
+      });
+      if (restaurant) usedRestaurants.add(restaurant.name);
+      const meal = lunchLabel(plan, ctx.lunch.name, restaurant);
       return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
     }
     case "midday_rest": {
@@ -174,7 +191,14 @@ function fillSlot(
         notes: "No overpacking — room to breathe.",
       });
     case "dinner": {
-      const meal = dinnerLabel(plan, ctx.dinner.name, day, adjustment);
+      const restaurant = pickRestaurantForMeal(city, plan, {
+        meal: "dinner",
+        day,
+        near: ctx.dinner,
+        excludeNames: usedRestaurants,
+      });
+      if (restaurant) usedRestaurants.add(restaurant.name);
+      const meal = dinnerLabel(plan, ctx.dinner.name, day, adjustment, restaurant);
       return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
     }
     default:
@@ -185,11 +209,15 @@ function fillSlot(
 export function fillDaySkeleton(
   slots: DayIntent[],
   plan: TripPlan,
+  city: CityConfig,
   ctx: DayLandmarkContext,
   day: number,
   totalDays: number,
   adjustNote?: string,
+  usedRestaurants: Set<string> = new Set(),
 ): RawActivity[] {
   const adjustment = getAdjustmentContext(adjustNote, day);
-  return slots.map((slot) => fillSlot(slot, plan, ctx, day, totalDays, adjustment));
+  return slots.map((slot) =>
+    fillSlot(slot, plan, city, ctx, day, totalDays, adjustment, usedRestaurants),
+  );
 }

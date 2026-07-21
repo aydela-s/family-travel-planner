@@ -73,7 +73,7 @@ describe("Budget Style drives real cost differences, not a numeric cap", () => {
     expect(day.costBreakdown.note!.length).toBeGreaterThan(0);
   });
 
-  it("restaurant meal copy reflects the selected style, never a dollar figure", async () => {
+  it("restaurant meal copy uses named places and never a dollar figure", async () => {
     const savePlan = planFor("save");
     const splurgePlan = planFor("splurge");
     const saveRaw = planTrip(savePlan);
@@ -87,9 +87,12 @@ describe("Budget Style drives real cost differences, not a numeric cap", () => {
     const saveDinner = saveMeals[saveMeals.length - 1];
     const splurgeDinner = splurgeMeals[splurgeMeals.length - 1];
 
-    expect(saveDinner.title.toLowerCase()).toContain("casual");
-    expect(splurgeDinner.title.toLowerCase()).toContain("top pick");
+    expect(saveDinner.title).toMatch(/Dinner at /);
+    expect(splurgeDinner.title).toMatch(/Dinner at /);
+    expect(saveDinner.title).not.toBe(splurgeDinner.title);
     expect(saveDinner.notes ?? "").not.toMatch(/\$\d/);
     expect(splurgeDinner.notes ?? "").not.toMatch(/\$\d/);
+    expect(saveDinner.location?.name).toBeTruthy();
+    expect(saveDinner.location?.name.toLowerCase()).not.toMatch(/ area$/);
   });
 });

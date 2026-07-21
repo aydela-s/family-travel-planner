@@ -45,7 +45,7 @@ export const initialTripPlan: TripPlan = {
   startDate: "",
   endDate: "",
   adults: 2,
-  children: [],
+  children: [0],
   travelStyle: "",
   walkingLimit: "",
   transportationType: "",

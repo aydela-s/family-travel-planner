@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { breakfastLabel } from "@/lib/planning-engine/meal-planner";
 import { TripPlan } from "@/types/trip-plan";
+import { CityRestaurant } from "@/config/city-restaurants";
 
 function plan(overrides: Partial<TripPlan> = {}): TripPlan {
   return {
@@ -21,18 +22,31 @@ function plan(overrides: Partial<TripPlan> = {}): TripPlan {
   };
 }
 
+const cafe: CityRestaurant = {
+  name: "Café Kitsuné Tuileries",
+  lat: 48.86,
+  lng: 2.33,
+  meals: ["breakfast"],
+  ageTags: ["tween", "teen"],
+  dietary: ["vegetarian"],
+  budgetStyles: ["balanced"],
+  familyNote: "Coffee and pastries near the gardens.",
+};
+
 describe("breakfastLabel — FAM-26", () => {
   it("does not mention kid-friendly language for teens", () => {
-    const { title, notes } = breakfastLabel(plan({ children: [16] }), "Marais");
+    const { title, notes } = breakfastLabel(plan({ children: [16] }), "Marais", cafe);
     expect(`${title} ${notes}`.toLowerCase()).not.toMatch(/kid/);
-    expect(notes).toBe("Café stop before the main outing.");
+    expect(title).toContain("Café Kitsuné Tuileries");
   });
 
   it("keeps takeaway copy age-neutral when there is no kitchen", () => {
-    const { notes } = breakfastLabel(
+    const { title, notes } = breakfastLabel(
       plan({ accommodationType: "airbnb_no_kitchen", children: [16] }),
       "Marais",
+      cafe,
     );
+    expect(title).toContain("Takeaway breakfast at");
     expect(notes.toLowerCase()).not.toMatch(/kid/);
   });
 });

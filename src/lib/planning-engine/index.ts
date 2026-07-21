@@ -24,17 +24,43 @@ function effectivePlan(plan: TripPlan, options?: PlanOptions): TripPlan {
   return plan;
 }
 
+function restaurantNamesFromItinerary(
+  itinerary: RawItinerary,
+  skipDay?: number,
+): Set<string> {
+  const names = new Set<string>();
+  for (const day of itinerary.days) {
+    if (skipDay !== undefined && day.day === skipDay) continue;
+    for (const activity of day.activities) {
+      if (activity.type !== "meal") continue;
+      const match = activity.title.match(/\bat\s+(.+)$/i);
+      if (match?.[1]) names.add(match[1].trim());
+    }
+  }
+  return names;
+}
+
 function buildDayActivities(
   plan: TripPlan,
   day: number,
   totalDays: number,
   adjustNote?: string,
+  usedRestaurants: Set<string> = new Set(),
 ): RawItinerary["days"][0]["activities"] {
   const city = detectCity(plan.destination);
   const adjustment = getAdjustmentContext(adjustNote, day);
   const slots = buildDaySkeleton(plan, day, totalDays, adjustment);
   const ctx = buildLandmarkContext(city, plan, day, totalDays, adjustNote);
-  const activities = fillDaySkeleton(slots, plan, ctx, day, totalDays, adjustNote);
+  const activities = fillDaySkeleton(
+    slots,
+    plan,
+    city,
+    ctx,
+    day,
+    totalDays,
+    adjustNote,
+    usedRestaurants,
+  );
   return fixRawDayActivities(activities, plan, adjustment, ctx);
 }
 
@@ -98,13 +124,23 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
   }
 
   if (options?.adjustDay && options.existingItinerary && options.adjustNote) {
+    const usedRestaurants = restaurantNamesFromItinerary(
+      options.existingItinerary,
+      options.adjustDay,
+    );
     return {
       raw: {
         days: options.existingItinerary.days.map((d) =>
           d.day === options.adjustDay
             ? {
                 day: d.day,
-                activities: buildDayActivities(workingPlan, d.day, dayCount, options.adjustNote),
+                activities: buildDayActivities(
+                  workingPlan,
+                  d.day,
+                  dayCount,
+                  options.adjustNote,
+                  usedRestaurants,
+                ),
               }
             : d,
         ),
@@ -113,10 +149,11 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
     };
   }
 
+  const usedRestaurants = new Set<string>();
   const raw: RawItinerary = {
     days: Array.from({ length: dayCount }, (_, i) => ({
       day: i + 1,
-      activities: buildDayActivities(workingPlan, i + 1, dayCount),
+      activities: buildDayActivities(workingPlan, i + 1, dayCount, undefined, usedRestaurants),
     })),
   };
 

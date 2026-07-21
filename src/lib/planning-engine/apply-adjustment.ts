@@ -3,6 +3,7 @@ import { isGroceryActivity, isDinnerMeal } from "@/lib/schedule/meal-planning";
 import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { activityTitleForLandmark, pickAlternateLandmark } from "@/lib/planning-engine/adjust-landmarks";
 import { buildDayAdjustContext } from "@/lib/planning-engine/adjust-context";
+import { pickRestaurantForMeal } from "@/lib/planning-engine/restaurant-picker";
 import {
   AdjustActionId,
   AdjustApplyResult,
@@ -166,12 +167,19 @@ function applyEatOut(activities: RawActivity[], plan: TripPlan, ctx: DayAdjustCo
     return { applied: false, message: "No dinner slot found", activities };
   }
   const city = detectCity(plan.destination);
-  const spot = city.landmarks[ctx.dayNumber % city.landmarks.length].name;
+  const near = city.landmarks[ctx.dayNumber % city.landmarks.length];
+  const restaurant = pickRestaurantForMeal(city, plan, {
+    meal: "dinner",
+    day: ctx.dayNumber,
+    near,
+  });
   result[dIdx] = {
     ...result[dIdx],
-    title: `Dinner out near ${spot}`,
+    title: restaurant ? `Dinner at ${restaurant.name}` : `Dinner out near ${near.name}`,
     type: "meal",
-    notes: "Night off from cooking — enjoy a local restaurant.",
+    notes: restaurant
+      ? `${restaurant.familyNote} Night off from cooking — enjoy a local restaurant.`
+      : "Night off from cooking — enjoy a local restaurant.",
   };
   return { applied: true, activities: result };
 }

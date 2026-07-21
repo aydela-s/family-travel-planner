@@ -18,6 +18,7 @@ import {
   validateActivityOpeningHours,
 } from "@/lib/schedule/landmark-hours";
 import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
+import { findRestaurantByName } from "@/lib/planning-engine/restaurant-picker";
 import {
   activityUsesStayHome,
   stayHomeLocation,
@@ -148,18 +149,27 @@ async function enrichDay(
       act.location = landmarkLocation(landmark, activitySlot, rawDay.day);
       act.activityCost = familyActivityCost(landmark.adultPrice, plan.adults, plan.children);
     } else if (a.type === "meal") {
-      const mealLandmark = pickLandmarkForFamily(
-        city,
-        plan,
-        rawDay.day,
-        10 + activitySlot,
-        pickedLandmarks,
-      );
-      act.location = {
-        name: `${mealLandmark.name} area`,
-        lat: mealLandmark.lat + 0.004,
-        lng: mealLandmark.lng - 0.004,
-      };
+      const restaurant = findRestaurantByName(city, a.title);
+      if (restaurant) {
+        act.location = {
+          name: restaurant.name,
+          lat: restaurant.lat,
+          lng: restaurant.lng,
+        };
+      } else {
+        const mealLandmark = pickLandmarkForFamily(
+          city,
+          plan,
+          rawDay.day,
+          10 + activitySlot,
+          pickedLandmarks,
+        );
+        act.location = {
+          name: `${mealLandmark.name} area`,
+          lat: mealLandmark.lat + 0.004,
+          lng: mealLandmark.lng - 0.004,
+        };
+      }
       act.activityCost = 0;
     } else {
       const restLandmark = pickLandmarkForFamily(
