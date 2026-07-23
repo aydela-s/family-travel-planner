@@ -14,6 +14,7 @@ import { normalizeRawItinerary } from "@/lib/itinerary";
 import { pickLandmarkForFamily } from "@/lib/schedule/family-profile";
 import { isGroceryActivity } from "@/lib/schedule/meal-planning";
 import {
+  extractLandmarkFromTitle,
   findLandmarkByName,
   validateActivityOpeningHours,
 } from "@/lib/schedule/landmark-hours";
@@ -41,15 +42,6 @@ import {
   ItineraryDay,
   RawItinerary,
 } from "@/types/itinerary";
-
-function landmarkLocation(landmark: Landmark, slotIndex: number, day: number): ActivityLocation {
-  const offset = (slotIndex * 0.006 + day * 0.003) % 0.015;
-  return {
-    name: landmark.name,
-    lat: landmark.lat + offset,
-    lng: landmark.lng - offset,
-  };
-}
 
 function normalizeActivity(activity: ItineraryActivity): ItineraryActivity {
   const timeOfDay = getTimeOfDay(activity.time);
@@ -140,13 +132,20 @@ async function enrichDay(
     if (a.type === "activity") {
       const startMin = parseTimeToMinutes(a.time);
       const endMin = startMin + itemDurationMin(a, plan);
-      const landmark = pickLandmarkForFamily(city, plan, rawDay.day, activitySlot, pickedLandmarks, {
-        startMin,
-        endMin,
-      });
+      const fromTitle = extractLandmarkFromTitle(a.title);
+      const matched = fromTitle ? findLandmarkByName(city.landmarks, fromTitle) : undefined;
+      const landmark =
+        matched ??
+        pickLandmarkForFamily(city, plan, rawDay.day, activitySlot, pickedLandmarks, {
+          visitWindow: { startMin, endMin },
+        });
       pickedLandmarks.push(landmark);
       activitySlot += 1;
-      act.location = landmarkLocation(landmark, activitySlot, rawDay.day);
+      act.location = {
+        name: landmark.name,
+        lat: landmark.lat,
+        lng: landmark.lng,
+      };
       act.activityCost = familyActivityCost(landmark.adultPrice, plan.adults, plan.children);
     } else if (a.type === "meal") {
       const restaurant = findRestaurantByName(city, a.title);
@@ -157,29 +156,27 @@ async function enrichDay(
           lng: restaurant.lng,
         };
       } else {
-        const mealLandmark = pickLandmarkForFamily(
-          city,
-          plan,
-          rawDay.day,
-          10 + activitySlot,
-          pickedLandmarks,
-        );
+        // Prefer anchoring meals near an already-picked activity, not a fresh random landmark.
+        const anchor = pickedLandmarks[pickedLandmarks.length - 1] ?? city.landmarks[0]!;
         act.location = {
-          name: `${mealLandmark.name} area`,
-          lat: mealLandmark.lat + 0.004,
-          lng: mealLandmark.lng - 0.004,
+          name: `${anchor.name} area`,
+          lat: anchor.lat + 0.004,
+          lng: anchor.lng - 0.004,
         };
       }
       act.activityCost = 0;
     } else {
-      const restLandmark = pickLandmarkForFamily(
-        city,
-        plan,
-        rawDay.day,
-        20 + activitySlot,
-        pickedLandmarks,
-      );
-      act.location = landmarkLocation(restLandmark, activitySlot + 2, rawDay.day);
+      const homeRest = stayHomeLocation(plan);
+      if (homeRest) {
+        act.location = homeRest;
+      } else {
+        const anchor = pickedLandmarks[0] ?? city.landmarks[0]!;
+        act.location = {
+          name: anchor.name,
+          lat: anchor.lat,
+          lng: anchor.lng,
+        };
+      }
       act.activityCost = 0;
     }
 

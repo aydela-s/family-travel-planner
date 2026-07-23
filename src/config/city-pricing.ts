@@ -3,6 +3,23 @@ export type TaxiProvider = "uber" | "lyft" | "bolt" | "gett";
 export type LandmarkAgeTag = "toddler" | "child" | "tween" | "teen";
 export type LandmarkIntensity = "low" | "medium" | "high";
 
+/** Wizard interest categories — keep in sync with interest-map label mapping. */
+export type LandmarkInterestTag =
+  | "parks"
+  | "beaches"
+  | "nature"
+  | "history"
+  | "museums"
+  | "playgrounds"
+  | "zoos"
+  | "theme-parks"
+  | "interactive"
+  | "food-markets"
+  | "shopping"
+  | "entertainment"
+  | "sports"
+  | "spas";
+
 /** Simple daily hours — Phase 2 soft validation; weekday variation can come later. */
 export type LandmarkOpeningHours = {
   open: string;
@@ -17,6 +34,8 @@ export type Landmark = {
   openingHours: LandmarkOpeningHours;
   intensity: LandmarkIntensity;
   ageTags: LandmarkAgeTag[];
+  /** Wizard interest categories this stop satisfies (FAM-7). */
+  interestTags: LandmarkInterestTag[];
   indoor: boolean;
 };
 
@@ -83,6 +102,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "08:00", close: "20:00" },
         intensity: "low",
         ageTags: ["toddler", "child", "tween", "teen"],
+        interestTags: ["parks", "museums", "playgrounds"],
         indoor: false,
       },
       {
@@ -93,6 +113,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "09:00", close: "17:00" },
         intensity: "high",
         ageTags: ["toddler", "child", "tween"],
+        interestTags: ["zoos"],
         indoor: false,
       },
       {
@@ -103,6 +124,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "06:00", close: "20:00" },
         intensity: "medium",
         ageTags: ["child", "tween", "teen"],
+        interestTags: ["beaches", "nature"],
         indoor: false,
       },
       {
@@ -113,7 +135,30 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "10:00", close: "17:00" },
         intensity: "medium",
         ageTags: ["tween", "teen"],
+        interestTags: ["museums", "history", "interactive"],
         indoor: true,
+      },
+      {
+        name: "Fleet Science Center",
+        lat: 32.7308,
+        lng: -117.147,
+        adultPrice: 25,
+        openingHours: { open: "10:00", close: "17:00" },
+        intensity: "medium",
+        ageTags: ["toddler", "child", "tween"],
+        interestTags: ["interactive", "museums"],
+        indoor: true,
+      },
+      {
+        name: "Belmont Park",
+        lat: 32.7714,
+        lng: -117.2525,
+        adultPrice: 20,
+        openingHours: { open: "11:00", close: "20:00" },
+        intensity: "high",
+        ageTags: ["child", "tween", "teen"],
+        interestTags: ["theme-parks", "beaches", "entertainment"],
+        indoor: false,
       },
     ],
   },
@@ -149,6 +194,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "09:00", close: "23:00" },
         intensity: "medium",
         ageTags: ["child", "tween", "teen"],
+        interestTags: ["history", "nature"],
         indoor: false,
       },
       {
@@ -159,6 +205,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "09:00", close: "18:00" },
         intensity: "high",
         ageTags: ["tween", "teen"],
+        interestTags: ["museums", "history"],
         indoor: true,
       },
       {
@@ -169,6 +216,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "07:30", close: "20:00" },
         intensity: "low",
         ageTags: ["toddler", "child", "tween"],
+        interestTags: ["parks", "playgrounds"],
         indoor: false,
       },
       {
@@ -179,6 +227,29 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "08:00", close: "22:00" },
         intensity: "medium",
         ageTags: ["child", "tween", "teen"],
+        interestTags: ["history", "shopping", "nature"],
+        indoor: false,
+      },
+      {
+        name: "Cité des Sciences",
+        lat: 48.8956,
+        lng: 2.3882,
+        adultPrice: 12,
+        openingHours: { open: "10:00", close: "18:00" },
+        intensity: "medium",
+        ageTags: ["toddler", "child", "tween", "teen"],
+        interestTags: ["interactive", "museums"],
+        indoor: true,
+      },
+      {
+        name: "Jardin d'Acclimatation",
+        lat: 48.8775,
+        lng: 2.2635,
+        adultPrice: 7,
+        openingHours: { open: "10:00", close: "18:00" },
+        intensity: "medium",
+        ageTags: ["toddler", "child", "tween"],
+        interestTags: ["theme-parks", "parks", "playgrounds"],
         indoor: false,
       },
     ],
@@ -215,6 +286,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "05:00", close: "22:00" },
         intensity: "low",
         ageTags: ["toddler", "child", "tween", "teen"],
+        interestTags: ["parks", "playgrounds", "nature"],
         indoor: false,
       },
       {
@@ -225,6 +297,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "10:00", close: "17:50" },
         intensity: "medium",
         ageTags: ["toddler", "child", "tween"],
+        interestTags: ["museums", "interactive"],
         indoor: true,
       },
       {
@@ -235,6 +308,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "09:00", close: "17:30" },
         intensity: "high",
         ageTags: ["tween", "teen"],
+        interestTags: ["history", "museums"],
         indoor: false,
       },
       {
@@ -245,7 +319,30 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "10:00", close: "20:00" },
         intensity: "medium",
         ageTags: ["child", "tween", "teen"],
+        interestTags: ["entertainment", "nature"],
         indoor: true,
+      },
+      {
+        name: "Science Museum",
+        lat: 51.4973,
+        lng: -0.1744,
+        adultPrice: 0,
+        openingHours: { open: "10:00", close: "18:00" },
+        intensity: "medium",
+        ageTags: ["toddler", "child", "tween", "teen"],
+        interestTags: ["interactive", "museums"],
+        indoor: true,
+      },
+      {
+        name: "Diana Memorial Playground",
+        lat: 51.5085,
+        lng: -0.1875,
+        adultPrice: 0,
+        openingHours: { open: "10:00", close: "18:00" },
+        intensity: "low",
+        ageTags: ["toddler", "child"],
+        interestTags: ["playgrounds", "parks"],
+        indoor: false,
       },
     ],
   },
@@ -281,6 +378,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "06:00", close: "22:00" },
         intensity: "medium",
         ageTags: ["toddler", "child", "tween", "teen"],
+        interestTags: ["beaches", "sports"],
         indoor: false,
       },
       {
@@ -291,6 +389,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "09:00", close: "22:00" },
         intensity: "medium",
         ageTags: ["child", "tween", "teen"],
+        interestTags: ["food-markets", "shopping"],
         indoor: true,
       },
       {
@@ -301,6 +400,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "06:00", close: "21:00" },
         intensity: "low",
         ageTags: ["toddler", "child", "tween"],
+        interestTags: ["parks", "playgrounds", "nature"],
         indoor: false,
       },
       {
@@ -311,6 +411,29 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "08:00", close: "22:00" },
         intensity: "medium",
         ageTags: ["child", "tween", "teen"],
+        interestTags: ["history", "shopping"],
+        indoor: false,
+      },
+      {
+        name: "Tel Aviv Museum of Art",
+        lat: 32.0775,
+        lng: 34.7868,
+        adultPrice: 50,
+        openingHours: { open: "10:00", close: "18:00" },
+        intensity: "medium",
+        ageTags: ["tween", "teen"],
+        interestTags: ["museums"],
+        indoor: true,
+      },
+      {
+        name: "Tel Aviv Port",
+        lat: 32.0965,
+        lng: 34.7745,
+        adultPrice: 0,
+        openingHours: { open: "08:00", close: "23:00" },
+        intensity: "medium",
+        ageTags: ["toddler", "child", "tween", "teen"],
+        interestTags: ["beaches", "shopping", "entertainment"],
         indoor: false,
       },
     ],
@@ -324,9 +447,7 @@ export const CITY_CONFIGS: CityConfig[] = [
     lat: 35.6762,
     lng: 139.6503,
     aliases: ["tokyo", "tokyo japan"],
-    taxiProviders: [
-      { name: "uber", label: "Uber", multiplier: 1.15 },
-    ],
+    taxiProviders: [{ name: "uber", label: "Uber", multiplier: 1.15 }],
     transport: {
       baseFare: 500,
       ratePerKm: 350,
@@ -346,6 +467,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "05:00", close: "23:00" },
         intensity: "low",
         ageTags: ["toddler", "child", "tween", "teen"],
+        interestTags: ["parks", "zoos", "museums"],
         indoor: false,
       },
       {
@@ -356,6 +478,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "09:00", close: "22:00" },
         intensity: "high",
         ageTags: ["child", "tween", "teen"],
+        interestTags: ["interactive", "museums", "entertainment"],
         indoor: true,
       },
       {
@@ -366,6 +489,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "06:00", close: "17:00" },
         intensity: "medium",
         ageTags: ["tween", "teen"],
+        interestTags: ["history", "shopping"],
         indoor: false,
       },
       {
@@ -376,7 +500,30 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "00:00", close: "23:59" },
         intensity: "high",
         ageTags: ["teen"],
+        interestTags: ["shopping", "entertainment"],
         indoor: false,
+      },
+      {
+        name: "Ueno Zoo",
+        lat: 35.7155,
+        lng: 139.7712,
+        adultPrice: 600,
+        openingHours: { open: "09:30", close: "17:00" },
+        intensity: "medium",
+        ageTags: ["toddler", "child", "tween"],
+        interestTags: ["zoos"],
+        indoor: false,
+      },
+      {
+        name: "KidZania Tokyo",
+        lat: 35.6565,
+        lng: 139.7935,
+        adultPrice: 4200,
+        openingHours: { open: "09:00", close: "17:00" },
+        intensity: "high",
+        ageTags: ["toddler", "child", "tween"],
+        interestTags: ["interactive", "theme-parks"],
+        indoor: true,
       },
     ],
   },
@@ -414,6 +561,7 @@ export const DEFAULT_CITY: CityConfig = {
       openingHours: { open: "06:00", close: "21:00" },
       intensity: "low",
       ageTags: ["toddler", "child", "tween", "teen"],
+      interestTags: ["parks", "playgrounds"],
       indoor: false,
     },
     {
@@ -424,6 +572,7 @@ export const DEFAULT_CITY: CityConfig = {
       openingHours: { open: "10:00", close: "17:00" },
       intensity: "medium",
       ageTags: ["toddler", "child", "tween"],
+      interestTags: ["museums", "interactive"],
       indoor: true,
     },
     {
@@ -434,6 +583,7 @@ export const DEFAULT_CITY: CityConfig = {
       openingHours: { open: "06:00", close: "22:00" },
       intensity: "low",
       ageTags: ["child", "tween", "teen"],
+      interestTags: ["beaches", "nature"],
       indoor: false,
     },
     {
@@ -444,7 +594,30 @@ export const DEFAULT_CITY: CityConfig = {
       openingHours: { open: "09:00", close: "20:00" },
       intensity: "medium",
       ageTags: ["child", "tween", "teen"],
+      interestTags: ["food-markets", "shopping"],
       indoor: true,
+    },
+    {
+      name: "City History Tower",
+      lat: 40.708,
+      lng: -74.012,
+      adultPrice: 18,
+      openingHours: { open: "10:00", close: "18:00" },
+      intensity: "medium",
+      ageTags: ["tween", "teen"],
+      interestTags: ["history", "museums"],
+      indoor: true,
+    },
+    {
+      name: "Adventure Play Yard",
+      lat: 40.716,
+      lng: -74.002,
+      adultPrice: 0,
+      openingHours: { open: "08:00", close: "19:00" },
+      intensity: "low",
+      ageTags: ["toddler", "child"],
+      interestTags: ["playgrounds", "parks"],
+      indoor: false,
     },
   ],
 };

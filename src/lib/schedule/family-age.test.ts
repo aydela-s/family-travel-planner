@@ -40,6 +40,7 @@ function landmark(partial: Partial<Landmark> & Pick<Landmark, "name" | "ageTags"
     openingHours: { open: "09:00", close: "18:00" },
     intensity: "medium",
     indoor: false,
+    interestTags: [],
     ...partial,
   };
 }

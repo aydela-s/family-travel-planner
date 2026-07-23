@@ -41,6 +41,7 @@ function landmark(
     adultPrice: 0,
     intensity: "medium",
     ageTags: ["child", "tween"],
+    interestTags: [],
     indoor: false,
     ...partial,
   };

@@ -15,6 +15,7 @@ const louvre: Landmark = {
   openingHours: { open: "09:00", close: "18:00" },
   intensity: "high",
   ageTags: ["tween", "teen"],
+  interestTags: ["museums"],
   indoor: true,
 };
 
@@ -74,7 +75,7 @@ describe("landmark opening hours", () => {
 });
 
 describe("city catalog — Phase 2 fields", () => {
-  it("every landmark has opening hours, intensity, age tags, and indoor flag", () => {
+  it("every landmark has opening hours, intensity, age tags, interest tags, and indoor flag", () => {
     for (const city of CITY_CONFIGS) {
       expect(city.landmarks.length).toBeGreaterThan(0);
       for (const landmark of city.landmarks) {
@@ -83,6 +84,7 @@ describe("city catalog — Phase 2 fields", () => {
         );
         expect(["low", "medium", "high"]).toContain(landmark.intensity);
         expect(landmark.ageTags.length).toBeGreaterThan(0);
+        expect(landmark.interestTags.length).toBeGreaterThan(0);
         expect(typeof landmark.indoor).toBe("boolean");
       }
     }

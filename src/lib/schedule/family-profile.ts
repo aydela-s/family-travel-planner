@@ -1,6 +1,7 @@
-import { CityConfig, Landmark, LandmarkAgeTag } from "@/config/city-pricing";
+import { CityConfig, Landmark, LandmarkAgeTag, LandmarkIntensity } from "@/config/city-pricing";
 import { haversineKm } from "@/lib/maps/directions";
 import { landmarksForStyle } from "@/lib/pricing/budget-style";
+import { interestTagsFromPlan } from "@/lib/schedule/interest-map";
 import { isLandmarkOpenForVisit, VisitWindow } from "@/lib/schedule/landmark-hours";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -15,10 +16,14 @@ export type FamilyAgeProfile = {
   hasTeen: boolean;
   isMixedAges: boolean;
   ageSummary: string;
+  /** Present age bands for coverage targeting (FAM-7). */
+  bands: LandmarkAgeTag[];
 };
 
 /** Prefer same-day picks within this radius of earlier stops (km). */
 export const SAME_DAY_CLUSTER_KM = 5;
+/** Tighter cluster when walking / low walking limit. */
+export const TIGHT_CLUSTER_KM = 2.5;
 
 /**
  * Age bands match the product spec:
@@ -39,82 +44,138 @@ export function getFamilyAgeProfile(plan: TripPlan): FamilyAgeProfile {
       hasTeen: false,
       isMixedAges: false,
       ageSummary: `${plan.adults} adult${plan.adults !== 1 ? "s" : ""}`,
+      bands: [],
     };
   }
 
   const youngest = Math.min(...ages);
   const oldest = Math.max(...ages);
-  const bands = new Set(
-    ages.map((age) => {
-      if (age <= 3) return "toddler";
-      if (age <= 7) return "young";
-      if (age <= 12) return "tween";
-      return "teen";
-    }),
-  );
+  const bands: LandmarkAgeTag[] = [];
+  const hasToddler = ages.some((a) => a <= 3);
+  const hasYoungChild = ages.some((a) => a >= 4 && a <= 7);
+  const hasTween = ages.some((a) => a >= 8 && a <= 12);
+  const hasTeen = ages.some((a) => a >= 13);
+  if (hasToddler) bands.push("toddler");
+  if (hasYoungChild) bands.push("child");
+  if (hasTween) bands.push("tween");
+  if (hasTeen) bands.push("teen");
 
   return {
     youngest,
     oldest,
-    hasToddler: ages.some((a) => a <= 3),
-    hasYoungChild: ages.some((a) => a >= 4 && a <= 7),
-    hasTween: ages.some((a) => a >= 8 && a <= 12),
-    hasTeen: ages.some((a) => a >= 13),
-    isMixedAges: bands.size > 1,
+    hasToddler,
+    hasYoungChild,
+    hasTween,
+    hasTeen,
+    isMixedAges: bands.length > 1,
     ageSummary: youngest === oldest ? `age ${youngest}` : `ages ${youngest}–${oldest}`,
+    bands,
   };
 }
 
-const TITLE_EXPLORE = /\b(museum|zoo|aquarium|park|garden|cove|midway|tower|beach|historic|natural|science|interactive)\b/i;
+const TITLE_EXPLORE =
+  /\b(museum|zoo|aquarium|park|garden|cove|midway|tower|beach|historic|natural|science|interactive)\b/i;
 const TITLE_TEEN = /\b(museum|midway|uss|adventure|sports|tower|historic|science)\b/i;
 
 function hasTag(landmark: Landmark, tag: LandmarkAgeTag): boolean {
   return landmark.ageTags.includes(tag);
 }
 
-/** Score a landmark for the family's age bands using catalog ageTags. */
+/** Score a landmark for the family's age bands — missing bands are penalized hard (FAM-7). */
 export function landmarkAgeScore(landmark: Landmark, profile: FamilyAgeProfile): number {
-  if (!profile.hasToddler && !profile.hasYoungChild && !profile.hasTween && !profile.hasTeen) {
+  if (profile.bands.length === 0) {
     return 10 + landmark.ageTags.length;
   }
 
   let score = 10;
 
   if (profile.hasToddler) {
-    if (hasTag(landmark, "toddler")) score += 22;
-    else if (hasTag(landmark, "child")) score += 6;
-    else score -= 8;
+    if (hasTag(landmark, "toddler")) score += 28;
+    else if (hasTag(landmark, "child")) score += 4;
+    else score -= 24;
   }
 
   if (profile.hasYoungChild) {
-    if (hasTag(landmark, "child")) score += 18;
+    if (hasTag(landmark, "child")) score += 22;
     else if (hasTag(landmark, "toddler") || hasTag(landmark, "tween")) score += 8;
+    else score -= 14;
   }
 
   if (profile.hasTween) {
-    // Spec: mix of child + teen activities for 8–12.
-    if (hasTag(landmark, "tween")) score += 14;
-    if (hasTag(landmark, "child")) score += 8;
-    if (hasTag(landmark, "teen")) score += 8;
+    if (hasTag(landmark, "tween")) score += 18;
+    else if (hasTag(landmark, "child") || hasTag(landmark, "teen")) score += 8;
+    else score -= 10;
   }
 
   if (profile.hasTeen) {
-    if (hasTag(landmark, "teen")) score += 18;
+    if (hasTag(landmark, "teen")) score += 22;
     else if (hasTag(landmark, "tween")) score += 6;
-    else if (!hasTag(landmark, "toddler")) score += 2;
+    else score -= 12;
   }
 
   if (profile.isMixedAges) {
-    const relevant: LandmarkAgeTag[] = [];
-    if (profile.hasToddler) relevant.push("toddler");
-    if (profile.hasYoungChild) relevant.push("child");
-    if (profile.hasTween) relevant.push("tween");
-    if (profile.hasTeen) relevant.push("teen");
-    const overlap = relevant.filter((t) => hasTag(landmark, t)).length;
-    score += overlap * 6;
+    const overlap = profile.bands.filter((t) => hasTag(landmark, t)).length;
+    score += overlap * 8;
+    // Reward multi-band stops that work for everyone on the trip.
+    if (overlap === profile.bands.length) score += 16;
   }
 
   return score;
+}
+
+/** Bonus when a pick is meant to cover a specific under-represented age band. */
+export function landmarkBandTargetScore(
+  landmark: Landmark,
+  preferBand: LandmarkAgeTag | null,
+): number {
+  if (!preferBand) return 0;
+  return hasTag(landmark, preferBand) ? 40 : -20;
+}
+
+export function landmarkInterestScore(landmark: Landmark, plan: TripPlan): number {
+  const wanted = interestTagsFromPlan(plan.interests);
+  if (wanted.length === 0) return 4;
+  const hits = wanted.filter((tag) => landmark.interestTags.includes(tag)).length;
+  if (hits === 0) return -18;
+  return hits * 22;
+}
+
+export function stayProximityScore(landmark: Landmark, plan: TripPlan): number {
+  if (typeof plan.stayLat !== "number" || typeof plan.stayLng !== "number") return 0;
+  const km = haversineKm(landmark.lat, landmark.lng, plan.stayLat, plan.stayLng);
+  if (km <= 1.5) return 24;
+  if (km <= 3) return 14;
+  if (km <= 6) return 4;
+  return -(km - 6) * 3;
+}
+
+export function walkingFitScore(landmark: Landmark, plan: TripPlan): number {
+  const lowWalking =
+    plan.walkingLimit === "low" || plan.transportationType === "walking";
+  if (!lowWalking) {
+    if (plan.walkingLimit === "high" && landmark.intensity === "high") return 6;
+    return 0;
+  }
+  switch (landmark.intensity as LandmarkIntensity) {
+    case "low":
+      return 18;
+    case "medium":
+      return 2;
+    case "high":
+      return -16;
+    default:
+      return 0;
+  }
+}
+
+export function clusterRadiusKm(plan: TripPlan): number {
+  if (plan.walkingLimit === "low" || plan.transportationType === "walking") {
+    return TIGHT_CLUSTER_KM;
+  }
+  if (plan.transportationType === "taxis" || plan.transportationType === "car-rental") {
+    return SAME_DAY_CLUSTER_KM + 2;
+  }
+  return SAME_DAY_CLUSTER_KM;
 }
 
 /** Minimum km from a candidate to any already-picked same-day landmark. */
@@ -140,13 +201,13 @@ export function maxPairwiseDistanceKm(landmarks: Landmark[]): number {
   return max;
 }
 
-function proximityBonus(candidate: Landmark, alreadyPicked: Landmark[]): number {
+function proximityBonus(candidate: Landmark, alreadyPicked: Landmark[], radiusKm: number): number {
   if (alreadyPicked.length === 0) return 0;
   const dist = minDistanceKmToPicked(candidate, alreadyPicked);
-  if (dist <= SAME_DAY_CLUSTER_KM) {
-    return (SAME_DAY_CLUSTER_KM - dist) * 8;
+  if (dist <= radiusKm) {
+    return (radiusKm - dist) * 8;
   }
-  return -(dist - SAME_DAY_CLUSTER_KM) * 12;
+  return -(dist - radiusKm) * 12;
 }
 
 /**
@@ -158,6 +219,7 @@ function preferOpenPool(
   cityLandmarks: Landmark[],
   pickedNames: Set<string>,
   alreadyPicked: Landmark[],
+  radiusKm: number,
   visitWindow?: VisitWindow,
 ): Landmark[] {
   if (!visitWindow) return pool;
@@ -171,7 +233,7 @@ function preferOpenPool(
   let wider = cityLandmarks.filter((l) => !pickedNames.has(l.name));
   if (alreadyPicked.length > 0) {
     const nearby = wider.filter(
-      (l) => minDistanceKmToPicked(l, alreadyPicked) <= SAME_DAY_CLUSTER_KM,
+      (l) => minDistanceKmToPicked(l, alreadyPicked) <= radiusKm,
     );
     if (nearby.length > 0) wider = nearby;
   }
@@ -179,17 +241,31 @@ function preferOpenPool(
   return openWider.length > 0 ? openWider : pool;
 }
 
+export type PickLandmarkOptions = {
+  visitWindow?: VisitWindow;
+  /** Prefer a landmark that covers this age band (mixed-age day diversification). */
+  preferBand?: LandmarkAgeTag | null;
+  /** When true and stay coords exist, heavily prefer near-stay for the first pick. */
+  anchorToStay?: boolean;
+};
+
 export function pickLandmarkForFamily(
   city: CityConfig,
   plan: TripPlan,
   dayNumber: number,
   slotIndex: number,
   alreadyPicked: Landmark[] = [],
-  visitWindow?: VisitWindow,
+  visitWindowOrOpts?: VisitWindow | PickLandmarkOptions,
 ): Landmark {
+  const opts: PickLandmarkOptions =
+    visitWindowOrOpts && "startMin" in visitWindowOrOpts
+      ? { visitWindow: visitWindowOrOpts }
+      : ((visitWindowOrOpts as PickLandmarkOptions | undefined) ?? {});
+
   const profile = getFamilyAgeProfile(plan);
   const rotation = (dayNumber - 1) * 3 + slotIndex;
   const pickedNames = new Set(alreadyPicked.map((l) => l.name));
+  const radiusKm = clusterRadiusKm(plan);
 
   const stylePool = landmarksForStyle(city.landmarks, (l) => l.adultPrice, plan.budgetStyle, {
     allowPremiumPick: slotIndex === 0,
@@ -204,12 +280,12 @@ export function pickLandmarkForFamily(
   }
 
   if (alreadyPicked.length > 0) {
-    const inCluster = pool.filter((l) => minDistanceKmToPicked(l, alreadyPicked) <= SAME_DAY_CLUSTER_KM);
+    const inCluster = pool.filter((l) => minDistanceKmToPicked(l, alreadyPicked) <= radiusKm);
     if (inCluster.length === 0) {
       const nearby = city.landmarks.filter(
         (l) =>
           !pickedNames.has(l.name) &&
-          minDistanceKmToPicked(l, alreadyPicked) <= SAME_DAY_CLUSTER_KM,
+          minDistanceKmToPicked(l, alreadyPicked) <= radiusKm,
       );
       if (nearby.length > 0) {
         pool = nearby;
@@ -219,25 +295,64 @@ export function pickLandmarkForFamily(
     }
   }
 
-  pool = preferOpenPool(pool, city.landmarks, pickedNames, alreadyPicked, visitWindow);
+  pool = preferOpenPool(
+    pool,
+    city.landmarks,
+    pickedNames,
+    alreadyPicked,
+    radiusKm,
+    opts.visitWindow,
+  );
 
   const ranked = [...pool]
-    .map((lm) => ({
-      landmark: lm,
-      score: landmarkAgeScore(lm, profile) + proximityBonus(lm, alreadyPicked),
-      dist: minDistanceKmToPicked(lm, alreadyPicked),
-    }))
-    .sort((a, b) => b.score - a.score || a.dist - b.dist || b.landmark.adultPrice - a.landmark.adultPrice);
+    .map((lm) => {
+      let score =
+        landmarkAgeScore(lm, profile) +
+        landmarkInterestScore(lm, plan) +
+        stayProximityScore(lm, plan) +
+        walkingFitScore(lm, plan) +
+        proximityBonus(lm, alreadyPicked, radiusKm) +
+        landmarkBandTargetScore(lm, opts.preferBand ?? null);
+
+      // First morning stop: lean harder toward the stay when we have coordinates.
+      if (opts.anchorToStay && alreadyPicked.length === 0) {
+        score += stayProximityScore(lm, plan);
+      }
+
+      return {
+        landmark: lm,
+        score,
+        dist: minDistanceKmToPicked(lm, alreadyPicked),
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.score - a.score || a.dist - b.dist || b.landmark.adultPrice - a.landmark.adultPrice,
+    );
 
   if (alreadyPicked.length > 0) {
-    const clustered = ranked.filter((r) => r.dist <= SAME_DAY_CLUSTER_KM);
+    const clustered = ranked.filter((r) => r.dist <= radiusKm);
     if (clustered.length > 0) {
-      return clustered[rotation % clustered.length].landmark;
+      return clustered[0]!.landmark;
     }
-    return ranked[0].landmark;
+    return ranked[0]!.landmark;
   }
 
-  return ranked[rotation % ranked.length].landmark;
+  // First pick: take best score (stay/interest/age), not alphabetical rotation alone.
+  if (opts.anchorToStay || opts.preferBand || plan.interests.length > 0) {
+    return ranked[0]!.landmark;
+  }
+  return ranked[rotation % ranked.length]!.landmark;
+}
+
+/** Which family age bands are still missing from already-picked landmarks. */
+export function uncoveredAgeBands(
+  profile: FamilyAgeProfile,
+  alreadyPicked: Landmark[],
+): LandmarkAgeTag[] {
+  if (profile.bands.length === 0) return [];
+  const covered = new Set(alreadyPicked.flatMap((l) => l.ageTags));
+  return profile.bands.filter((b) => !covered.has(b));
 }
 
 export function activityNoteForFamily(plan: TripPlan, day: number): string {

@@ -93,6 +93,7 @@ describe("same-day landmark proximity — Phase 3", () => {
           openingHours: { open: "08:00", close: "20:00" },
           intensity: "low" as const,
           ageTags: ["child" as const],
+          interestTags: ["parks" as const],
           indoor: false,
         },
         {
@@ -103,6 +104,7 @@ describe("same-day landmark proximity — Phase 3", () => {
           openingHours: { open: "08:00", close: "20:00" },
           intensity: "low" as const,
           ageTags: ["child" as const],
+          interestTags: ["beaches" as const],
           indoor: false,
         },
       ],

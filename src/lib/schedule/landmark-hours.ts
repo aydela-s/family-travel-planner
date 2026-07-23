@@ -94,8 +94,13 @@ function formatEnd(endMin: number): string {
 }
 
 /** Pull landmark name from titles like "Explore Louvre Museum". */
-function extractLandmarkFromTitle(title: string): string | null {
-  const match = title.match(/^(?:Explore|Visit|Family time at)\s+(.+)$/i);
+export function extractLandmarkFromTitle(title: string): string | null {
+  const match = title.match(
+    /^(?:Explore|Visit|Family time at|Outdoor time:|Museum & culture:)\s+(.+)$/i,
+  );
   if (match) return match[1].trim();
+  // Fallback: strip a leading "Something: " prefix from adjust actions.
+  const colon = title.match(/^[^:]+:\s*(.+)$/);
+  if (colon && colon[1].length > 3) return colon[1].trim();
   return null;
 }

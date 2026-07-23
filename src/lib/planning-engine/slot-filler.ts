@@ -1,8 +1,10 @@
-import { CityConfig } from "@/config/city-pricing";
+import { CityConfig, LandmarkAgeTag } from "@/config/city-pricing";
 import {
   activityNoteForFamily,
+  getFamilyAgeProfile,
   pickLandmarkForFamily,
   suggestActivityTitle,
+  uncoveredAgeBands,
   VisitWindow,
 } from "@/lib/schedule/family-profile";
 import { morningActivityDefaultTime } from "@/lib/planning-engine/skeleton-builder";
@@ -28,6 +30,19 @@ function visitWindowFromTime(startTime: string, durationMin: number): VisitWindo
   return { startMin, endMin: startMin + durationMin };
 }
 
+/** Rotate preferred bands so mixed-age days cover toddler, tween, teen, etc. */
+function nextPreferBand(
+  profile: ReturnType<typeof getFamilyAgeProfile>,
+  already: Parameters<typeof uncoveredAgeBands>[1],
+  day: number,
+  slot: number,
+): LandmarkAgeTag | null {
+  if (!profile.isMixedAges || profile.bands.length === 0) return null;
+  const missing = uncoveredAgeBands(profile, already);
+  if (missing.length > 0) return missing[0]!;
+  return profile.bands[(day + slot) % profile.bands.length]!;
+}
+
 export function buildLandmarkContext(
   city: CityConfig,
   plan: TripPlan,
@@ -41,12 +56,27 @@ export function buildLandmarkContext(
   const morningWindow = visitWindowFromTime(morningActivityDefaultTime(plan), activityMins);
   const afternoonWindow = visitWindowFromTime("15:30", activityMins);
   const extraWindow = visitWindowFromTime("16:15", activityMins);
+  const profile = getFamilyAgeProfile(plan);
 
-  const morning = pickLandmarkForFamily(city, plan, offset, 0, [], morningWindow);
-  const afternoon = pickLandmarkForFamily(city, plan, offset, 1, [morning], afternoonWindow);
-  const extra = pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon], extraWindow);
-  const lunch = pickLandmarkForFamily(city, plan, offset, 3, [morning, afternoon]);
-  const dinner = pickLandmarkForFamily(city, plan, offset, 4, [morning, afternoon, lunch]);
+  const morning = pickLandmarkForFamily(city, plan, offset, 0, [], {
+    visitWindow: morningWindow,
+    preferBand: nextPreferBand(profile, [], day, 0),
+    anchorToStay: true,
+  });
+  const afternoon = pickLandmarkForFamily(city, plan, offset, 1, [morning], {
+    visitWindow: afternoonWindow,
+    preferBand: nextPreferBand(profile, [morning], day, 1),
+  });
+  const extra = pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon], {
+    visitWindow: extraWindow,
+    preferBand: nextPreferBand(profile, [morning, afternoon], day, 2),
+  });
+  const lunch = pickLandmarkForFamily(city, plan, offset, 3, [morning, afternoon], {
+    preferBand: null,
+  });
+  const dinner = pickLandmarkForFamily(city, plan, offset, 4, [morning, afternoon, lunch], {
+    preferBand: null,
+  });
 
   return {
     morning,
