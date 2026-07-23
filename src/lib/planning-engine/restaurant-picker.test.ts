@@ -183,8 +183,24 @@ describe("restaurant picker — FAM-46", () => {
     expect(picked?.ageTags).toContain("toddler");
   });
 
-  it("names real restaurants on the scheduled day (not bakery/café placeholders)", () => {
-    const { raw } = planTrip(plan());
+  it("names a real restaurant for balanced dinner; breakfast/lunch stay light", () => {
+    const { raw } = planTrip(plan({ budgetStyle: "balanced" }));
+    const meals = raw.days[0].activities.filter((a) => a.type === "meal");
+    expect(meals.length).toBeGreaterThanOrEqual(2);
+
+    const dinner = meals.find((m) => /dinner/i.test(m.title));
+    expect(dinner?.title).toMatch(/\bat\b/i);
+    expect(dinner?.notes?.toLowerCase() ?? "").not.toMatch(/confirm the menu|standout/);
+
+    const light = meals.filter((m) => !/dinner/i.test(m.title));
+    expect(light.length).toBeGreaterThan(0);
+    for (const meal of light) {
+      expect(meal.title.toLowerCase()).toMatch(/pastries|bakery|picnic|sandwich|café breakfast/);
+    }
+  });
+
+  it("names real restaurants throughout the day on splurge", () => {
+    const { raw } = planTrip(plan({ budgetStyle: "splurge" }));
     const meals = raw.days[0].activities.filter((a) => a.type === "meal");
     expect(meals.length).toBeGreaterThanOrEqual(2);
 
@@ -195,8 +211,10 @@ describe("restaurant picker — FAM-46", () => {
     }
   });
 
-  it("mentions dietary fit without asking the user to double-check the menu", () => {
-    const { raw } = planTrip(plan({ dietaryRestrictions: "Gluten-free", children: [6] }));
+  it("mentions dietary fit on named restaurant meals without asking to double-check the menu", () => {
+    const { raw } = planTrip(
+      plan({ dietaryRestrictions: "Gluten-free", children: [6], budgetStyle: "splurge" }),
+    );
     const meals = raw.days.flatMap((d) => d.activities.filter((a) => a.type === "meal"));
     expect(meals.length).toBeGreaterThan(0);
     for (const meal of meals) {

@@ -11,22 +11,21 @@ const budgetStyleOptions: {
     value: "save",
     emoji: "💰",
     label: "Save Money",
-    description: "Focus on free and affordable experiences.",
+    description: "Free sights, bakery breakfasts, picnic lunches, casual dinners.",
   },
   {
     value: "balanced",
     emoji: "⚖️",
     label: "Balanced",
-    description: "A mix of affordable and premium experiences.",
+    description: "Mix of paid sights; light breakfast & lunch, one sit-down dinner.",
   },
   {
     value: "splurge",
     emoji: "✨",
     label: "Treat Ourselves",
-    description: "Prioritize the best experiences.",
+    description: "Premium sights and restaurant meals throughout the day.",
   },
 ];
-
 export default function BudgetStyleStep({ formData, updateFormData }: StepProps) {
   return (
     <div className="space-y-6">

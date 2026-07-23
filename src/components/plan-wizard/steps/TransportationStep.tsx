@@ -12,7 +12,7 @@ const transportationOptions: {
   {
     value: "car-rental",
     label: TRANSPORTATION_LABELS["car-rental"],
-    description: "Your own wheels — great for flexibility with kids",
+    description: "Your own wheels — farther stops OK; fuel + parking in the estimate",
     icon: <CarIcon />,
   },
   {
@@ -71,7 +71,11 @@ export default function TransportationStep({ formData, updateFormData }: StepPro
 
       {selected && (
         <DynamicHint>
-          Got it — we&apos;ll plan routes that work well with {selected.label.toLowerCase()}.
+          Got it — we&apos;ll plan routes that work well with {selected.label.toLowerCase()}
+          {selected.value === "car-rental"
+            ? ", allow wider day distances, and include estimated parking"
+            : ""}
+          .
         </DynamicHint>
       )}
     </div>

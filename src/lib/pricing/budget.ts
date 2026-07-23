@@ -36,13 +36,18 @@ export function budgetStyleFoodFactor(style: BudgetStyle | ""): number {
 function mealTierFromActivity(activity: ItineraryActivity): keyof typeof MEAL_TIERS {
   const t = `${activity.title} ${activity.notes ?? ""}`.toLowerCase();
   if (t.includes("top pick") || t.includes("standout") || t.includes("special ")) return "premium";
-  if (t.includes("picnic")) return "picnic";
+  if (t.includes("picnic") || t.includes("sandwich")) return "picnic";
   if (t.includes("supermarket") || t.includes("ready-meal")) return "supermarket";
   if (
+    t.includes("pastries") ||
+    t.includes("bakery") ||
     t.includes("casual") ||
     t.includes("takeaway") ||
     t.includes("street food") ||
-    t.includes("simple and affordable")
+    t.includes("simple and affordable") ||
+    t.includes("light and affordable") ||
+    t.includes("share plates") ||
+    t.includes("share dishes")
   ) {
     return "takeaway";
   }

@@ -68,6 +68,14 @@ export function buildDaySkeleton(
     slots.push(intent("extra_activity", "16:15"));
   }
 
+  // Balanced/relaxed: soft evening filler so the day doesn't go quiet from ~3pm to dinner.
+  if (
+    !intensity.includeExtraActivity &&
+    (intensity.style === "balanced" || intensity.style === "relaxed")
+  ) {
+    slots.push(intent("evening_rest", "16:45"));
+  }
+
   if (shouldCookDinnerAtHome(plan, day, adjustment)) {
     slots.push(intent("grocery", "17:00"));
     slots.push(intent("dinner", dinnerDefaultTime(plan)));

@@ -47,16 +47,25 @@ describe("formatTransportDisplay — FAM-38", () => {
 describe("estimateDailyTransport — FAM-42", () => {
   const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
 
-  it("rounds car fuel distance to a whole number of km", () => {
+  it("rounds car fuel distance to a whole number of km and includes parking", () => {
     const result = estimateDailyTransport(
       "car-rental",
       city,
       plan(),
-      [],
+      [0, 0, 0],
       10.399999999999999,
     );
-    expect(result.label).toBe("Car · est. fuel (10 km)");
+    expect(result.label).toBe("Car · fuel + parking (10 km, 3 stops)");
     expect(result.label).not.toMatch(/\d+\.\d+/);
     expect(result.distanceKm).toBe(10);
+    expect(result.parkingCost).toBe(30);
+    expect(result.cost).toBeGreaterThan(result.fuelCost ?? 0);
+  });
+
+  it("still shows fuel-only label when there are no stops to park at", () => {
+    const result = estimateDailyTransport("car-rental", city, plan(), [], 0);
+    expect(result.label).toBe("Car · est. fuel (0 km)");
+    expect(result.parkingCost).toBe(0);
+    expect(result.cost).toBe(0);
   });
 });

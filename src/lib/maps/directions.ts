@@ -2,6 +2,7 @@ import { CityConfig } from "@/config/city-pricing";
 import {
   choosePublicTransitFare,
   estimateFuelCostForDriving,
+  estimateParkingCost,
   estimateTaxiDailyCost,
 } from "@/lib/pricing/transport-planner";
 import { calculateRideCost } from "@/lib/pricing/transport-cost";
@@ -93,18 +94,33 @@ export function estimateDailyTransport(
   plan: TripPlan,
   segmentCosts: number[],
   totalKm: number,
-): { cost: number; label: string; steps?: number; distanceKm?: number; fuelCost?: number } {
+): {
+  cost: number;
+  label: string;
+  steps?: number;
+  distanceKm?: number;
+  fuelCost?: number;
+  parkingCost?: number;
+} {
   if (transportType === "walking") {
     const { steps, distanceKm } = estimateWalkingMetrics(totalKm, plan.walkingLimit);
     return { cost: 0, label: `${steps.toLocaleString()} steps · ${distanceKm} km walking`, steps, distanceKm };
   }
   if (transportType === "car-rental") {
     const fuelCost = estimateFuelCostForDriving(city, totalKm);
+    // One parking fee per destination stop (each route leg arrives somewhere you park).
+    const parkingStops = Math.max(totalKm > 0 ? 1 : 0, segmentCosts.length);
+    const parkingCost = estimateParkingCost(city, parkingStops);
     const roundedKm = Math.round(totalKm);
+    const cost = Math.round((fuelCost + parkingCost) * 100) / 100;
     return {
-      cost: fuelCost,
-      label: `Car · est. fuel (${roundedKm} km)`,
+      cost,
+      label:
+        parkingCost > 0
+          ? `Car · fuel + parking (${roundedKm} km, ${parkingStops} stop${parkingStops === 1 ? "" : "s"})`
+          : `Car · est. fuel (${roundedKm} km)`,
       fuelCost,
+      parkingCost,
       distanceKm: roundedKm,
     };
   }

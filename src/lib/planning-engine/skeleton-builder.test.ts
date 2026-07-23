@@ -47,9 +47,9 @@ describe("buildDayIntents — Phase 1 skeleton alignment", () => {
     expect(intents.find((i) => i.kind === "morning_activity")?.defaultTime).toBe("08:30");
   });
 
-  it("balanced day has no evening stroll slot", () => {
+  it("balanced day includes a soft evening stroll before dinner", () => {
     const kinds = slotKinds(basePlan({ travelStyle: "balanced" }));
-    expect(kinds).not.toContain("evening_rest");
+    expect(kinds).toContain("evening_rest");
     expect(kinds).toContain("afternoon_activity");
     expect(kinds).toContain("dinner");
   });
@@ -60,11 +60,11 @@ describe("buildDayIntents — Phase 1 skeleton alignment", () => {
     expect(kinds).not.toContain("evening_rest");
   });
 
-  it("relaxed day has calm activity but no afternoon rest block", () => {
+  it("relaxed day has calm activity and a soft evening stroll", () => {
     const kinds = slotKinds(basePlan({ travelStyle: "relaxed" }));
     expect(kinds).toContain("calm_activity");
     expect(kinds).not.toContain("afternoon_rest");
     expect(kinds).not.toContain("afternoon_activity");
-    expect(kinds).not.toContain("evening_rest");
+    expect(kinds).toContain("evening_rest");
   });
 });

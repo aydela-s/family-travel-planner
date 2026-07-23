@@ -57,6 +57,8 @@ export type CityConfig = {
     publicTransitSingleRide: number;
     fuelPricePerLiter: number;
     avgFuelLitersPerDay: number;
+    /** Typical paid parking fee per stop when driving (car rental). */
+    parkingFeePerStop: number;
   };
   food: {
     breakfast: number;
@@ -91,6 +93,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       publicTransitSingleRide: 2.5,
       fuelPricePerLiter: 1.1,
       avgFuelLitersPerDay: 8,
+      parkingFeePerStop: 10,
     },
     food: { breakfast: 35, lunch: 55, dinner: 80 },
     landmarks: [
@@ -183,6 +186,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       publicTransitSingleRide: 2.15,
       fuelPricePerLiter: 1.85,
       avgFuelLitersPerDay: 6,
+      parkingFeePerStop: 12,
     },
     food: { breakfast: 30, lunch: 50, dinner: 90 },
     landmarks: [
@@ -275,6 +279,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       publicTransitSingleRide: 2.8,
       fuelPricePerLiter: 1.55,
       avgFuelLitersPerDay: 7,
+      parkingFeePerStop: 8,
     },
     food: { breakfast: 32, lunch: 48, dinner: 85 },
     landmarks: [
@@ -367,6 +372,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       publicTransitSingleRide: 6,
       fuelPricePerLiter: 7.2,
       avgFuelLitersPerDay: 6,
+      parkingFeePerStop: 25,
     },
     food: { breakfast: 90, lunch: 140, dinner: 220 },
     landmarks: [
@@ -456,6 +462,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       publicTransitSingleRide: 210,
       fuelPricePerLiter: 170,
       avgFuelLitersPerDay: 5,
+      parkingFeePerStop: 800,
     },
     food: { breakfast: 2500, lunch: 4000, dinner: 6000 },
     landmarks: [
@@ -550,6 +557,7 @@ export const DEFAULT_CITY: CityConfig = {
     publicTransitSingleRide: 3,
     fuelPricePerLiter: 1.2,
     avgFuelLitersPerDay: 7,
+    parkingFeePerStop: 8,
   },
   food: { breakfast: 30, lunch: 50, dinner: 75 },
   landmarks: [

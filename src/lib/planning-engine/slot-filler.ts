@@ -20,6 +20,7 @@ import {
   dinnerLabel,
   lunchLabel,
   slotActivityType,
+  usesNamedRestaurant,
 } from "@/lib/planning-engine/meal-planner";
 import { pickRestaurantForMeal } from "@/lib/planning-engine/restaurant-picker";
 import { DayLandmarkContext, RawActivity, DayIntent } from "@/lib/planning-engine/types";
@@ -49,6 +50,7 @@ export function buildLandmarkContext(
   day: number,
   totalDays: number,
   adjustNote?: string,
+  usedLandmarks: Set<string> = new Set(),
 ): DayLandmarkContext {
   const adjustment = getAdjustmentContext(adjustNote, day);
   const offset = day + adjustment.landmarkOffset;
@@ -57,26 +59,36 @@ export function buildLandmarkContext(
   const afternoonWindow = visitWindowFromTime("15:30", activityMins);
   const extraWindow = visitWindowFromTime("16:15", activityMins);
   const profile = getFamilyAgeProfile(plan);
+  const excludeNames = usedLandmarks;
 
   const morning = pickLandmarkForFamily(city, plan, offset, 0, [], {
     visitWindow: morningWindow,
     preferBand: nextPreferBand(profile, [], day, 0),
     anchorToStay: true,
+    excludeNames,
   });
   const afternoon = pickLandmarkForFamily(city, plan, offset, 1, [morning], {
     visitWindow: afternoonWindow,
     preferBand: nextPreferBand(profile, [morning], day, 1),
+    excludeNames,
   });
   const extra = pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon], {
     visitWindow: extraWindow,
     preferBand: nextPreferBand(profile, [morning, afternoon], day, 2),
+    excludeNames,
   });
   const lunch = pickLandmarkForFamily(city, plan, offset, 3, [morning, afternoon], {
     preferBand: null,
+    excludeNames,
   });
   const dinner = pickLandmarkForFamily(city, plan, offset, 4, [morning, afternoon, lunch], {
     preferBand: null,
+    excludeNames,
   });
+
+  usedLandmarks.add(morning.name);
+  usedLandmarks.add(afternoon.name);
+  if (extra) usedLandmarks.add(extra.name);
 
   return {
     morning,
@@ -111,12 +123,14 @@ function fillSlot(
 
   switch (slot.kind) {
     case "breakfast": {
-      const restaurant = pickRestaurantForMeal(city, plan, {
-        meal: "breakfast",
-        day,
-        near: ctx.morning,
-        excludeNames: usedRestaurants,
-      });
+      const restaurant = usesNamedRestaurant(plan, "breakfast")
+        ? pickRestaurantForMeal(city, plan, {
+            meal: "breakfast",
+            day,
+            near: ctx.morning,
+            excludeNames: usedRestaurants,
+          })
+        : null;
       if (restaurant) usedRestaurants.add(restaurant.name);
       const meal = breakfastLabel(plan, ctx.morning.name, restaurant);
       return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
@@ -137,12 +151,14 @@ function fillSlot(
       );
     }
     case "lunch": {
-      const restaurant = pickRestaurantForMeal(city, plan, {
-        meal: "lunch",
-        day,
-        near: ctx.lunch,
-        excludeNames: usedRestaurants,
-      });
+      const restaurant = usesNamedRestaurant(plan, "lunch")
+        ? pickRestaurantForMeal(city, plan, {
+            meal: "lunch",
+            day,
+            near: ctx.lunch,
+            excludeNames: usedRestaurants,
+          })
+        : null;
       if (restaurant) usedRestaurants.add(restaurant.name);
       const meal = lunchLabel(plan, ctx.lunch.name, restaurant);
       return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });

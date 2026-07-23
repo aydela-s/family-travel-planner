@@ -24,6 +24,10 @@ export type FamilyAgeProfile = {
 export const SAME_DAY_CLUSTER_KM = 5;
 /** Tighter cluster when walking / low walking limit. */
 export const TIGHT_CLUSTER_KM = 2.5;
+/** Wider same-day radius when driving a rental car. */
+export const CAR_CLUSTER_KM = 12;
+/** Moderate expansion for taxis. */
+export const TAXI_CLUSTER_KM = 7;
 
 /**
  * Age bands match the product spec:
@@ -143,6 +147,13 @@ export function landmarkInterestScore(landmark: Landmark, plan: TripPlan): numbe
 export function stayProximityScore(landmark: Landmark, plan: TripPlan): number {
   if (typeof plan.stayLat !== "number" || typeof plan.stayLng !== "number") return 0;
   const km = haversineKm(landmark.lat, landmark.lng, plan.stayLat, plan.stayLng);
+  // Driving: farther stays are fine — only soft-penalize very long hops.
+  if (plan.transportationType === "car-rental") {
+    if (km <= 3) return 12;
+    if (km <= 8) return 8;
+    if (km <= 15) return 2;
+    return -(km - 15) * 1.5;
+  }
   if (km <= 1.5) return 24;
   if (km <= 3) return 14;
   if (km <= 6) return 4;
@@ -172,8 +183,11 @@ export function clusterRadiusKm(plan: TripPlan): number {
   if (plan.walkingLimit === "low" || plan.transportationType === "walking") {
     return TIGHT_CLUSTER_KM;
   }
-  if (plan.transportationType === "taxis" || plan.transportationType === "car-rental") {
-    return SAME_DAY_CLUSTER_KM + 2;
+  if (plan.transportationType === "car-rental") {
+    return CAR_CLUSTER_KM;
+  }
+  if (plan.transportationType === "taxis") {
+    return TAXI_CLUSTER_KM;
   }
   return SAME_DAY_CLUSTER_KM;
 }
@@ -247,7 +261,12 @@ export type PickLandmarkOptions = {
   preferBand?: LandmarkAgeTag | null;
   /** When true and stay coords exist, heavily prefer near-stay for the first pick. */
   anchorToStay?: boolean;
+  /** Trip-level names already used on prior days — avoid repeating until the pool is exhausted. */
+  excludeNames?: Set<string> | string[];
 };
+
+/** Score margin for rotating among near-tied top candidates across days. */
+const TOP_SCORE_ROTATION_MARGIN = 18;
 
 export function pickLandmarkForFamily(
   city: CityConfig,
@@ -265,13 +284,26 @@ export function pickLandmarkForFamily(
   const profile = getFamilyAgeProfile(plan);
   const rotation = (dayNumber - 1) * 3 + slotIndex;
   const pickedNames = new Set(alreadyPicked.map((l) => l.name));
+  const tripExcluded = new Set(
+    opts.excludeNames instanceof Set ? opts.excludeNames : (opts.excludeNames ?? []),
+  );
   const radiusKm = clusterRadiusKm(plan);
 
   const stylePool = landmarksForStyle(city.landmarks, (l) => l.adultPrice, plan.budgetStyle, {
     allowPremiumPick: slotIndex === 0,
   });
 
-  let pool = stylePool.filter((l) => !pickedNames.has(l.name));
+  const withoutTripUsed = (list: Landmark[]) =>
+    list.filter((l) => !pickedNames.has(l.name) && !tripExcluded.has(l.name));
+
+  let pool = withoutTripUsed(stylePool);
+  if (pool.length === 0) {
+    pool = withoutTripUsed(city.landmarks);
+  }
+  // Exhausted unused landmarks — allow reuse rather than failing.
+  if (pool.length === 0) {
+    pool = stylePool.filter((l) => !pickedNames.has(l.name));
+  }
   if (pool.length === 0) {
     pool = city.landmarks.filter((l) => !pickedNames.has(l.name));
   }
@@ -285,6 +317,7 @@ export function pickLandmarkForFamily(
       const nearby = city.landmarks.filter(
         (l) =>
           !pickedNames.has(l.name) &&
+          !tripExcluded.has(l.name) &&
           minDistanceKmToPicked(l, alreadyPicked) <= radiusKm,
       );
       if (nearby.length > 0) {
@@ -330,19 +363,23 @@ export function pickLandmarkForFamily(
         b.score - a.score || a.dist - b.dist || b.landmark.adultPrice - a.landmark.adultPrice,
     );
 
+  const pickFromRanked = (list: typeof ranked): Landmark => {
+    if (list.length === 0) return city.landmarks[0]!;
+    const top = list[0]!.score;
+    const contenders = list.filter((r) => r.score >= top - TOP_SCORE_ROTATION_MARGIN);
+    return contenders[rotation % contenders.length]!.landmark;
+  };
+
   if (alreadyPicked.length > 0) {
     const clustered = ranked.filter((r) => r.dist <= radiusKm);
     if (clustered.length > 0) {
-      return clustered[0]!.landmark;
+      return pickFromRanked(clustered);
     }
-    return ranked[0]!.landmark;
+    return pickFromRanked(ranked);
   }
 
-  // First pick: take best score (stay/interest/age), not alphabetical rotation alone.
-  if (opts.anchorToStay || opts.preferBand || plan.interests.length > 0) {
-    return ranked[0]!.landmark;
-  }
-  return ranked[rotation % ranked.length]!.landmark;
+  // First pick: score-first, but rotate among near-tied winners across days.
+  return pickFromRanked(ranked);
 }
 
 /** Which family age bands are still missing from already-picked landmarks. */

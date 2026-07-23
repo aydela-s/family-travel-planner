@@ -47,7 +47,10 @@ function budgetFlavorNote(style: BudgetStyle | "", meal: "breakfast" | "lunch" |
     case "splurge":
       return "";
     default:
-      return `A relaxed sit-down ${meal} with a local neighborhood feel.`;
+      if (meal === "dinner") {
+        return "One sit-down dinner — share plates if you like, without overdoing meals out.";
+      }
+      return `Keeping ${meal} light and affordable.`;
   }
 }
 
@@ -78,6 +81,20 @@ function namedMealNotes(
   return parts.join(" ");
 }
 
+/**
+ * When budget style should name a restaurant for this meal.
+ * Save/balanced: bakery/picnic for breakfast & lunch; restaurant mainly at dinner.
+ * Splurge (Treat Ourselves): restaurant meals throughout the day.
+ */
+export function usesNamedRestaurant(
+  plan: TripPlan,
+  meal: "breakfast" | "lunch" | "dinner",
+): boolean {
+  if (plan.budgetStyle === "splurge") return true;
+  if (plan.budgetStyle === "balanced" && meal === "dinner") return true;
+  return false;
+}
+
 /** Restaurant-tier copy when no named place is available — driven by Budget Style. */
 function restaurantMealLabel(
   style: BudgetStyle | "",
@@ -97,6 +114,12 @@ function restaurantMealLabel(
         notes: `A special ${meal} in the ${spot} area.`,
       };
     default:
+      if (meal === "lunch") {
+        return {
+          title: `Picnic or sandwich lunch near ${spot}`,
+          notes: "Grab sandwiches, bakery bites, or a park picnic — keep the sit-down meal for later.",
+        };
+      }
       return {
         title: `${capitalized} in the ${spot} area`,
         notes: `A relaxed sit-down ${meal} with a local neighborhood feel.`,
@@ -109,7 +132,7 @@ export function breakfastLabel(
   spot: string,
   restaurant?: CityRestaurant | null,
 ): { title: string; notes: string } {
-  if (restaurant) {
+  if (restaurant && usesNamedRestaurant(plan, "breakfast")) {
     const takeaway = plan.accommodationType === "airbnb_no_kitchen";
     return {
       title: takeaway
@@ -122,6 +145,21 @@ export function breakfastLabel(
         takeaway ? "No kitchen at your rental — grab it to go." : undefined,
       ),
     };
+  }
+
+  switch (plan.budgetStyle) {
+    case "splurge":
+      break;
+    case "save":
+      return {
+        title: `Bakery breakfast near ${spot}`,
+        notes: "Pastries or takeaway coffee — simple and affordable.",
+      };
+    default:
+      return {
+        title: `Pastries or café breakfast near ${spot}`,
+        notes: "Bakery or café takeaway before the main outing — not a full sit-down meal.",
+      };
   }
 
   switch (plan.accommodationType) {
@@ -150,7 +188,7 @@ export function lunchLabel(
     };
   }
 
-  if (restaurant) {
+  if (restaurant && usesNamedRestaurant(plan, "lunch")) {
     const hostExtra =
       plan.accommodationType === "staying_with_family_or_friends"
         ? "May be shared with hosts — budget extra for treats out."
@@ -159,6 +197,26 @@ export function lunchLabel(
       title: `Lunch at ${restaurant.name}`,
       notes: namedMealNotes(plan, "lunch", restaurant, hostExtra),
     };
+  }
+
+  if (plan.budgetStyle === "save" || plan.budgetStyle === "balanced" || !plan.budgetStyle) {
+    const base =
+      plan.budgetStyle === "save"
+        ? {
+            title: `Casual lunch near ${spot}`,
+            notes: "Sandwiches, takeaway, or a park picnic — keeping lunch simple and affordable.",
+          }
+        : {
+            title: `Picnic or sandwich lunch near ${spot}`,
+            notes: "Grab sandwiches, bakery bites, or a park picnic — keep the sit-down meal for later.",
+          };
+    if (plan.accommodationType === "staying_with_family_or_friends") {
+      return {
+        ...base,
+        notes: `${base.notes} May be shared with hosts — budget extra for treats out.`,
+      };
+    }
+    return base;
   }
 
   if (plan.accommodationType === "staying_with_family_or_friends") {
@@ -191,11 +249,13 @@ export function dinnerLabel(
     };
   }
 
-  if (restaurant) {
+  if (restaurant && usesNamedRestaurant(plan, "dinner")) {
     const kitchenNightOff =
       plan.accommodationType === "airbnb_with_kitchen"
         ? "Night off from cooking — enjoy a local restaurant as a family."
-        : undefined;
+        : plan.budgetStyle === "balanced"
+          ? "Share plates if you like — one sit-down meal for the day."
+          : undefined;
     return {
       title: `Dinner at ${restaurant.name}`,
       notes: namedMealNotes(plan, "dinner", restaurant, kitchenNightOff),

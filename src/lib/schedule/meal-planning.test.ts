@@ -68,14 +68,15 @@ describe("resolveNapStartAroundLunch", () => {
     expect(start - (11 * 60) - MIN_LUNCH_DURATION_MIN).toBeGreaterThanOrEqual(20);
   });
 
-  it("slips a noon nap when toddler lunch cannot start before 11:30", () => {
+  it("keeps a noon nap when early lunch flex lets a 40-min meal fit", () => {
+    // lunchFloor = max(11:00, 11:30-45) = 11:00; need start 11:05 → no slip needed.
     const start = resolveNapStartAroundLunch({
       preferredNapStart: 12 * 60,
       lunchBeforeNap: true,
       travelMin: 15,
       lunchWindowMin: 11 * 60 + 30,
     });
-    expect(start).toBe(12 * 60 + 25);
+    expect(start).toBe(12 * 60);
   });
 
   it("does not slip when lunch is after the nap", () => {
@@ -150,7 +151,9 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
     const napStart = parseTimeToMinutes(nap!.time);
     expect(napStart).toBeGreaterThanOrEqual(11 * 60 + 45);
     expect(napStart).toBeLessThanOrEqual(11 * 60 + 45 + NAP_START_SLIP_MAX_MIN);
-    expect(parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(13 * 60 + 30);
+    expect(parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(
+      13 * 60 + 30 + HIGH_INTENSITY_REST_BONUS_MIN,
+    );
     expect(nap!.title).toBe("Nap & Quiet Time");
     const lunchDur =
       parseTimeToMinutes(lunch!.endTime!) - parseTimeToMinutes(lunch!.time);

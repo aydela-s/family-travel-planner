@@ -18,6 +18,7 @@ import {
   itemDurationMin,
   minutesToTime,
   parseTimeToMinutes,
+  scheduleSpan,
 } from "@/lib/schedule/timeline";
 
 type RawActivity = {
@@ -40,10 +41,18 @@ const RETURN_HOME = /\breturn to|back to (your )?(rental|accommodation|stay|hote
 export const MIN_LUNCH_DURATION_MIN = 40;
 /** How far a typed nap may slip later so lunch still fits. */
 export const NAP_START_SLIP_MAX_MIN = 30;
+/**
+ * When a nap follows soon after a morning stop, lunch may start this many
+ * minutes before the age-based window so a full meal still fits.
+ */
+export const LUNCH_EARLY_FLEX_MIN = 45;
+/** Absolute earliest lunch when flexing early for a nap (11:00). */
+export const LUNCH_EARLY_ABSOLUTE_MIN = 11 * 60;
 
 /**
- * Prefer the typed nap start; if a full lunch (≥40 min) cannot begin at the
- * age-based lunch window start before that nap, slip the nap by up to 30 minutes.
+ * Prefer the typed nap start; if a full lunch (≥40 min) cannot begin near the
+ * age-based lunch window before that nap, slip the nap by up to 30 minutes.
+ * Lunch may also start slightly before the window (LUNCH_EARLY_FLEX_MIN).
  */
 export function resolveNapStartAroundLunch(opts: {
   preferredNapStart: number;
@@ -54,9 +63,10 @@ export function resolveNapStartAroundLunch(opts: {
   const { preferredNapStart, lunchBeforeNap, travelMin, lunchWindowMin } = opts;
   if (!lunchBeforeNap) return preferredNapStart;
 
-  // Use the real lunch-window floor — not an earlier absolute clock — so we
-  // don't keep a noon nap when toddler lunch can't start until 11:30.
-  const lunchFloor = lunchWindowMin;
+  const lunchFloor = Math.max(
+    LUNCH_EARLY_ABSOLUTE_MIN,
+    lunchWindowMin - LUNCH_EARLY_FLEX_MIN,
+  );
   const needLunchStart = preferredNapStart - travelMin - MIN_LUNCH_DURATION_MIN;
   if (needLunchStart >= lunchFloor) {
     return preferredNapStart;
@@ -64,6 +74,12 @@ export function resolveNapStartAroundLunch(opts: {
 
   const slipped = lunchFloor + MIN_LUNCH_DURATION_MIN + travelMin;
   return Math.min(preferredNapStart + NAP_START_SLIP_MAX_MIN, Math.max(preferredNapStart, slipped));
+}
+
+/** Earliest allowed lunch start when a nap follows (window with early flex). */
+export function lunchFloorBeforeNap(plan: TripPlan): number {
+  const { minMin } = lunchTimeWindow(plan);
+  return Math.max(LUNCH_EARLY_ABSOLUTE_MIN, minMin - LUNCH_EARLY_FLEX_MIN);
 }
 
 
@@ -144,12 +160,13 @@ export function applyPackedFewerLonger<T extends RawActivity & { endTime: string
 
 export function isDinnerMeal(a: RawActivity): boolean {
   if (a.type !== "meal") return false;
-  const t = `${a.title} ${a.notes ?? ""}`.toLowerCase();
-  return (
-    COOK_DINNER.test(t) ||
-    t.includes("dinner") ||
-    parseTimeToMinutes(a.time) >= 17 * 60
-  );
+  const title = a.title.toLowerCase();
+  // Prefer the title — notes may mention dinner while describing lunch/breakfast.
+  if (COOK_DINNER.test(title) || title.includes("dinner")) return true;
+  if (title.includes("lunch") || title.includes("breakfast") || title.includes("picnic")) {
+    return false;
+  }
+  return parseTimeToMinutes(a.time) >= 17 * 60;
 }
 
 export function isLunchMeal(a: RawActivity): boolean {
@@ -415,12 +432,13 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       const { maxMin: lunchMax, minMin } = lunchTimeWindow(plan);
       const natural = cursor + travel;
       // When nap follows, start lunch early enough for a full 40-minute meal —
-      // but stay inside the age-based lunch window.
+      // allow a bit of early flex before the age window when needed.
       if (napRequiredIdx > i && resolvedNapStart != null) {
         const gap = defaultTravelMin(plan);
+        const floor = lunchFloorBeforeNap(plan);
         const latestLunchStart = resolvedNapStart - gap - MIN_LUNCH_DURATION_MIN;
-        start = Math.min(Math.max(natural, minMin), Math.max(minMin, latestLunchStart));
-        if (start > latestLunchStart && latestLunchStart >= minMin) start = latestLunchStart;
+        start = Math.min(Math.max(natural, floor), Math.max(floor, latestLunchStart));
+        if (start > latestLunchStart && latestLunchStart >= floor) start = latestLunchStart;
       } else {
         // After a morning nap (or no nap ahead), stay inside the lunch window —
         // never let travel push lunch past lunchMax (toddler mornings were landing at 12:15).
@@ -450,19 +468,22 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       const gap = defaultTravelMin(plan);
       const mustEndBy = resolvedNapStart - gap;
       if (isDaytimeMeal(item)) {
-        const { minMin: lunchMin } = lunchTimeWindow(plan);
-        start = Math.min(start, mustEndBy - MIN_LUNCH_DURATION_MIN);
-        start = Math.max(lunchMin, start);
-        duration = Math.max(
-          MIN_LUNCH_DURATION_MIN,
-          Math.min(duration, mustEndBy - start),
-        );
+        const lunchFloor = lunchFloorBeforeNap(plan);
+        // Prefer moving lunch earlier over shrinking below a usable meal.
+        if (mustEndBy - lunchFloor >= MIN_LUNCH_DURATION_MIN) {
+          start = Math.min(start, mustEndBy - MIN_LUNCH_DURATION_MIN);
+          start = Math.max(lunchFloor, start);
+          duration = Math.max(
+            MIN_LUNCH_DURATION_MIN,
+            Math.min(duration, mustEndBy - start),
+          );
+        } else {
+          // Still tight even with early flex — take the full early window.
+          start = lunchFloor;
+          duration = Math.max(20, Math.min(MIN_LUNCH_DURATION_MIN, mustEndBy - start));
+        }
         if (start + duration > mustEndBy) {
           duration = Math.max(20, mustEndBy - start);
-        }
-        if (start + MIN_LUNCH_DURATION_MIN > mustEndBy) {
-          start = Math.max(lunchMin, mustEndBy - MIN_LUNCH_DURATION_MIN);
-          duration = Math.min(MIN_LUNCH_DURATION_MIN, Math.max(20, mustEndBy - start));
         }
       } else if (start < mustEndBy) {
         duration = Math.min(duration, Math.max(20, mustEndBy - start));
@@ -496,8 +517,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
 
     const scheduled = {
       ...item,
-      time: minutesToTime(start),
-      endTime: minutesToTime(start + duration),
+      ...scheduleSpan(start, duration),
     };
     result.push(scheduled);
     cursor = parseTimeToMinutes(scheduled.endTime);
@@ -628,10 +648,11 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     }
   }
 
+  const dinnerSpan = scheduleSpan(dinnerStart, Math.max(20, dinnerEnd - dinnerStart));
   const anchoredDinners = dinnerItems.map((d) => ({
     ...d,
-    time: minutesToTime(dinnerStart),
-    endTime: minutesToTime(dinnerEnd),
+    time: dinnerSpan.time,
+    endTime: dinnerSpan.endTime,
   }));
 
   return [...result, ...anchoredDinners];

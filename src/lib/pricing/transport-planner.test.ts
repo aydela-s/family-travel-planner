@@ -4,6 +4,7 @@ import { calculateRideCost } from "@/lib/pricing/transport-cost";
 import {
   choosePublicTransitFare,
   estimateFuelCostForDriving,
+  estimateParkingCost,
   estimateTaxiDailyCost,
   familyTransitRiders,
 } from "@/lib/pricing/transport-planner";
@@ -47,6 +48,14 @@ describe("transport business rules", () => {
         SAN_DIEGO.transport.fuelPricePerLiter * SAN_DIEGO.transport.avgFuelLitersPerDay;
       const shortDay = estimateFuelCostForDriving(SAN_DIEGO, 10);
       expect(shortDay).toBeLessThan(flatDaily);
+    });
+  });
+
+  describe("car rental — parking fees per stop", () => {
+    it("charges parkingFeePerStop for each destination stop", () => {
+      expect(estimateParkingCost(SAN_DIEGO, 0)).toBe(0);
+      expect(estimateParkingCost(SAN_DIEGO, 1)).toBe(SAN_DIEGO.transport.parkingFeePerStop);
+      expect(estimateParkingCost(SAN_DIEGO, 3)).toBe(SAN_DIEGO.transport.parkingFeePerStop * 3);
     });
   });
 

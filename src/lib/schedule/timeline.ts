@@ -21,12 +21,31 @@ export function snapMinutes(
   return Math.round(totalMinutes / step) * step;
 }
 
-export function minutesToTime(totalMinutes: number): string {
-  const snapped = snapMinutes(totalMinutes);
-  const clamped = Math.max(6 * 60, Math.min(22 * 60, snapped));
+/** Format a clock time without snapping (use after start has already been snapped). */
+export function formatClockMinutes(totalMinutes: number): string {
+  const clamped = Math.max(6 * 60, Math.min(22 * 60, Math.round(totalMinutes)));
   const h = Math.floor(clamped / 60);
   const m = clamped % 60;
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+}
+
+export function minutesToTime(totalMinutes: number): string {
+  return formatClockMinutes(snapMinutes(totalMinutes));
+}
+
+/**
+ * Snap the start to a friendly clock, then keep the exact duration on the end
+ * so a 40-minute lunch cannot display as 15 minutes after double-snapping.
+ */
+export function scheduleSpan(
+  startMin: number,
+  durationMin: number,
+): { time: string; endTime: string } {
+  const start = snapMinutes(startMin);
+  return {
+    time: formatClockMinutes(start),
+    endTime: formatClockMinutes(start + durationMin),
+  };
 }
 
 export const GROCERY_DURATION_MIN = 30;

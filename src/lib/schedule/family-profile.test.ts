@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import { CITY_CONFIGS, Landmark } from "@/config/city-pricing";
 import { buildLandmarkContext } from "@/lib/planning-engine/slot-filler";
 import {
+  CAR_CLUSTER_KM,
+  clusterRadiusKm,
   maxPairwiseDistanceKm,
   minDistanceKmToPicked,
   pickLandmarkForFamily,
   SAME_DAY_CLUSTER_KM,
+  stayProximityScore,
+  TIGHT_CLUSTER_KM,
 } from "@/lib/schedule/family-profile";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -127,5 +131,29 @@ describe("same-day landmark proximity — Phase 3", () => {
 
   it("maxPairwiseDistanceKm returns 0 for a single landmark", () => {
     expect(maxPairwiseDistanceKm([sanDiego.landmarks[0]])).toBe(0);
+  });
+});
+
+describe("car rental — wider day distances", () => {
+  const sanDiego = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
+
+  it("uses a wider same-day cluster radius than transit or walking", () => {
+    expect(clusterRadiusKm(basePlan({ transportationType: "car-rental" }))).toBe(CAR_CLUSTER_KM);
+    expect(clusterRadiusKm(basePlan({ transportationType: "public-transportation" }))).toBe(
+      SAME_DAY_CLUSTER_KM,
+    );
+    expect(clusterRadiusKm(basePlan({ transportationType: "walking" }))).toBe(TIGHT_CLUSTER_KM);
+    expect(CAR_CLUSTER_KM).toBeGreaterThan(SAME_DAY_CLUSTER_KM);
+  });
+
+  it("softens stay-distance penalties when driving", () => {
+    const far = sanDiego.landmarks.find((l) => l.name === "La Jolla Cove")!;
+    const stay = { stayLat: 32.7341, stayLng: -117.1446 };
+    const car = stayProximityScore(far, basePlan({ transportationType: "car-rental", ...stay }));
+    const transit = stayProximityScore(
+      far,
+      basePlan({ transportationType: "public-transportation", ...stay }),
+    );
+    expect(car).toBeGreaterThan(transit);
   });
 });

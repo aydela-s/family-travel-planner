@@ -26,6 +26,16 @@ export function estimateFuelCostForDriving(city: CityConfig, totalKm: number): n
   return roundMoney(city.transport.fuelPricePerLiter * liters, city.currency);
 }
 
+/**
+ * Car rental rule: paid parking at each stop on the day's route.
+ * `stopCount` is typically the number of route legs (each arrival parks).
+ */
+export function estimateParkingCost(city: CityConfig, stopCount: number): number {
+  const stops = Math.max(0, Math.floor(stopCount));
+  if (stops <= 0) return 0;
+  return roundMoney(city.transport.parkingFeePerStop * stops, city.currency);
+}
+
 export type PublicTransitChoice = {
   cost: number;
   label: string;

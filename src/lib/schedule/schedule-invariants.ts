@@ -4,7 +4,9 @@ import {
   isDinnerMeal,
   isGroceryActivity,
   isLunchMeal,
+  lunchFloorBeforeNap,
 } from "@/lib/schedule/meal-planning";
+import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import {
   activitiesOverlap,
   defaultDurationMin,
@@ -70,7 +72,8 @@ export function validateDaySchedule(
   if (lunch) {
     const { minMin, maxMin } = lunchTimeWindow(plan);
     const start = parseTimeToMinutes(lunch.time);
-    if (start < minMin || start > maxMin) {
+    const earliest = shouldIncludeNaps(plan) ? lunchFloorBeforeNap(plan) : minMin;
+    if (start < earliest || start > maxMin) {
       issues.push({
         code: "lunch_outside_window",
         message: `Lunch at ${lunch.time} outside allowed window`,

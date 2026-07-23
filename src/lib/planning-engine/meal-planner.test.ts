@@ -35,18 +35,33 @@ const cafe: CityRestaurant = {
 
 describe("breakfastLabel — FAM-26", () => {
   it("does not mention kid-friendly language for teens", () => {
-    const { title, notes } = breakfastLabel(plan({ children: [16] }), "Marais", cafe);
+    const { title, notes } = breakfastLabel(
+      plan({ children: [16], budgetStyle: "splurge" }),
+      "Marais",
+      cafe,
+    );
     expect(`${title} ${notes}`.toLowerCase()).not.toMatch(/kid/);
     expect(title).toContain("Café Kitsuné Tuileries");
   });
 
   it("keeps takeaway copy age-neutral when there is no kitchen", () => {
     const { title, notes } = breakfastLabel(
-      plan({ accommodationType: "airbnb_no_kitchen", children: [16] }),
+      plan({
+        accommodationType: "airbnb_no_kitchen",
+        children: [16],
+        budgetStyle: "splurge",
+      }),
       "Marais",
       cafe,
     );
     expect(title).toContain("Takeaway breakfast at");
     expect(notes.toLowerCase()).not.toMatch(/kid/);
+  });
+
+  it("uses bakery/pastry copy for balanced breakfast instead of a named restaurant", () => {
+    const { title, notes } = breakfastLabel(plan({ budgetStyle: "balanced" }), "Marais", cafe);
+    expect(title).toMatch(/pastries|bakery|café breakfast/i);
+    expect(title).not.toContain("Café Kitsuné");
+    expect(notes.toLowerCase()).toMatch(/takeaway|bakery|pastries/);
   });
 });
