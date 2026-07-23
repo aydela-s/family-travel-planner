@@ -174,10 +174,10 @@ function fillSlot(
             : `Break at ${ctx.afternoon.name}`,
         type,
         notes: recovery
-          ? "Extra downtime after a high-energy morning stop."
+          ? "Extra downtime after a high-energy morning."
           : intensity.longBreak
-            ? "Extra downtime for a relaxed family pace."
-            : "Stretch, shade, and recharge before the afternoon.",
+            ? "Extra downtime for a relaxed pace."
+            : "Quick recharge before the afternoon.",
       });
     }
     case "afternoon_rest":
@@ -185,7 +185,7 @@ function fillSlot(
         time: slot.defaultTime,
         title: "Free time & low-key exploring",
         type,
-        notes: "Unstructured time — no rushing between stops.",
+        notes: "Unstructured time between stops.",
       });
     case "afternoon_activity":
       return tagged(
@@ -198,9 +198,9 @@ function fillSlot(
           type,
           notes:
             ctx.afternoon.adultPrice > 0
-              ? "A worthwhile paid stop — balanced within your daily family budget."
+              ? "Paid stop within your family budget."
               : plan.walkingLimit === "low"
-                ? "Short walks, stroller-friendly routes."
+                ? "Short walks, stroller-friendly."
                 : "Light exploring between stops.",
         },
         ctx.afternoon.intensity,
@@ -210,7 +210,7 @@ function fillSlot(
         time: slot.defaultTime,
         title: `Calm family time near ${ctx.afternoon.name}`,
         type,
-        notes: "Low-key exploring, shade, and room to breathe — relaxed pace.",
+        notes: "Low-key pace with room to breathe.",
       });
     case "extra_activity":
       return tagged(
@@ -218,7 +218,7 @@ function fillSlot(
           time: slot.defaultTime,
           title: suggestActivityTitle(ctx.extra?.name ?? ctx.afternoon.name, plan, "afternoon"),
           type,
-          notes: "Extra stop for a packed day — still family-friendly pacing.",
+          notes: "Extra stop for a packed day.",
         },
         (ctx.extra ?? ctx.afternoon).intensity,
       );
@@ -227,16 +227,18 @@ function fillSlot(
         time: slot.defaultTime,
         title: "Grocery stop for dinner ingredients",
         type,
-        notes: "Pick up ingredients on your way back to the rental to cook dinner.",
+        notes: "Pick up ingredients on the way back.",
       });
-    case "evening_rest":
+    case "evening_rest": {
+      const hour = parseInt(slot.defaultTime.split(":")[0] ?? "17", 10);
+      const strollLabel = hour >= 18 ? "Evening stroll" : "Afternoon stroll";
       return tagged({
         time: slot.defaultTime,
-        title: day === totalDays ? "Pack up & unwind" : `Evening stroll near ${ctx.dinner.name}`,
+        title: day === totalDays ? "Pack up & unwind" : `${strollLabel} near ${ctx.dinner.name}`,
         type,
-        notes: "No overpacking — room to breathe.",
+        notes: "Easy pace before dinner.",
       });
-    case "dinner": {
+    }    case "dinner": {
       const restaurant = pickRestaurantForMeal(city, plan, {
         meal: "dinner",
         day,

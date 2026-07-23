@@ -63,18 +63,33 @@ export function isGroceryTitle(title: string): boolean {
   return /\bgrocery\b/i.test(title);
 }
 
+/** Soft timeline fillers typed as activity for display — never paid attractions. */
+export function isUnpaidTimelineActivity(item: {
+  type?: string;
+  title: string;
+  slotKind?: string;
+}): boolean {
+  if (isGroceryTitle(item.title) || /\bpicnic supplies\b/i.test(item.title)) return true;
+  if (
+    item.slotKind === "evening_rest" ||
+    item.slotKind === "midday_rest" ||
+    item.slotKind === "afternoon_rest" ||
+    item.slotKind === "calm_activity" ||
+    item.slotKind === "return_home"
+  ) {
+    return true;
+  }
+  return /\b(stroll|break|free time|calm family|pack up|low-key exploring)\b/i.test(item.title);
+}
+
 export function itemDurationMin(
-  item: { type: ActivityType; title: string },
+  item: { type: ActivityType; title: string; slotKind?: string },
   plan: TripPlan,
 ): number {
-  if (item.type === "activity" && (isGroceryTitle(item.title) || /\bpicnic supplies\b/i.test(item.title))) {
-    return GROCERY_DURATION_MIN;
-  }
-  // FAM-14: strolls/breaks display as activity but keep rest-length timing.
-  if (
-    item.type === "activity" &&
-    /\b(stroll|break|free time|calm family|pack up|low-key exploring)\b/i.test(item.title)
-  ) {
+  if (item.type === "activity" && isUnpaidTimelineActivity(item)) {
+    if (isGroceryTitle(item.title) || /\bpicnic supplies\b/i.test(item.title)) {
+      return GROCERY_DURATION_MIN;
+    }
     return defaultDurationMin("rest", plan);
   }
   return defaultDurationMin(item.type, plan);

@@ -6,6 +6,7 @@ import {
   formatDayHeader,
   formatTripDateRange,
   getTimeOfDay,
+  oneLineNote,
 } from "@/lib/format";
 import { estimateDailyTransport, formatTransportDisplay } from "@/lib/maps/directions";
 import { buildRouteSegments } from "@/lib/maps/route-segments";
@@ -29,7 +30,7 @@ import {
   rescheduleEnrichedActivities,
   validateEnrichedDay,
 } from "@/lib/schedule/fix-itinerary";
-import { itemDurationMin, parseTimeToMinutes } from "@/lib/schedule/timeline";
+import { itemDurationMin, isUnpaidTimelineActivity, parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
 import { maybeAddAccommodationGroceryStop, summarizeDailyCost, type DaySpendSummary } from "@/lib/pricing/budget";
 import { familyActivityCost } from "@/lib/pricing/activity-cost";
@@ -49,6 +50,7 @@ function normalizeActivity(activity: ItineraryActivity): ItineraryActivity {
     ...activity,
     timeOfDay,
     title: alignTitleWithTimeOfDay(activity.title, timeOfDay),
+    notes: activity.notes ? oneLineNote(activity.notes) : activity.notes,
   };
 }
 
@@ -70,7 +72,11 @@ function applyGroceryLocations(
 ): ItineraryActivity[] {
   return activities.map((activity, i) =>
     isGroceryActivity(activity)
-      ? { ...activity, location: groceryLocationNearRoute(activities, i, city, home) }
+      ? {
+          ...activity,
+          activityCost: 0,
+          location: groceryLocationNearRoute(activities, i, city, home),
+        }
       : activity,
   );
 }
@@ -130,6 +136,20 @@ async function enrichDay(
     }
 
     if (a.type === "activity") {
+      // Grocery / strolls / breaks display as activities but are not paid attractions.
+      if (isGroceryActivity(act) || isUnpaidTimelineActivity(act)) {
+        const nearMatch = act.title.match(/\bnear (.+)$/i);
+        const named = nearMatch?.[1] ? findLandmarkByName(city.landmarks, nearMatch[1]) : undefined;
+        const anchor =
+          named ?? pickedLandmarks[pickedLandmarks.length - 1] ?? city.landmarks[0]!;
+        act.location = {
+          name: named?.name ?? (nearMatch?.[1] ? nearMatch[1].trim() : anchor.name),
+          lat: named?.lat ?? anchor.lat,
+          lng: named?.lng ?? anchor.lng,
+        };
+        act.activityCost = 0;
+        return act;
+      }
       const startMin = parseTimeToMinutes(a.time);
       const endMin = startMin + itemDurationMin(a, plan);
       const fromTitle = extractLandmarkFromTitle(a.title);
@@ -185,7 +205,13 @@ async function enrichDay(
 
   const home = stayHomeLocation(plan);
   const withGroceryStop = maybeAddAccommodationGroceryStop(activities, plan, city, home);
-  const located = applyGroceryLocations(withGroceryStop, city, home);
+  const located = applyGroceryLocations(withGroceryStop, city, home).map((act) => {
+    // Cook-at-home / naps must stay at the rental — never inherit supermarket pins.
+    if (home && activityUsesStayHome(act)) {
+      return { ...act, location: home, activityCost: 0 };
+    }
+    return act;
+  });
 
   const { routeSegments, totalKm, segmentCosts, segmentDurations } = await buildRouteSegments(
     located,

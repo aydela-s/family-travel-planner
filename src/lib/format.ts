@@ -64,13 +64,28 @@ export function alignTitleWithTimeOfDay(title: string, period: TimeOfDay): strin
 
   if (period === "afternoon") {
     strip(["morning", "breakfast", "sunrise", "early"]);
+    // "Evening stroll" at 5pm should not disagree with the Afternoon label.
+    t = t.replace(/\bEvening\b/g, "Afternoon").replace(/\bevening\b/g, "afternoon");
   } else if (period === "evening") {
     strip(["morning", "afternoon", "midday", "lunch"]);
+    t = t.replace(/\bAfternoon\b/g, "Evening").replace(/\bafternoon\b/g, "evening");
   } else {
     strip(["afternoon", "evening", "dinner", "sunset"]);
   }
 
   return t || title.replace(/^(morning|afternoon|evening):\s*/i, "").trim() || title;
+}
+
+/** Keep activity bubble tips to a single short line. */
+export function oneLineNote(text: string, maxChars = 100): string {
+  let t = text.replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  const sentence = t.match(/^(.+?[.!?])(?:\s|$)/);
+  t = (sentence?.[1] ?? t).trim();
+  if (t.length <= maxChars) return t;
+  const cut = t.slice(0, maxChars - 1);
+  const sp = cut.lastIndexOf(" ");
+  return `${(sp > 40 ? cut.slice(0, sp) : cut).trimEnd()}…`;
 }
 
 export function displayLocation(name: string): string {

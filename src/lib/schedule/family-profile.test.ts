@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { CITY_CONFIGS, Landmark } from "@/config/city-pricing";
-import { buildLandmarkContext } from "@/lib/planning-engine/slot-filler";
 import {
   CAR_CLUSTER_KM,
   clusterRadiusKm,
+  PUBLIC_TRANSIT_CLUSTER_KM,
+  TAXI_CLUSTER_KM,
+  WALKING_CLUSTER_KM,
+} from "@/config/cluster-distances";
+import { CITY_CONFIGS } from "@/config/city-pricing";
+import { buildLandmarkContext } from "@/lib/planning-engine/slot-filler";
+import {
   maxPairwiseDistanceKm,
   minDistanceKmToPicked,
   pickLandmarkForFamily,
-  SAME_DAY_CLUSTER_KM,
   stayProximityScore,
-  TIGHT_CLUSTER_KM,
 } from "@/lib/schedule/family-profile";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -53,7 +56,9 @@ describe("same-day landmark proximity — Phase 3", () => {
     expect(minDistanceKmToPicked(afternoon, [balboa])).toBeLessThan(
       minDistanceKmToPicked(laJolla, [balboa]),
     );
-    expect(minDistanceKmToPicked(afternoon, [balboa])).toBeLessThanOrEqual(SAME_DAY_CLUSTER_KM);
+    expect(minDistanceKmToPicked(afternoon, [balboa])).toBeLessThanOrEqual(
+      PUBLIC_TRANSIT_CLUSTER_KM,
+    );
   });
 
   it("buildLandmarkContext keeps morning + afternoon within the cluster radius when possible", () => {
@@ -63,7 +68,7 @@ describe("same-day landmark proximity — Phase 3", () => {
     const spread = maxPairwiseDistanceKm(activityStops);
 
     // Paris center landmarks are ~2–4 km apart; Montmartre is farther.
-    expect(spread).toBeLessThanOrEqual(SAME_DAY_CLUSTER_KM);
+    expect(spread).toBeLessThanOrEqual(PUBLIC_TRANSIT_CLUSTER_KM);
     expect(ctx.morning.name).not.toBe(ctx.afternoon.name);
   });
 
@@ -77,15 +82,19 @@ describe("same-day landmark proximity — Phase 3", () => {
     const plan = basePlan({ budgetStyle: "balanced" });
     for (let day = 1; day <= 6; day++) {
       const morning = pickLandmarkForFamily(sanDiego, plan, day, 0, []);
-      if (morning.name === "Balboa Park" || morning.name === "San Diego Zoo" || morning.name === "USS Midway Museum") {
+      if (
+        morning.name === "Balboa Park" ||
+        morning.name === "San Diego Zoo" ||
+        morning.name === "USS Midway Museum"
+      ) {
         const afternoon = pickLandmarkForFamily(sanDiego, plan, day, 1, [morning]);
         expect(afternoon.name).not.toBe("La Jolla Cove");
       }
     }
   });
 
-  it("with only far free options left and no nearby paid stops, still picks the nearest remaining", () => {
-    // Isolated catalog: two free landmarks far apart — clustering cannot invent a third stop.
+  it("with only far free options left, may slightly exceed the preferred radius", () => {
+    // Isolated catalog: two free landmarks far apart — soft cluster may exceed.
     const islandCity = {
       ...sanDiego,
       landmarks: [
@@ -117,7 +126,7 @@ describe("same-day landmark proximity — Phase 3", () => {
     const first = pickLandmarkForFamily(islandCity, plan, 1, 0, []);
     const second = pickLandmarkForFamily(islandCity, plan, 1, 1, [first]);
     expect(second.name).not.toBe(first.name);
-    expect(minDistanceKmToPicked(second, [first])).toBeGreaterThan(SAME_DAY_CLUSTER_KM);
+    expect(minDistanceKmToPicked(second, [first])).toBeGreaterThan(PUBLIC_TRANSIT_CLUSTER_KM);
   });
 
   it("expands beyond the cheap tier when a nearby paid landmark keeps the day clustered", () => {
@@ -126,24 +135,33 @@ describe("same-day landmark proximity — Phase 3", () => {
     const afternoon = pickLandmarkForFamily(sanDiego, plan, 1, 1, [balboa]);
     // Zoo is ~0.5 km from Balboa; La Jolla is ~15 km.
     expect(afternoon.name).not.toBe("La Jolla Cove");
-    expect(minDistanceKmToPicked(afternoon, [balboa])).toBeLessThanOrEqual(SAME_DAY_CLUSTER_KM);
+    expect(minDistanceKmToPicked(afternoon, [balboa])).toBeLessThanOrEqual(
+      PUBLIC_TRANSIT_CLUSTER_KM,
+    );
   });
 
   it("maxPairwiseDistanceKm returns 0 for a single landmark", () => {
-    expect(maxPairwiseDistanceKm([sanDiego.landmarks[0]])).toBe(0);
+    expect(maxPairwiseDistanceKm([sanDiego.landmarks[0]!])).toBe(0);
   });
 });
 
-describe("car rental — wider day distances", () => {
+describe("cluster distances by transportation mode", () => {
   const sanDiego = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
 
-  it("uses a wider same-day cluster radius than transit or walking", () => {
-    expect(clusterRadiusKm(basePlan({ transportationType: "car-rental" }))).toBe(CAR_CLUSTER_KM);
+  it("uses the configured preferred radii per mode", () => {
+    expect(WALKING_CLUSTER_KM).toBe(3);
+    expect(PUBLIC_TRANSIT_CLUSTER_KM).toBe(5);
+    expect(TAXI_CLUSTER_KM).toBe(9);
+    expect(CAR_CLUSTER_KM).toBe(15);
+
+    expect(clusterRadiusKm(basePlan({ transportationType: "walking" }))).toBe(WALKING_CLUSTER_KM);
     expect(clusterRadiusKm(basePlan({ transportationType: "public-transportation" }))).toBe(
-      SAME_DAY_CLUSTER_KM,
+      PUBLIC_TRANSIT_CLUSTER_KM,
     );
-    expect(clusterRadiusKm(basePlan({ transportationType: "walking" }))).toBe(TIGHT_CLUSTER_KM);
-    expect(CAR_CLUSTER_KM).toBeGreaterThan(SAME_DAY_CLUSTER_KM);
+    expect(clusterRadiusKm(basePlan({ transportationType: "taxis" }))).toBe(TAXI_CLUSTER_KM);
+    expect(clusterRadiusKm(basePlan({ transportationType: "car-rental" }))).toBe(CAR_CLUSTER_KM);
+    expect(CAR_CLUSTER_KM).toBeGreaterThan(TAXI_CLUSTER_KM);
+    expect(TAXI_CLUSTER_KM).toBeGreaterThan(PUBLIC_TRANSIT_CLUSTER_KM);
   });
 
   it("softens stay-distance penalties when driving", () => {

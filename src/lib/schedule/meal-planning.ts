@@ -84,7 +84,9 @@ export function lunchFloorBeforeNap(plan: TripPlan): number {
 
 
 export function isGroceryActivity(a: RawActivity): boolean {
-  return GROCERY.test(a.title) || GROCERY.test(a.notes ?? "");
+  // Title only — cook-at-home notes say "Grocery-based dinner" and must not match.
+  if (COOK_DINNER.test(a.title)) return false;
+  return GROCERY.test(a.title);
 }
 
 function isLengthenablePackedActivity(a: RawActivity): boolean {

@@ -55,6 +55,26 @@ describe("stay-home — FAM-24", () => {
     expect(activityUsesStayHome({ type: "meal", title: "Lunch near Louvre" })).toBe(false);
   });
 
+  it("does not treat cook-dinner notes as a grocery stop", async () => {
+    const { isGroceryActivity } = await import("@/lib/schedule/meal-planning");
+    expect(
+      isGroceryActivity({
+        time: "18:00",
+        title: "Cook dinner at your rental",
+        type: "meal",
+        notes: "Grocery-based dinner — a relaxed night in.",
+      }),
+    ).toBe(false);
+    expect(
+      isGroceryActivity({
+        time: "17:00",
+        title: "Grocery stop for dinner ingredients",
+        type: "activity",
+        notes: "Pick up ingredients.",
+      }),
+    ).toBe(true);
+  });
+
   it("falls grocery back to stay when no prior stop has a location", () => {
     const home = stayHomeLocation(plan())!;
     const loc = groceryLocationNearRoute([{ location: undefined }], 0, {

@@ -61,11 +61,11 @@ describe("adaptive lunch before nap", () => {
 });
 
 describe("balanced afternoon → dinner gap", () => {
-  it("adds an evening stroll and avoids a 3+ hour void before dinner", () => {
+  it("adds an evening or afternoon stroll and avoids a 3+ hour void before dinner", () => {
     const trip = plan({ napSchedule: "No naps needed", children: [5, 10] });
     const { raw } = planTrip(trip);
     const day = raw.days[0].activities;
-    expect(day.some((a) => /stroll|evening|unwind/i.test(a.title))).toBe(true);
+    expect(day.some((a) => /stroll|evening|afternoon|unwind/i.test(a.title))).toBe(true);
 
     const scheduled = rescheduleActivitiesWithMealAnchors(day, trip);
     const dinnerS = scheduled.find((a) => a.type === "meal" && /dinner/i.test(a.title))!;

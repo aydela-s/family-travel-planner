@@ -1,7 +1,14 @@
 "use client";
 
 import PlanSelectionChips from "@/components/PlanSelectionChips";
-import { displayLocation, formatMoney, formatTime12h, formatTimeOfDayLabel, getTimeOfDay } from "@/lib/format";
+import {
+  displayLocation,
+  formatMoney,
+  formatTime12h,
+  formatTimeOfDayLabel,
+  getTimeOfDay,
+  oneLineNote,
+} from "@/lib/format";
 import { getBudgetStyleLabel } from "@/lib/format-labels";
 import { Itinerary, ItineraryActivity, ItineraryDay } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
@@ -76,7 +83,7 @@ function TimelineItem({ activity, currencySymbol }: { activity: ItineraryActivit
           </p>
         )}
         {activity.notes && (
-          <p className="mt-2 text-sm leading-relaxed text-muted">{activity.notes}</p>
+          <p className="mt-2 truncate text-sm text-muted">{oneLineNote(activity.notes)}</p>
         )}
         {activity.activityCost != null && activity.activityCost > 0 && (
           <p className="mt-2 text-xs font-medium text-muted">

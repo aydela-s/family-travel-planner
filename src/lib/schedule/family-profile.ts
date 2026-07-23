@@ -1,4 +1,5 @@
 import { CityConfig, Landmark, LandmarkAgeTag, LandmarkIntensity } from "@/config/city-pricing";
+import { CLUSTER_PREFER_SCORE_MARGIN, clusterRadiusKm } from "@/config/cluster-distances";
 import { haversineKm } from "@/lib/maps/directions";
 import { landmarksForStyle } from "@/lib/pricing/budget-style";
 import { interestTagsFromPlan } from "@/lib/schedule/interest-map";
@@ -6,6 +7,21 @@ import { isLandmarkOpenForVisit, VisitWindow } from "@/lib/schedule/landmark-hou
 import { TripPlan } from "@/types/trip-plan";
 
 export type { VisitWindow };
+
+/** Re-export cluster distances from the shared config (adjust values there only). */
+export {
+  CAR_CLUSTER_KM,
+  CLUSTER_PREFER_SCORE_MARGIN,
+  clusterRadiusKm,
+  PUBLIC_TRANSIT_CLUSTER_KM,
+  TAXI_CLUSTER_KM,
+  WALKING_CLUSTER_KM,
+} from "@/config/cluster-distances";
+
+/** @deprecated Use PUBLIC_TRANSIT_CLUSTER_KM. */
+export const SAME_DAY_CLUSTER_KM = 5;
+/** @deprecated Use WALKING_CLUSTER_KM. */
+export const TIGHT_CLUSTER_KM = 3;
 
 export type FamilyAgeProfile = {
   youngest: number | null;
@@ -19,15 +35,6 @@ export type FamilyAgeProfile = {
   /** Present age bands for coverage targeting (FAM-7). */
   bands: LandmarkAgeTag[];
 };
-
-/** Prefer same-day picks within this radius of earlier stops (km). */
-export const SAME_DAY_CLUSTER_KM = 5;
-/** Tighter cluster when walking / low walking limit. */
-export const TIGHT_CLUSTER_KM = 2.5;
-/** Wider same-day radius when driving a rental car. */
-export const CAR_CLUSTER_KM = 12;
-/** Moderate expansion for taxis. */
-export const TAXI_CLUSTER_KM = 7;
 
 /**
  * Age bands match the product spec:
@@ -179,19 +186,6 @@ export function walkingFitScore(landmark: Landmark, plan: TripPlan): number {
   }
 }
 
-export function clusterRadiusKm(plan: TripPlan): number {
-  if (plan.walkingLimit === "low" || plan.transportationType === "walking") {
-    return TIGHT_CLUSTER_KM;
-  }
-  if (plan.transportationType === "car-rental") {
-    return CAR_CLUSTER_KM;
-  }
-  if (plan.transportationType === "taxis") {
-    return TAXI_CLUSTER_KM;
-  }
-  return SAME_DAY_CLUSTER_KM;
-}
-
 /** Minimum km from a candidate to any already-picked same-day landmark. */
 export function minDistanceKmToPicked(candidate: Landmark, alreadyPicked: Landmark[]): number {
   if (alreadyPicked.length === 0) return 0;
@@ -219,9 +213,11 @@ function proximityBonus(candidate: Landmark, alreadyPicked: Landmark[], radiusKm
   if (alreadyPicked.length === 0) return 0;
   const dist = minDistanceKmToPicked(candidate, alreadyPicked);
   if (dist <= radiusKm) {
-    return (radiusKm - dist) * 8;
+    // Prefer closer stops inside the preferred cluster.
+    return (radiusKm - dist) * 8 + 16;
   }
-  return -(dist - radiusKm) * 12;
+  // Soft penalty beyond the radius — slight overshoot is allowed when needed.
+  return -(dist - radiusKm) * 5;
 }
 
 /**
@@ -312,6 +308,8 @@ export function pickLandmarkForFamily(
   }
 
   if (alreadyPicked.length > 0) {
+    // Soft preference: keep the full pool so scoring can slightly exceed the
+    // radius when in-cluster options are unsuitable — do not hard-filter.
     const inCluster = pool.filter((l) => minDistanceKmToPicked(l, alreadyPicked) <= radiusKm);
     if (inCluster.length === 0) {
       const nearby = city.landmarks.filter(
@@ -320,11 +318,10 @@ export function pickLandmarkForFamily(
           !tripExcluded.has(l.name) &&
           minDistanceKmToPicked(l, alreadyPicked) <= radiusKm,
       );
+      // Prefer nearby unused city landmarks when the style pool has none in range.
       if (nearby.length > 0) {
-        pool = nearby;
+        pool = [...pool, ...nearby.filter((l) => !pool.some((p) => p.name === l.name))];
       }
-    } else {
-      pool = inCluster;
     }
   }
 
@@ -371,10 +368,16 @@ export function pickLandmarkForFamily(
   };
 
   if (alreadyPicked.length > 0) {
-    const clustered = ranked.filter((r) => r.dist <= radiusKm);
-    if (clustered.length > 0) {
-      return pickFromRanked(clustered);
+    const topScore = ranked[0]?.score ?? 0;
+    const inCluster = ranked.filter((r) => r.dist <= radiusKm);
+    // Prefer in-cluster picks when they are competitively scored.
+    const competitive = inCluster.filter(
+      (r) => r.score >= topScore - CLUSTER_PREFER_SCORE_MARGIN,
+    );
+    if (competitive.length > 0) {
+      return pickFromRanked(competitive);
     }
+    // Soft fallback: allow slightly exceeding the preferred radius.
     return pickFromRanked(ranked);
   }
 
@@ -394,25 +397,19 @@ export function uncoveredAgeBands(
 
 export function activityNoteForFamily(plan: TripPlan, day: number): string {
   const profile = getFamilyAgeProfile(plan);
-  const travelers = `${plan.adults} adult${plan.adults > 1 ? "s" : ""}${
-    plan.children.length
-      ? ` and ${plan.children.length} kid${plan.children.length > 1 ? "s" : ""} (${profile.ageSummary})`
-      : ""
-  }`;
-
   if (!plan.children.length) {
-    return `Day ${day} — planned for ${travelers}.`;
+    return `Day ${day} — planned for ${plan.adults} adult${plan.adults > 1 ? "s" : ""}.`;
   }
   if (profile.isMixedAges) {
-    return `Day ${day} — mixed-age family (${profile.ageSummary}): picks with something for everyone.`;
+    return `Day ${day} — mixed ages (${profile.ageSummary}).`;
   }
   if (profile.hasTeen && !profile.hasToddler) {
-    return `Day ${day} — great for older kids and teens, plus ${plan.adults} adult${plan.adults > 1 ? "s" : ""}.`;
+    return `Day ${day} — good for teens and adults.`;
   }
   if (profile.hasToddler) {
-    return `Day ${day} — toddler-friendly pacing with hands-on stops for ${travelers}.`;
+    return `Day ${day} — toddler-friendly pacing.`;
   }
-  return `Day ${day} highlight — tailored for ${travelers}.`;
+  return `Day ${day} — tailored for ${profile.ageSummary}.`;
 }
 
 export function suggestActivityTitle(

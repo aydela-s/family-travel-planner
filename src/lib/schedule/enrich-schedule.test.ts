@@ -168,4 +168,38 @@ describe("enrich scheduling — Phase B", () => {
     const longAfternoon = longTravel.find((a) => a.title.includes("Afternoon"))!;
     expect(longAfternoon.time > shortAfternoon.time).toBe(true);
   });
+
+  it("does not assign a paid activity estimate to grocery stops", async () => {
+    const { enrichItinerary } = await import("@/lib/enrich-itinerary");
+    const { isGroceryActivity } = await import("@/lib/schedule/meal-planning");
+    const plan = airbnbCookPlan();
+    const { raw, plan: working } = planTrip(plan);
+    const itinerary = await enrichItinerary(raw, working);
+    const groceries = itinerary.days.flatMap((d) =>
+      d.activities.filter((a) => isGroceryActivity(a)),
+    );
+    expect(groceries.length).toBeGreaterThan(0);
+    for (const g of groceries) {
+      expect(g.activityCost ?? 0).toBe(0);
+    }
+  });
+
+  it("does not bill afternoon/evening strolls as paid attractions", async () => {
+    const { enrichItinerary } = await import("@/lib/enrich-itinerary");
+    const plan: TripPlan = {
+      ...airbnbCookPlan(),
+      accommodationType: "hotel_no_breakfast",
+      travelStyle: "balanced",
+      napSchedule: "No naps needed",
+    };
+    const { raw, plan: working } = planTrip(plan);
+    const itinerary = await enrichItinerary(raw, working);
+    const strolls = itinerary.days.flatMap((d) =>
+      d.activities.filter((a) => /\bstroll\b/i.test(a.title) || a.slotKind === "evening_rest"),
+    );
+    expect(strolls.length).toBeGreaterThan(0);
+    for (const s of strolls) {
+      expect(s.activityCost ?? 0).toBe(0);
+    }
+  });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { breakfastLabel } from "@/lib/planning-engine/meal-planner";
+import { planTrip } from "@/lib/planning-engine";
+import { breakfastLabel, shouldCookDinnerAtHome } from "@/lib/planning-engine/meal-planner";
 import { TripPlan } from "@/types/trip-plan";
 import { CityRestaurant } from "@/config/city-restaurants";
 
@@ -63,5 +64,39 @@ describe("breakfastLabel — FAM-26", () => {
     expect(title).toMatch(/pastries|bakery|café breakfast/i);
     expect(title).not.toContain("Café Kitsuné");
     expect(notes.toLowerCase()).toMatch(/takeaway|bakery|pastries/);
+  });
+});
+
+describe("shouldCookDinnerAtHome — splurge vs kitchen", () => {
+  it("still alternates cook nights for balanced kitchen stays", () => {
+    const kitchen = plan({
+      accommodationType: "airbnb_with_kitchen",
+      budgetStyle: "balanced",
+    });
+    expect(shouldCookDinnerAtHome(kitchen, 1)).toBe(true);
+    expect(shouldCookDinnerAtHome(kitchen, 2)).toBe(false);
+  });
+
+  it("never cooks at home on Treat Ourselves, even with a kitchen", () => {
+    const kitchen = plan({
+      accommodationType: "airbnb_with_kitchen",
+      budgetStyle: "splurge",
+    });
+    expect(shouldCookDinnerAtHome(kitchen, 1)).toBe(false);
+    expect(shouldCookDinnerAtHome(kitchen, 2)).toBe(false);
+  });
+
+  it("plans restaurant dinners with no grocery stops for splurge + kitchen", () => {
+    const trip = plan({
+      accommodationType: "airbnb_with_kitchen",
+      budgetStyle: "splurge",
+      startDate: "2026-08-10",
+      endDate: "2026-08-13",
+    });
+    const { raw } = planTrip(trip);
+    const titles = raw.days.flatMap((d) => d.activities.map((a) => a.title));
+    expect(titles.some((t) => /cook dinner/i.test(t))).toBe(false);
+    expect(titles.some((t) => /grocery/i.test(t))).toBe(false);
+    expect(titles.some((t) => /dinner at /i.test(t))).toBe(true);
   });
 });

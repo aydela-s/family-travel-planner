@@ -7,7 +7,6 @@ import {
   matchesDietaryOptions,
   parseDietaryTags,
 } from "@/lib/planning-engine/restaurant-picker";
-import { getFamilyAgeProfile } from "@/lib/schedule/family-profile";
 
 /** P0 #5–6: breakfast slot only when accommodation does not cover it */
 export function requiresBreakfastSlot(plan: TripPlan): boolean {
@@ -30,6 +29,8 @@ export function shouldCookDinnerAtHome(
   adjustment?: AdjustmentContext,
 ): boolean {
   if (plan.accommodationType !== "airbnb_with_kitchen") return false;
+  // Treat Ourselves: restaurant dinners every night — no cook / grocery nights.
+  if (plan.budgetStyle === "splurge") return false;
   if (adjustment?.forceEatOut) return false;
   if (adjustment?.forceCookDinner) return true;
   return day % 2 === 1;
@@ -60,25 +61,19 @@ function namedMealNotes(
   restaurant: CityRestaurant,
   extra?: string,
 ): string {
-  const parts = [restaurant.familyNote];
   const dietary = parseDietaryTags(plan.dietaryRestrictions);
   if (dietary.length > 0) {
     if (matchesDietaryNeeds(restaurant, dietary)) {
-      parts.push(`Fits your ${dietary.join(" / ")} preferences.`);
-    } else if (matchesDietaryOptions(restaurant, dietary)) {
-      parts.push(`Has ${dietary.join(" / ")} options on the menu.`);
+      return `Fits your ${dietary.join(" / ")} preferences.`;
+    }
+    if (matchesDietaryOptions(restaurant, dietary)) {
+      return `Has ${dietary.join(" / ")} options on the menu.`;
     }
   }
-  const profile = getFamilyAgeProfile(plan);
-  if (profile.hasToddler && restaurant.ageTags.includes("toddler")) {
-    parts.push("Chosen with toddlers in mind.");
-  } else if (profile.hasYoungChild && restaurant.ageTags.includes("child")) {
-    parts.push("Works well for younger kids.");
-  }
+  if (extra) return extra;
   const budgetNote = budgetFlavorNote(plan.budgetStyle, meal);
-  if (budgetNote) parts.push(budgetNote);
-  if (extra) parts.push(extra);
-  return parts.join(" ");
+  if (budgetNote) return budgetNote;
+  return restaurant.familyNote.split(/(?<=[.!?])\s+/)[0] ?? restaurant.familyNote;
 }
 
 /**
@@ -239,7 +234,7 @@ export function dinnerLabel(
   if (shouldCookDinnerAtHome(plan, day, adjustment)) {
     return {
       title: "Cook dinner at your rental",
-      notes: "Grocery-based dinner — a relaxed night in, ingredients picked up on the way back.",
+      notes: "Home-cooked dinner from ingredients picked up earlier.",
     };
   }
   if (plan.accommodationType === "staying_with_family_or_friends") {
