@@ -157,10 +157,7 @@ function budgetScore(restaurant: CityRestaurant, style: BudgetStyle | ""): numbe
 
 function proximityScore(restaurant: CityRestaurant, near: Landmark | null): number {
   if (!near) return 0;
-  const km = haversineKm(
-    { lat: near.lat, lng: near.lng },
-    { lat: restaurant.lat, lng: restaurant.lng },
-  );
+  const km = haversineKm(near.lat, near.lng, restaurant.lat, restaurant.lng);
   if (km <= 1.5) return 14;
   if (km <= 3) return 8;
   if (km <= 6) return 3;

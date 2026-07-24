@@ -65,6 +65,7 @@ const hoursCity: CityConfig = {
     publicTransitSingleRide: 2,
     fuelPricePerLiter: 1,
     avgFuelLitersPerDay: 8,
+    parkingFeePerStop: 5,
   },
   food: { breakfast: 20, lunch: 30, dinner: 40 },
   landmarks: [
