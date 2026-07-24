@@ -137,7 +137,6 @@ Timeline UI
 
 - AI-powered activity and restaurant recommendations
 - Weather-aware itinerary adjustments
-- End-to-end testing with Playwright
 - User accounts and saved trips
 - PDF itinerary export
 - Mobile application
