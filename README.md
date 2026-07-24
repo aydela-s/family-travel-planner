@@ -38,7 +38,7 @@ Instead of only testing software, I designed product requirements, identified ed
 - React
 - TypeScript
 - Tailwind CSS
-- OpenAI API
+- OpenAI API (via Vercel AI Gateway)
 - Google Maps API
 - Vitest
 - Vercel
@@ -88,8 +88,11 @@ npm run test
 
 | Variable              | Purpose                                                                 |
 | --------------------- | ----------------------------------------------------------------------- |
-| DEMO_MODE             | Use mock itineraries without OpenAI costs                               |
-| OPENAI_API_KEY        | Reserved for AI-powered itinerary generation                            |
+| DEMO_MODE             | Use mock itineraries without AI tip enrichment                          |
+| AI_GATEWAY_API_KEY    | Vercel AI Gateway key for optional family tips (FAM-47)                 |
+| AI_GATEWAY_MODEL      | Optional model id (default `openai/gpt-4o-mini`)                        |
+| AI_ENRICH_TIPS        | Set `false` to disable tip enrichment while keeping the gateway key     |
+| OPENAI_API_KEY        | Legacy fallback auth for AI Gateway locally                             |
 | GOOGLE_MAPS_API_KEY   | Places autocomplete, directions, and maps                               |
 | RESEND_API_KEY        | Send product feedback email (FAM-49)                                    |
 | FEEDBACK_TO_EMAIL     | Inbox that receives feedback                                            |

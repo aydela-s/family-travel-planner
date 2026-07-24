@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { enrichItineraryTipsWithAi } from "@/lib/ai/enrich-tips";
+import { shouldEnrichItineraryWithAi } from "@/lib/ai/config";
 import { enrichItinerary, isDemoMode } from "@/lib/enrich-itinerary";
 import { isValidTripPlan, normalizeRawItinerary } from "@/lib/itinerary";
 import { planTrip } from "@/lib/planning-engine";
@@ -74,11 +76,20 @@ export async function POST(request: Request) {
 
     const normalized = normalizeRawItinerary(raw, effectivePlan);
 
-    const enriched = await enrichItinerary(normalized, effectivePlan, {
+    let enriched = await enrichItinerary(normalized, effectivePlan, {
       adjustDay: body.adjustDay,
       adjustAction: body.adjustAction,
       previousItinerary: body.existingItinerary,
     });
+
+    // Optional AI tips via Vercel AI Gateway — never blocks the deterministic plan.
+    if (shouldEnrichItineraryWithAi(useDemo)) {
+      try {
+        enriched = await enrichItineraryTipsWithAi(enriched, effectivePlan);
+      } catch (aiError) {
+        console.warn("AI Gateway tip enrichment skipped:", aiError);
+      }
+    }
 
     return NextResponse.json({ ...enriched, demo: useDemo });
   } catch (error) {

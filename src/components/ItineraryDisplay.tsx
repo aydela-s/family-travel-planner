@@ -224,7 +224,7 @@ export default function ItineraryDisplay({
 
       {isDemo && (
         <div className="rounded-2xl border border-warning/30 bg-warning-muted px-4 py-3.5 text-sm text-ink">
-          <strong>Demo mode</strong> — personalized mock itinerary. Set <code className="rounded bg-warning/15 px-1">DEMO_MODE=true</code> in .env.local to always use this (no OpenAI costs).
+          <strong>Demo mode</strong> — personalized mock itinerary (no AI tip enrichment).
         </div>
       )}
 
