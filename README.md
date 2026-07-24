@@ -86,11 +86,23 @@ npm run test
 ## Environment Variables
 
 
-| Variable            | Purpose                                      |
-| ------------------- | -------------------------------------------- |
-| DEMO_MODE           | Use mock itineraries without OpenAI costs    |
-| OPENAI_API_KEY      | Reserved for AI-powered itinerary generation |
-| GOOGLE_MAPS_API_KEY | Places autocomplete, directions, and maps    |
+| Variable              | Purpose                                                                 |
+| --------------------- | ----------------------------------------------------------------------- |
+| DEMO_MODE             | Use mock itineraries without OpenAI costs                               |
+| OPENAI_API_KEY        | Reserved for AI-powered itinerary generation                            |
+| GOOGLE_MAPS_API_KEY   | Places autocomplete, directions, and maps                               |
+| RESEND_API_KEY        | Send product feedback email (FAM-49)                                    |
+| FEEDBACK_TO_EMAIL     | Inbox that receives feedback                                            |
+| FEEDBACK_FROM_EMAIL   | Optional From header (default: `TripNestly Feedback <onboarding@resend.dev>` for local testing) |
+
+### Testing feedback on localhost
+
+1. Sign up at [resend.com](https://resend.com) and create an API key.
+2. Put the key and your Resend account email into `.env.local` (see `.env.example`).
+3. Keep `FEEDBACK_FROM_EMAIL` as `onboarding@resend.dev` until you verify `tripnestly.app`.
+4. Run `npm run dev`, click **Feedback**, submit a note — it should arrive in that inbox.
+
+Resend’s free onboarding sender can only deliver to **the email on your Resend account**. After you buy/verify the domain, switch `FEEDBACK_FROM_EMAIL` to something like `TripNestly Feedback <feedback@tripnestly.app>` and you can send to any inbox.
 
 
 ---
