@@ -143,12 +143,55 @@ export function buildItineraryPdf(ctx: ItineraryExportContext): {
   return { blob, filename: itineraryPdfFilename(itinerary) };
 }
 
-export function downloadItineraryPdf(ctx: ItineraryExportContext): void {
+export async function downloadItineraryPdf(ctx: ItineraryExportContext): Promise<void> {
   const { blob, filename } = buildItineraryPdf(ctx);
+  const file = new File([blob], filename, { type: "application/pdf" });
+
+  // Phones (esp. iOS Safari) often ignore <a download> for blob URLs.
+  // Prefer the native share sheet so the user can Save to Files / Drive.
+  const canShareFile =
+    typeof navigator !== "undefined" &&
+    typeof navigator.canShare === "function" &&
+    navigator.canShare({ files: [file] });
+
+  if (canShareFile) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: filename,
+      });
+      return;
+    } catch (err) {
+      // User cancelled — don't fall through to a broken download attempt.
+      if (err instanceof DOMException && err.name === "AbortError") return;
+    }
+  }
+
   const url = URL.createObjectURL(blob);
+  const isIos =
+    typeof navigator !== "undefined" &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
+  if (isIos) {
+    // Opens the PDF; user can use Share → Save to Files.
+    const opened = window.open(url, "_blank");
+    if (!opened) {
+      window.location.assign(url);
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
+
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.rel = "noopener";
+  a.style.display = "none";
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  // Delay revoke — some browsers start the download asynchronously.
+  window.setTimeout(() => URL.revokeObjectURL(url), 2_000);
 }
+

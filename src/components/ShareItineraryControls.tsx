@@ -32,6 +32,8 @@ export default function ShareItineraryControls({
   const [error, setError] = useState("");
   const titleId = useId();
 
+  const [downloadError, setDownloadError] = useState("");
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -62,18 +64,23 @@ export default function ShareItineraryControls({
     if (status === "sent") resetShareForm();
   }
 
-  function onDownload() {
-    downloadItineraryPdf({
-      itinerary,
-      plan: plan
-        ? {
-            adults: plan.adults,
-            children: plan.children,
-            startDate: plan.startDate,
-            endDate: plan.endDate,
-          }
-        : undefined,
-    });
+  async function onDownload() {
+    setDownloadError("");
+    try {
+      await downloadItineraryPdf({
+        itinerary,
+        plan: plan
+          ? {
+              adults: plan.adults,
+              children: plan.children,
+              startDate: plan.startDate,
+              endDate: plan.endDate,
+            }
+          : undefined,
+      });
+    } catch {
+      setDownloadError("Couldn’t create the PDF. Please try again.");
+    }
   }
 
   async function onShare(event: FormEvent) {
@@ -211,12 +218,17 @@ export default function ShareItineraryControls({
         <button
           type="button"
           disabled={disabled}
-          onClick={onDownload}
+          onClick={() => void onDownload()}
           className={btnPrimaryClassName}
         >
           Download PDF
         </button>
       </div>
+      {downloadError && (
+        <p className="mt-2 text-sm text-error" role="alert">
+          {downloadError}
+        </p>
+      )}
       {dialog}
     </>
   );
