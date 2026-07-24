@@ -10,6 +10,7 @@ import {
   TRANSPORTATION_LABELS,
   TRAVEL_STYLE_LABELS,
 } from "@/lib/format-labels";
+import { formatCoverDateRange } from "@/lib/itinerary-export";
 import { formatNapsSummary, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { updatesForPlanChip, type PlanChipUpdateKey } from "@/lib/plan-selection-updates";
@@ -73,7 +74,7 @@ function stayLabel(plan: TripPlan): string {
   if (isStayNotBookedYet(plan)) return `${type} · city center`;
   const address = (plan.stayAddress ?? "").trim();
   if (!address) return type;
-  const short = address.length > 36 ? `${address.slice(0, 34)}…` : address;
+  const short = address.length > 24 ? `${address.slice(0, 22)}…` : address;
   return `${type} · ${short}`;
 }
 
@@ -95,7 +96,10 @@ function buildChips(plan: TripPlan): ChipDef[] {
       key: "dates",
       label: "Dates",
       value:
-        plan.startDate && plan.endDate ? `${plan.startDate} → ${plan.endDate}` : "—",
+        plan.startDate && plan.endDate
+          ? formatCoverDateRange(plan.startDate, plan.endDate) ||
+            `${plan.startDate} → ${plan.endDate}`
+          : "—",
       editable: false,
     },
     {
@@ -112,7 +116,7 @@ function buildChips(plan: TripPlan): ChipDef[] {
     },
     {
       key: "transportation",
-      label: "Getting around",
+      label: "Transit",
       value: getTransportationLabel(plan.transportationType),
       editable: true,
       options: TRANSPORT_CHIP_OPTIONS.map((value) => ({
@@ -232,22 +236,22 @@ export default function PlanSelectionChips({
   }
 
   return (
-    <div ref={rootRef} className="space-y-2">
+    <div ref={rootRef} className="min-w-0 space-y-2">
       <p className="text-xs font-semibold uppercase tracking-wider text-muted">Your selections</p>
-      <ul className="flex flex-wrap gap-2" aria-label="Trip plan selections">
+      <ul className="flex w-full min-w-0 flex-wrap gap-2" aria-label="Trip plan selections">
         {chips.map((chip) => {
           const isOpen = openKey === chip.key;
           const canEdit = chip.editable && !disabled;
 
           return (
-            <li key={chip.key} className="relative">
+            <li key={chip.key} className="relative max-w-full min-w-0">
               <div
-                className={`group inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-ink transition ${
+                className={`group flex w-fit max-w-full items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-ink transition ${
                   isOpen ? "border-primary/40 bg-primary-muted/50" : canEdit ? "hover:border-primary/30" : ""
                 } ${disabled ? "opacity-60" : ""}`}
               >
                 <span className="shrink-0 text-xs font-semibold text-muted">{chip.label}</span>
-                <span className="truncate font-medium">{chip.value}</span>
+                <span className="min-w-0 truncate font-medium">{chip.value}</span>
                 {chip.editable && (
                   <button
                     type="button"
@@ -272,7 +276,7 @@ export default function PlanSelectionChips({
                   id={`${listId}-${chip.key}`}
                   role="listbox"
                   aria-label={`Change ${chip.label}`}
-                  className="absolute left-0 z-20 mt-2 min-w-[12rem] max-w-[18rem] overflow-hidden rounded-2xl border border-border bg-surface py-1 shadow-[var(--shadow-card)]"
+                  className="absolute left-0 z-20 mt-2 w-max min-w-[12rem] max-w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-surface py-1 shadow-[var(--shadow-card)]"
                 >
                   {chip.options.map((option) => {
                     const selected =

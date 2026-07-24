@@ -1,5 +1,10 @@
 import { StepProps, TripPlan } from "@/types/trip-plan";
-import { todayIso } from "@/lib/planning-engine/date-validation";
+import { getTripDayCount } from "@/lib/itinerary";
+import {
+  MAX_TRIP_DAYS,
+  maxEndDateForStart,
+  todayIso,
+} from "@/lib/planning-engine/date-validation";
 import { tripLengthHint } from "@/lib/planning-engine/trip-date-context";
 import { DynamicHint, labelClassName, StepIntro } from "../shared";
 
@@ -14,8 +19,15 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
     formData.endDate !== "" &&
     formData.endDate < formData.startDate;
   const endMin = formData.startDate && formData.startDate >= today ? formData.startDate : today;
+  const endMax = formData.startDate ? maxEndDateForStart(formData.startDate) : undefined;
+  const tooLong =
+    formData.startDate !== "" &&
+    formData.endDate !== "" &&
+    !endBeforeStart &&
+    !startInPast &&
+    getTripDayCount(formData.startDate, formData.endDate) > MAX_TRIP_DAYS;
   const lengthHint =
-    formData.startDate && formData.endDate && !endBeforeStart && !startInPast
+    formData.startDate && formData.endDate && !endBeforeStart && !startInPast && !tooLong
       ? tripLengthHint(formData.startDate, formData.endDate)
       : null;
 
@@ -24,7 +36,7 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
       <StepIntro
         emoji="📅"
         title="When are you traveling?"
-        subtitle="Pick your first and last day on the trip — we'll build one plan for the whole stretch."
+        subtitle={`Pick your first and last day — up to ${MAX_TRIP_DAYS} days.`}
       />
 
       <div>
@@ -45,8 +57,11 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
                 const value = e.target.value;
                 if (!value) return;
                 const updates: Partial<TripPlan> = { startDate: value };
+                const maxEnd = maxEndDateForStart(value);
                 if (formData.endDate && formData.endDate < value) {
                   updates.endDate = value;
+                } else if (formData.endDate && formData.endDate > maxEnd) {
+                  updates.endDate = maxEnd;
                 }
                 updateFormData(updates);
               }}
@@ -67,6 +82,7 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
               type="date"
               required
               min={endMin}
+              max={endMax}
               value={formData.endDate}
               aria-label="Trip end"
               onChange={(e) => {
@@ -87,6 +103,11 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
         {endBeforeStart && (
           <p className="mt-2 text-sm font-medium text-error">
             Your last day must be on or after your first day.
+          </p>
+        )}
+        {tooLong && (
+          <p className="mt-2 text-sm font-medium text-error">
+            Trips are limited to {MAX_TRIP_DAYS} days — shorten your dates to continue.
           </p>
         )}
       </div>

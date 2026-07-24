@@ -112,7 +112,7 @@ export function OptionCard({
 }: {
   selected: boolean;
   label: string;
-  description: string;
+  description?: string;
   onClick: () => void;
   icon?: React.ReactNode;
 }) {
@@ -128,7 +128,9 @@ export function OptionCard({
     >
       {icon && <div className="mb-3 text-primary">{icon}</div>}
       <span className="font-semibold text-ink">{label}</span>
-      <p className="mt-1 text-sm leading-relaxed text-muted">{description}</p>
+      {description ? (
+        <p className="mt-1 text-sm leading-relaxed text-muted">{description}</p>
+      ) : null}
     </button>
   );
 }
