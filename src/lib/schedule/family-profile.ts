@@ -251,6 +251,42 @@ function preferOpenPool(
   return openWider.length > 0 ? openWider : pool;
 }
 
+const STROLLER_QUIET_TAGS = new Set([
+  "parks",
+  "beaches",
+  "nature",
+  "shopping",
+  "food-markets",
+  "playgrounds",
+]);
+const STROLLER_LOUD_TAGS = new Set(["theme-parks", "entertainment", "zoos", "interactive"]);
+
+/** Soft bias toward quiet / low-stimulation stops during a stroller nap (FAM-52). */
+export function strollerQuietScore(landmark: Landmark): number {
+  let score = 0;
+  switch (landmark.intensity as LandmarkIntensity) {
+    case "low":
+      score += 26;
+      break;
+    case "medium":
+      score += 2;
+      break;
+    case "high":
+      score -= 32;
+      break;
+    default:
+      break;
+  }
+  const quietHits = landmark.interestTags.filter((t) => STROLLER_QUIET_TAGS.has(t)).length;
+  const loudHits = landmark.interestTags.filter((t) => STROLLER_LOUD_TAGS.has(t)).length;
+  score += quietHits * 14;
+  score -= loudHits * 18;
+  if (/\b(park|garden|waterfront|promenade|harbor|beach|walk|shopping)\b/i.test(landmark.name)) {
+    score += 10;
+  }
+  return score;
+}
+
 export type PickLandmarkOptions = {
   visitWindow?: VisitWindow;
   /** Prefer a landmark that covers this age band (mixed-age day diversification). */
@@ -259,6 +295,8 @@ export type PickLandmarkOptions = {
   anchorToStay?: boolean;
   /** Trip-level names already used on prior days — avoid repeating until the pool is exhausted. */
   excludeNames?: Set<string> | string[];
+  /** Prefer quiet low-intensity landmarks (stroller nap window). */
+  strollerQuiet?: boolean;
 };
 
 /** Score margin for rotating among near-tied top candidates across days. */
@@ -343,6 +381,10 @@ export function pickLandmarkForFamily(
         walkingFitScore(lm, plan) +
         proximityBonus(lm, alreadyPicked, radiusKm) +
         landmarkBandTargetScore(lm, opts.preferBand ?? null);
+
+      if (opts.strollerQuiet) {
+        score += strollerQuietScore(lm);
+      }
 
       // First morning stop: lean harder toward the stay when we have coordinates.
       if (opts.anchorToStay && alreadyPicked.length === 0) {

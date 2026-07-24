@@ -21,7 +21,7 @@ function plan(children: number[]): TripPlan {
     transportationType: "public-transportation",
     accommodationType: "hotel_no_breakfast",
     dietaryRestrictions: "",
-    napSchedule: "",
+    naps: [],
     budgetStyle: "balanced",
     interests: [],
   };

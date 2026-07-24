@@ -37,7 +37,7 @@ function balancedPlan(children: number[], overrides: Partial<TripPlan> = {}): Tr
     transportationType: "public-transportation",
     accommodationType: "hotel_no_breakfast",
     dietaryRestrictions: "",
-    napSchedule: "No naps needed",
+    naps: [],
     budgetStyle: "balanced",
     interests: [],
     ...overrides,
@@ -122,7 +122,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
   });
 
   it("chains afternoon items from the nap cursor instead of jumping to skeleton times", () => {
-    const plan = balancedPlan([2, 5], { napSchedule: "Early afternoon (1–3 PM)" });
+    const plan = balancedPlan([2, 5], { naps: [{ startTime: "1:00 PM", endTime: "3:00 PM", type: "regular" }] });
     const { raw } = planTrip(plan);
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
     const nap = scheduled.find((a) => a.type === "nap");
@@ -139,7 +139,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
 
   it("starts a typed 11:45-1:30 nap near 11:45 and keeps lunch ≥40 min", () => {
     // Oldest ≤7 → lunch window 11:30–12:00, so lunch sits before an 11:45 nap.
-    const plan = balancedPlan([2, 5], { napSchedule: "11:45-1:30" });
+    const plan = balancedPlan([2, 5], { naps: [{ startTime: "11:45 AM", endTime: "1:30 PM", type: "regular" }] });
     const { raw } = planTrip(plan);
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
     const nap = scheduled.find((a) => a.type === "nap");
@@ -162,7 +162,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
   });
 
   it("extends nap end time when the typed window is lengthened (12:30-2:30)", () => {
-    const plan = balancedPlan([2, 5], { napSchedule: "12:30-2:30" });
+    const plan = balancedPlan([2, 5], { naps: [{ startTime: "12:30 PM", endTime: "2:30 PM", type: "regular" }] });
     const { raw } = planTrip(plan);
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
     const nap = scheduled.find((a) => a.type === "nap");
@@ -176,7 +176,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
   });
 
   it("keeps lunch from overlapping a 12-2 nap on balanced days", () => {
-    const plan = balancedPlan([3], { napSchedule: "12-2" });
+    const plan = balancedPlan([3], { naps: [{ startTime: "12:00 PM", endTime: "2:00 PM", type: "regular" }] });
     const { raw } = planTrip(plan);
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
     const lunch = scheduled.find(
@@ -201,7 +201,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
   it("keeps a buffer between grocery and cook-at-home dinner", () => {
     const plan = balancedPlan([5, 10], {
       accommodationType: "airbnb_with_kitchen",
-      napSchedule: "No naps needed",
+      naps: [],
     });
     const { raw } = planTrip(plan);
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
@@ -256,7 +256,7 @@ describe("high-intensity recovery rest — Phase 6", () => {
   });
 
   it("lengthens the next nap by 15 minutes after a high-intensity activity", () => {
-    const plan = balancedPlan([3], { napSchedule: "Early afternoon (1–3 PM)" });
+    const plan = balancedPlan([3], { naps: [{ startTime: "1:00 PM", endTime: "3:00 PM", type: "regular" }] });
     const base: Raw[] = [
       { time: "08:00", title: "Breakfast", type: "meal" },
       {

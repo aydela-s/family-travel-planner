@@ -10,6 +10,7 @@ import {
   TRANSPORTATION_LABELS,
   TRAVEL_STYLE_LABELS,
 } from "@/lib/format-labels";
+import { formatNapsSummary, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { updatesForPlanChip, type PlanChipUpdateKey } from "@/lib/plan-selection-updates";
 import {
@@ -131,11 +132,11 @@ function buildChips(plan: TripPlan): ChipDef[] {
     },
   ];
 
-  if (plan.children.length > 0) {
+  if (shouldShowNapSection(plan)) {
     chips.push({
       key: "naps",
       label: "Naps",
-      value: plan.napSchedule?.trim() || "Flexible",
+      value: formatNapsSummary(plan.naps),
       editable: true,
     });
   }

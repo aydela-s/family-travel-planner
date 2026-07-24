@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   minutesToTime,
+  scheduleSpan,
   snapMinutes,
   TIME_SNAP_MINUTES,
 } from "@/lib/schedule/timeline";
@@ -17,5 +18,11 @@ describe("time snapping — FAM-12", () => {
     expect(minutesToTime(14 * 60 + 14)).toBe("14:15");
     expect(minutesToTime(15 * 60 + 29)).toBe("15:30");
     expect(minutesToTime(12 * 60 + 45)).toBe("12:45");
+  });
+
+  it("snaps both ends of a span so displays never show :32", () => {
+    const span = scheduleSpan(8 * 60 + 30, 62);
+    expect(span.time).toBe("08:30");
+    expect(span.endTime).toBe("09:30");
   });
 });

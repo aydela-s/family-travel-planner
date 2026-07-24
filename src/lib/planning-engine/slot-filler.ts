@@ -8,6 +8,7 @@ import {
   VisitWindow,
 } from "@/lib/schedule/family-profile";
 import { morningActivityDefaultTime } from "@/lib/planning-engine/skeleton-builder";
+import { overlapsStrollerNap } from "@/lib/schedule/nap-policy";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
 import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import {
@@ -66,16 +67,19 @@ export function buildLandmarkContext(
     preferBand: nextPreferBand(profile, [], day, 0),
     anchorToStay: true,
     excludeNames,
+    strollerQuiet: overlapsStrollerNap(plan, morningWindow.startMin, morningWindow.endMin),
   });
   const afternoon = pickLandmarkForFamily(city, plan, offset, 1, [morning], {
     visitWindow: afternoonWindow,
     preferBand: nextPreferBand(profile, [morning], day, 1),
     excludeNames,
+    strollerQuiet: overlapsStrollerNap(plan, afternoonWindow.startMin, afternoonWindow.endMin),
   });
   const extra = pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon], {
     visitWindow: extraWindow,
     preferBand: nextPreferBand(profile, [morning, afternoon], day, 2),
     excludeNames,
+    strollerQuiet: overlapsStrollerNap(plan, extraWindow.startMin, extraWindow.endMin),
   });
   const lunch = pickLandmarkForFamily(city, plan, offset, 3, [morning, afternoon], {
     preferBand: null,

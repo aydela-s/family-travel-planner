@@ -25,7 +25,7 @@ function basePlan(overrides: Partial<TripPlan> = {}): TripPlan {
     transportationType: "public-transportation",
     accommodationType: "hotel_no_breakfast",
     dietaryRestrictions: "",
-    napSchedule: "No naps needed",
+    naps: [],
     budgetStyle: "balanced",
     interests: [],
     ...overrides,

@@ -29,7 +29,7 @@ function packedPlan(overrides: Partial<TripPlan> = {}): TripPlan {
     transportationType: "public-transportation",
     accommodationType: "hotel_breakfast_included",
     dietaryRestrictions: "",
-    napSchedule: "No naps needed",
+    naps: [],
     budgetStyle: "balanced",
     interests: [],
     ...overrides,
@@ -96,7 +96,7 @@ describe("packed fewer/longer activities — P1", () => {
   it("tries the packed extra after naps, and lengthens only when it cannot fit", () => {
     const plan = packedPlan({
       children: [2, 5],
-      napSchedule: "Early afternoon (1–3 PM)",
+      naps: [{ startTime: "1:00 PM", endTime: "3:00 PM", type: "regular" }],
     });
     // Skeleton still offers the extra (FAM-5).
     const intents = buildDayIntents(plan, 1, 2);
@@ -123,8 +123,8 @@ describe("packed fewer/longer activities — P1", () => {
 
   it("makes packed+nap days differ from balanced when the extra stop fits", () => {
     const shared = {
-      children: [8],
-      napSchedule: "12-2",
+      children: [4],
+      naps: [{ startTime: "12:00 PM", endTime: "2:00 PM", type: "regular" as const }],
       accommodationType: "hotel_no_breakfast" as const,
     };
     const balanced = packedPlan({ ...shared, travelStyle: "balanced" });
@@ -137,14 +137,9 @@ describe("packed fewer/longer activities — P1", () => {
       planTrip(packed).raw.days[0].activities,
       packed,
     );
-    const balancedCount = balancedSched.filter(
-      (a) => a.type === "activity" && !isGroceryActivity(a),
-    ).length;
-    const packedCount = packedSched.filter(
-      (a) => a.type === "activity" && !isGroceryActivity(a),
-    ).length;
-    expect(packedCount).toBeGreaterThan(balancedCount);
     expect(packedSched.some((a) => a.slotKind === "extra_activity")).toBe(true);
+    expect(balancedSched.some((a) => a.slotKind === "extra_activity")).toBe(false);
+    expect(balancedSched.some((a) => a.slotKind === "evening_rest")).toBe(true);
     expect(validateDaySchedule(balancedSched, balanced)).toEqual([]);
     expect(validateDaySchedule(packedSched, packed)).toEqual([]);
   });
@@ -182,7 +177,7 @@ describe("packed fewer/longer activities — P1", () => {
     const plan = packedPlan({
       destination: "Paris",
       children: [3, 5],
-      napSchedule: "No naps needed",
+      naps: [],
       transportationType: "taxis",
       accommodationType: "hotel_no_breakfast",
     });

@@ -19,6 +19,15 @@ export type AccommodationType =
   | "dont_know_yet"
   | "";
 
+/** FAM-52 — structured nap windows (12-hour clock strings). */
+export type NapType = "regular" | "stroller";
+
+export type NapEntry = {
+  startTime: string;
+  endTime: string;
+  type: NapType;
+};
+
 export type TripPlan = {
   destination: string;
   startDate: string;
@@ -35,7 +44,13 @@ export type TripPlan = {
   stayLat?: number | null;
   stayLng?: number | null;
   dietaryRestrictions: string;
-  napSchedule: string;
+  /**
+   * Structured naps (FAM-52).
+   * - `null` — not answered yet (wizard)
+   * - `[]` — no naps needed
+   * - entries — up to 3 scheduled naps
+   */
+  naps: NapEntry[] | null;
   budgetStyle: BudgetStyle | "";
   interests: string[];
 };
@@ -55,7 +70,8 @@ export const initialTripPlan: TripPlan = {
   stayLat: null,
   stayLng: null,
   dietaryRestrictions: "",
-  napSchedule: "",
+  /** Default one regular midday nap when traveling with a young child (FAM-52). */
+  naps: [{ startTime: "12:00 PM", endTime: "2:00 PM", type: "regular" }],
   budgetStyle: "",
   interests: [],
 };

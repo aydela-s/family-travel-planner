@@ -1,4 +1,5 @@
 import { StepProps } from "@/types/trip-plan";
+import { DEFAULT_NAP_ENTRY, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
 import {
   CounterControl,
   DynamicHint,
@@ -11,21 +12,32 @@ import {
 
 const childAges = Array.from({ length: 18 }, (_, age) => age);
 
+function defaultNapsOpen() {
+  return [{ ...DEFAULT_NAP_ENTRY }];
+}
+
 export default function TravelersStep({ formData, updateFormData }: StepProps) {
   function handleChildCountChange(count: number) {
     const children = [...formData.children];
     while (children.length < count) children.push(0);
     while (children.length > count) children.pop();
+    const wasShown = shouldShowNapSection(formData);
+    const willShow = shouldShowNapSection({ children });
     updateFormData({
       children,
-      ...(count === 0 ? { napSchedule: "" } : {}),
+      ...(!willShow ? { naps: [] } : !wasShown ? { naps: defaultNapsOpen() } : {}),
     });
   }
 
   function handleChildAgeChange(index: number, age: number) {
     const children = [...formData.children];
     children[index] = age;
-    updateFormData({ children });
+    const wasShown = shouldShowNapSection(formData);
+    const willShow = shouldShowNapSection({ children });
+    updateFormData({
+      children,
+      ...(!willShow ? { naps: [] } : !wasShown ? { naps: defaultNapsOpen() } : {}),
+    });
   }
 
   const hints = getTravelerHints(formData.children);

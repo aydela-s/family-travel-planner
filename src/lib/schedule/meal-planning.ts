@@ -7,7 +7,7 @@ import {
 import { SlotKind } from "@/lib/planning-engine/types";
 import { TripPlan } from "@/types/trip-plan";
 import { ActivityType } from "@/types/itinerary";
-import { getNapWindow, napDurationMin, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
+import { getNapWindow, getRegularNapWindows, napDurationMin, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import { PACKED_LONGER_ACTIVITY_MIN } from "@/lib/schedule/travel-style";
 import {
   defaultDurationMin,
@@ -389,6 +389,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
   const optional = daySequence.filter(isOptionalActivity);
 
   const napWindow = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
+  const regularNapWindows = shouldIncludeNaps(plan) ? getRegularNapWindows(plan) : [];
   // Always try the packed extra; lengthen remaining stops only if it does not fit.
   // Pre-dropping the extra made packed+nap schedules look identical to balanced.
   const optionalToPlace = optional;
@@ -402,6 +403,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
   let cursor = 8 * 60;
   let travelIdx = 0;
   let needsRecoveryRest = false;
+  let regularNapSeen = 0;
 
   const nextTravel = () => travelAfterEach[travelIdx++] ?? defaultTravelMin(plan);
   const napRequiredIdx = napWindow ? required.findIndex((a) => a.type === "nap") : -1;
@@ -422,13 +424,19 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     const travel = result.length > 0 ? nextTravel() : 0;
     const lunchIdx = required.findIndex((a, j) => j > i && isDaytimeMeal(a));
     let start: number;
+    const thisNapWindow =
+      item.type === "nap" ? regularNapWindows[regularNapSeen] ?? napWindow : null;
+    if (item.type === "nap") regularNapSeen += 1;
 
-    if (item.type === "nap" && napWindow && resolvedNapStart != null) {
-      start = resolvedNapStart;
-      if (cursor + travel > resolvedNapStart) {
-        const napLen = napDurationMin(plan);
-        const latestStart = Math.max(resolvedNapStart, napWindow.endMin - napLen);
-        start = Math.min(Math.max(cursor + travel, resolvedNapStart), latestStart);
+    if (item.type === "nap" && thisNapWindow && resolvedNapStart != null) {
+      // First regular nap uses lunch-slip resolution; later naps keep their own start.
+      const preferred =
+        regularNapSeen === 1 ? resolvedNapStart : thisNapWindow.startMin;
+      start = preferred;
+      if (cursor + travel > preferred) {
+        const napLen = napDurationMin(plan, thisNapWindow);
+        const latestStart = Math.max(preferred, thisNapWindow.endMin - napLen);
+        start = Math.min(Math.max(cursor + travel, preferred), latestStart);
       }
     } else if (isDaytimeMeal(item)) {
       const { maxMin: lunchMax, minMin } = lunchTimeWindow(plan);
@@ -509,10 +517,10 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       duration = Math.min(duration, Math.max(20, maxEnd - start));
     }
 
-    if (item.type === "nap" && napWindow) {
+    if (item.type === "nap" && thisNapWindow) {
       // Stay inside the typed window; only the high-intensity recovery bonus may run past it.
-      const withinWindow = Math.max(45, napWindow.endMin - start);
-      const intended = napDurationMin(plan);
+      const withinWindow = Math.max(45, thisNapWindow.endMin - start);
+      const intended = napDurationMin(plan, thisNapWindow);
       const bonus = Math.max(0, duration - intended);
       duration = Math.min(duration, withinWindow + bonus);
     }

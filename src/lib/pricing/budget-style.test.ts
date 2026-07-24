@@ -27,7 +27,7 @@ const BASE_PLAN: Omit<TripPlan, "budgetStyle"> = {
   transportationType: "public-transportation",
   accommodationType: "hotel_no_breakfast",
   dietaryRestrictions: "",
-  napSchedule: "",
+  naps: [],
   interests: [],
 };
 

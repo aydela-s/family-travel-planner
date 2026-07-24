@@ -23,7 +23,7 @@ function plan(overrides: Partial<TripPlan> = {}): TripPlan {
     transportationType: "public-transportation",
     accommodationType: "hotel_no_breakfast",
     dietaryRestrictions: "",
-    napSchedule: "1:00 PM – 3:00 PM",
+    naps: [{ startTime: "1:00 PM", endTime: "3:00 PM", type: "regular" }],
     budgetStyle: "balanced",
     interests: [],
     ...overrides,
@@ -263,7 +263,7 @@ describe("restaurant picker — FAM-46", () => {
         startDate: "2026-08-10",
         endDate: "2026-08-13",
         children: [6, 10],
-        napSchedule: "No naps needed",
+        naps: [],
         dietaryRestrictions: "Vegan",
       }),
     );

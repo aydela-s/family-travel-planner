@@ -24,7 +24,7 @@ function plan(overrides: Partial<TripPlan> = {}): TripPlan {
     stayLat: 48.86,
     stayLng: 2.34,
     dietaryRestrictions: "",
-    napSchedule: "12-2 PM",
+    naps: [{ startTime: "12:00 PM", endTime: "2:00 PM", type: "regular" }],
     budgetStyle: "balanced",
     interests: [],
     ...overrides,

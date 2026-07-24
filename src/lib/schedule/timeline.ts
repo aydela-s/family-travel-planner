@@ -34,17 +34,23 @@ export function minutesToTime(totalMinutes: number): string {
 }
 
 /**
- * Snap the start to a friendly clock, then keep the exact duration on the end
- * so a 40-minute lunch cannot display as 15 minutes after double-snapping.
+ * Snap the start to a friendly clock, then snap the end as well (FAM-12)
+ * so spans never display odd minutes like 9:32.
  */
 export function scheduleSpan(
   startMin: number,
   durationMin: number,
 ): { time: string; endTime: string } {
   const start = snapMinutes(startMin);
+  const rawEnd = start + Math.max(0, durationMin);
+  let end = snapMinutes(rawEnd);
+  // Keep a usable span if rounding collapsed start/end onto the same tick.
+  if (end <= start) {
+    end = start + TIME_SNAP_MINUTES;
+  }
   return {
     time: formatClockMinutes(start),
-    endTime: formatClockMinutes(start + durationMin),
+    endTime: formatClockMinutes(end),
   };
 }
 

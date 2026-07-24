@@ -20,7 +20,7 @@ import {
 import { validateDaySchedule } from "@/lib/schedule/schedule-invariants";
 import {
   applyNapTiming,
-  getNapWindow,
+  getRegularNapWindows,
   hasChildren,
   napDurationMin,
   sanitizeActivitiesForNapPolicy,
@@ -222,15 +222,17 @@ export function validateRawDay(
   }
 
   if (shouldIncludeNaps(plan)) {
-    const window = getNapWindow(plan);
-    const nap = activities.find((a) => a.type === "nap");
-    if (window && nap) {
+    const windows = getRegularNapWindows(plan);
+    const naps = activities.filter((a) => a.type === "nap");
+    naps.forEach((nap, idx) => {
+      const window = windows[idx];
+      if (!window) return;
       const start = parseTimeToMinutes(nap.time);
-      const end = start + napDurationMin(plan);
+      const end = start + napDurationMin(plan, window);
       if (start < window.startMin - 5 || end > window.endMin + 5) {
         issues.push({ code: "nap_wrong_window", message: "Nap outside user preference window" });
       }
-    }
+    });
   }
 
   if (duplicateStartTimes(activities)) {

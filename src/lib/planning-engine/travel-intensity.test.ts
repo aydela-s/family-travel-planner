@@ -28,7 +28,7 @@ const BASE_PLAN: Omit<TripPlan, "travelStyle" | "children"> = {
   // otherwise be a confounding variable for "activity" slot counts.
   accommodationType: "hotel_breakfast_included",
   dietaryRestrictions: "",
-  napSchedule: "",
+  naps: [],
   budgetStyle: "balanced",
   interests: [],
 };

@@ -23,7 +23,7 @@ function basePlan(overrides: Partial<TripPlan>): TripPlan {
     transportationType: "public-transportation",
     accommodationType: "hotel_no_breakfast",
     dietaryRestrictions: "",
-    napSchedule: "No naps needed",
+    naps: [],
     budgetStyle: "balanced",
     interests: [],
     ...overrides,
@@ -36,9 +36,9 @@ function scheduleDay1(plan: TripPlan) {
 }
 
 const NAP_OPTIONS = [
-  { label: "no naps", napSchedule: "No naps needed" },
-  { label: "afternoon nap", napSchedule: "Early afternoon (1–3 PM)" },
-  { label: "morning nap", napSchedule: "Morning nap (~9–11 AM)" },
+  { label: "no naps", naps: [] },
+  { label: "afternoon nap", naps: [{ startTime: "1:00 PM", endTime: "3:00 PM", type: "regular" }] },
+  { label: "morning nap", naps: [{ startTime: "9:00 AM", endTime: "11:00 AM", type: "regular" }] },
 ] as const;
 
 const FAMILY_OPTIONS = [
@@ -59,7 +59,7 @@ describe("schedule invariant matrix", () => {
           plan: basePlan({
             children: [...family.children],
             travelStyle: style,
-            napSchedule: nap.napSchedule,
+            naps: nap.naps ? [...nap.naps] : [],
           }),
         })),
       ),
@@ -73,7 +73,7 @@ describe("schedule invariant matrix", () => {
   it("keeps morning activity with morning nap preference", () => {
     const plan = basePlan({
       children: [3],
-      napSchedule: "Morning nap (~9–11 AM)",
+      naps: [{ startTime: "9:00 AM", endTime: "11:00 AM", type: "regular" }],
     });
     const scheduled = scheduleDay1(plan);
     const morningActivity = scheduled.find(
@@ -87,7 +87,7 @@ describe("schedule invariant matrix", () => {
     const plan = basePlan({
       children: [4, 6],
       travelStyle: "packed",
-      napSchedule: "No naps needed",
+      naps: [],
     });
     const scheduled = scheduleDay1(plan);
     const lunch = scheduled.find(isDaytimeMeal);

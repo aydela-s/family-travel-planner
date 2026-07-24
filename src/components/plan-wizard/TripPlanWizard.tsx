@@ -11,7 +11,7 @@ import { Itinerary } from "@/types/itinerary";
 import { GenerateItineraryOptions } from "@/types/generate";
 import { initialTripPlan, TripPlan } from "@/types/trip-plan";
 import { getDatesValidationError } from "@/lib/planning-engine/date-validation";
-import { isValidNapSelection } from "@/lib/planning-engine/nap-options";
+import { isValidNapSelection, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
 import { resolveStayFromText } from "@/lib/planning-engine/resolve-stay";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import StepTransition from "./StepTransition";
@@ -136,8 +136,12 @@ export default function TripPlanWizard() {
         return "Type your hotel name or stay address, or choose “I don’t know yet”.";
       }
     }
-    if (step.title === "Naps & Food" && plan.children.length > 0 && !isValidNapSelection(plan.napSchedule, true)) {
-      return "Please choose a nap preference for your trip.";
+    if (
+      step.title === "Naps & Food" &&
+      shouldShowNapSection(plan) &&
+      !isValidNapSelection(plan.naps, plan)
+    ) {
+      return "Add a nap window, or choose “No naps needed.”";
     }
     if (!step.validate(plan)) return "Almost there — just fill in what's missing and we'll keep going.";
     return null;
@@ -321,7 +325,9 @@ export default function TripPlanWizard() {
               key={[
                 formData.travelStyle,
                 formData.budgetStyle,
-                formData.napSchedule,
+                formData.naps == null
+                  ? "unset"
+                  : formData.naps.map((n) => `${n.startTime}-${n.endTime}-${n.type}`).join("|"),
                 formData.transportationType,
                 formData.accommodationType,
                 formData.interests.join("|"),

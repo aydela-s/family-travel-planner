@@ -4,6 +4,7 @@ import {
   getTransportationLabel,
   getTravelStyleLabel,
 } from "@/lib/format-labels";
+import { formatNapsSummary, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { StepProps, TripPlan } from "@/types/trip-plan";
 import { StepIntro } from "../shared";
@@ -45,8 +46,8 @@ export default function SummaryStep({ formData }: StepProps) {
       label: "Travel style",
       value: `${getTravelStyleLabel(formData.travelStyle)} pace`,
     },
-    ...(formData.children.length > 0
-      ? [{ label: "Nap schedule", value: formData.napSchedule || "Flexible" }]
+    ...(shouldShowNapSection(formData)
+      ? [{ label: "Nap schedule", value: formatNapsSummary(formData.naps) }]
       : []),
     { label: "Dietary", value: formData.dietaryRestrictions || "Nothing specific" },
     {

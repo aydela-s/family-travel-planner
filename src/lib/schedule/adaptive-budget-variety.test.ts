@@ -29,7 +29,7 @@ function plan(overrides: Partial<TripPlan> = {}): TripPlan {
     transportationType: "public-transportation",
     accommodationType: "hotel_no_breakfast",
     dietaryRestrictions: "",
-    napSchedule: "No naps needed",
+    naps: [],
     budgetStyle: "balanced",
     interests: ["Zoos & Aquariums", "Parks & Gardens"],
     ...overrides,
@@ -40,7 +40,7 @@ describe("adaptive lunch before nap", () => {
   it("keeps lunch ≥40 minutes when a noon nap follows an early morning stop", () => {
     const trip = plan({
       children: [8, 3],
-      napSchedule: "12-2",
+      naps: [{ startTime: "12:00 PM", endTime: "2:00 PM", type: "regular" }],
       destination: "Paris",
     });
     const { raw } = planTrip(trip);
@@ -62,7 +62,7 @@ describe("adaptive lunch before nap", () => {
 
 describe("balanced afternoon → dinner gap", () => {
   it("adds an evening or afternoon stroll and avoids a 3+ hour void before dinner", () => {
-    const trip = plan({ napSchedule: "No naps needed", children: [5, 10] });
+    const trip = plan({ naps: [], children: [5, 10] });
     const { raw } = planTrip(trip);
     const day = raw.days[0].activities;
     expect(day.some((a) => /stroll|evening|afternoon|unwind/i.test(a.title))).toBe(true);

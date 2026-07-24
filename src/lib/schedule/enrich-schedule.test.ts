@@ -26,7 +26,7 @@ function airbnbCookPlan(): TripPlan {
     transportationType: "public-transportation",
     accommodationType: "airbnb_with_kitchen",
     dietaryRestrictions: "",
-    napSchedule: "No naps needed",
+    naps: [],
     budgetStyle: "balanced",
     interests: [],
   };
@@ -120,7 +120,7 @@ describe("enrich scheduling — Phase B", () => {
     const plan: TripPlan = {
       ...airbnbCookPlan(),
       children: [3],
-      napSchedule: "Early afternoon (1–3 PM)",
+      naps: [{ startTime: "1:00 PM", endTime: "3:00 PM", type: "regular" }],
     };
     const { raw } = planTrip(plan);
     const enriched: ItineraryActivity[] = raw.days[0].activities.map((a) => ({
@@ -190,7 +190,7 @@ describe("enrich scheduling — Phase B", () => {
       ...airbnbCookPlan(),
       accommodationType: "hotel_no_breakfast",
       travelStyle: "balanced",
-      napSchedule: "No naps needed",
+      naps: [],
     };
     const { raw, plan: working } = planTrip(plan);
     const itinerary = await enrichItinerary(raw, working);
