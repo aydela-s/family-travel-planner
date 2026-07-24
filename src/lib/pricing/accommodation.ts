@@ -48,7 +48,7 @@ const PROFILES: Record<AccommodationType, AccommodationFoodProfile> = {
     preferCooking: true,
     preferRestaurants: false,
     planningTips: [
-      "Stock up at a grocery store and cook breakfast at your Airbnb.",
+      "Stock up at a grocery store and cook breakfast at your stay.",
       "Pack a picnic lunch — easy with a kitchen for prep and storage.",
       "Cook dinner at your stay some nights to balance restaurant spend.",
     ],
@@ -158,6 +158,8 @@ export function estimateAccommodationFoodCosts(
 }
 
 const BUDGET_ONLY_TIP = /\b(pastries|budget-smart|budget|affordable|low-key spot|keeping .+ simple)\b/i;
+/** Saving-by-cooking tips — hide on Treat Ourselves (restaurant dinners every night). */
+const COOK_DINNER_SAVING_TIP = /\bcook dinner|balance restaurant spend\b/i;
 
 export type DayTipContext = {
   landmarkNames?: string[];
@@ -167,7 +169,9 @@ export type DayTipContext = {
 function tipsForBudgetStyle(plan: TripPlan): string[] {
   const tips = getAccommodationProfile(plan.accommodationType).planningTips;
   if (plan.budgetStyle === "splurge") {
-    return tips.filter((tip) => !BUDGET_ONLY_TIP.test(tip));
+    return tips.filter(
+      (tip) => !BUDGET_ONLY_TIP.test(tip) && !COOK_DINNER_SAVING_TIP.test(tip),
+    );
   }
   return tips;
 }

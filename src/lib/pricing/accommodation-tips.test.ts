@@ -27,6 +27,28 @@ describe("accommodationPlanningTips — FAM-6", () => {
     expect(tips.join(" ").toLowerCase()).not.toMatch(/pastries|budget-smart/);
   });
 
+  it("says stay instead of Airbnb for kitchen rentals", () => {
+    const tips = accommodationPlanningTips(
+      plan({ accommodationType: "airbnb_with_kitchen" }),
+      1,
+    );
+    expect(tips.join(" ")).not.toMatch(/Airbnb/i);
+    expect(tips.join(" ")).toMatch(/cook breakfast at your stay/i);
+  });
+
+  it("does not suggest cook-dinner nights on Treat Ourselves", () => {
+    const tips = accommodationPlanningTips(
+      plan({
+        accommodationType: "airbnb_with_kitchen",
+        budgetStyle: "splurge",
+      }),
+      1,
+    );
+    expect(tips.join(" ").toLowerCase()).not.toMatch(
+      /cook dinner|balance restaurant spend/,
+    );
+  });
+
   it("varies tips across days when landmark context differs", () => {
     const day1 = accommodationPlanningTips(plan(), 1, {
       landmarkNames: ["Louvre Museum"],
