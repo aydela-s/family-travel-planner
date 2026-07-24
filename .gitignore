@@ -22,6 +22,9 @@
 .DS_Store
 *.pem
 
+# local persisted itinerary shares (email deep links)
+.data/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

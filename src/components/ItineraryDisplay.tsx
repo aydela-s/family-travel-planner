@@ -1,6 +1,7 @@
 "use client";
 
 import PlanSelectionChips from "@/components/PlanSelectionChips";
+import ShareItineraryControls from "@/components/ShareItineraryControls";
 import {
   displayLocation,
   formatMoney,
@@ -257,6 +258,12 @@ export default function ItineraryDisplay({
           <p className="text-xs font-semibold uppercase tracking-wider opacity-90">Estimated trip total</p>
           <p className="text-2xl font-bold">{formatMoney(tripTotal, itinerary.currency, symbol)}</p>
         </div>
+
+        <ShareItineraryControls
+          itinerary={itinerary}
+          plan={plan}
+          disabled={isLoading}
+        />
       </header>
 
       <div className="space-y-8">

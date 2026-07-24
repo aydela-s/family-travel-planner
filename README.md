@@ -102,6 +102,8 @@ npm run test
 3. Keep `FEEDBACK_FROM_EMAIL` as `onboarding@resend.dev` until you verify `tripnestly.app`.
 4. Run `npm run dev`, click **Feedback**, submit a note — it should arrive in that inbox.
 
+The same Resend keys power **Share by email** on the itinerary (FAM-50). **Download PDF** runs in the browser and does not need Resend.
+
 Resend’s free onboarding sender can only deliver to **the email on your Resend account**. After you buy/verify the domain, switch `FEEDBACK_FROM_EMAIL` to something like `TripNestly Feedback <feedback@tripnestly.app>` and you can send to any inbox.
 
 

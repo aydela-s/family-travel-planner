@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type KeyboardEvent } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import BackToTopButton from "@/components/BackToTopButton";
 import ItineraryDisplay from "@/components/ItineraryDisplay";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -96,12 +97,17 @@ type GenerateParams = GenerateItineraryOptions & {
 };
 
 export default function TripPlanWizard() {
+  const searchParams = useSearchParams();
+  const shareId = searchParams.get("share");
   const [stepIndex, setStepIndex] = useState(0);
   const [stepDirection, setStepDirection] = useState<"forward" | "back">("forward");
   const [formData, setFormData] = useState<TripPlan>(initialTripPlan);
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState<string | undefined>();
+  // When opening a shared trip, start on the loading screen — never flash an empty wizard.
+  const [isLoading, setIsLoading] = useState(() => Boolean(shareId));
+  const [loadingMessage, setLoadingMessage] = useState<string | undefined>(() =>
+    shareId ? "Loading your itinerary…" : undefined,
+  );
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [isDemo, setIsDemo] = useState(false);
   const [useDemoNext, setUseDemoNext] = useState(false);
@@ -111,6 +117,37 @@ export default function TripPlanWizard() {
   const isFirstStep = stepIndex === 0;
   const isLastStep = stepIndex === TOTAL_STEPS - 1;
   const progress = ((stepIndex + 1) / TOTAL_STEPS) * 100;
+
+  useEffect(() => {
+    if (!shareId) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingMessage("Loading your itinerary…");
+      setIsLoading(true);
+      setError("");
+      try {
+        const res = await fetch(`/api/itinerary-shares/${shareId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Shared itinerary not found.");
+        if (cancelled) return;
+        if (data.plan) {
+          setFormData({ ...initialTripPlan, ...(data.plan as TripPlan) });
+        }
+        setItinerary(data.itinerary as Itinerary);
+      } catch (e) {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Couldn’t load this shared trip.");
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+          setLoadingMessage(undefined);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [shareId]);
 
   function updateFormData(updates: Partial<TripPlan>) {
     setFormData((current) => ({ ...current, ...updates }));

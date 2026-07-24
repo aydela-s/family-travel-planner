@@ -1,26 +1,35 @@
 "use client";
 
-import { FormEvent, useEffect, useId, useRef, useState } from "react";
+import { FormEvent, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
-import { usePathname } from "next/navigation";
 import {
   btnGhostClassName,
   btnPrimaryClassName,
+  btnSecondaryClassName,
   inputClassName,
   labelClassName,
 } from "@/components/plan-wizard/shared";
+import { downloadItineraryPdf } from "@/lib/itinerary-pdf";
+import { Itinerary } from "@/types/itinerary";
+import { TripPlan } from "@/types/trip-plan";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
-export default function FeedbackButton() {
-  const pathname = usePathname();
+export default function ShareItineraryControls({
+  itinerary,
+  plan,
+  disabled = false,
+}: {
+  itinerary: Itinerary;
+  plan?: TripPlan;
+  disabled?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [to, setTo] = useState("");
   const [message, setMessage] = useState("");
-  const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
-  const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
   useEffect(() => {
@@ -29,7 +38,6 @@ export default function FeedbackButton() {
 
   useEffect(() => {
     if (!open) return;
-
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
@@ -42,37 +50,52 @@ export default function FeedbackButton() {
     };
   }, [open]);
 
-  function resetForm() {
+  function resetShareForm() {
+    setTo("");
     setMessage("");
-    setEmail("");
     setStatus("idle");
     setError("");
   }
 
   function close() {
     setOpen(false);
-    if (status === "sent") resetForm();
+    if (status === "sent") resetShareForm();
   }
 
-  async function onSubmit(event: FormEvent) {
+  function onDownload() {
+    downloadItineraryPdf({
+      itinerary,
+      plan: plan
+        ? {
+            adults: plan.adults,
+            children: plan.children,
+            startDate: plan.startDate,
+            endDate: plan.endDate,
+          }
+        : undefined,
+    });
+  }
+
+  async function onShare(event: FormEvent) {
     event.preventDefault();
     setStatus("sending");
     setError("");
-
     try {
-      const res = await fetch("/api/feedback", {
+      const res = await fetch("/api/share-itinerary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message,
-          email: email.trim() || undefined,
-          pageUrl: typeof window !== "undefined" ? window.location.href : undefined,
+          to,
+          message: message.trim() || undefined,
+          itinerary,
+          plan,
+          appOrigin: window.location.origin,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         setStatus("error");
-        setError(data.error || "Couldn’t send feedback. Please try again.");
+        setError(data.error || "Couldn’t send the itinerary.");
         return;
       }
       setStatus("sent");
@@ -80,11 +103,6 @@ export default function FeedbackButton() {
       setStatus("error");
       setError("Couldn’t reach the server. Check your connection and try again.");
     }
-  }
-
-  // Dedicated /feedback page already has the form — don’t stack a floating launcher.
-  if (pathname === "/feedback") {
-    return null;
   }
 
   const dialog =
@@ -98,26 +116,20 @@ export default function FeedbackButton() {
             }}
           >
             <div
-              ref={dialogRef}
               role="dialog"
               aria-modal="true"
               aria-labelledby={titleId}
               className="w-full max-w-md rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6"
             >
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 id={titleId} className="text-lg font-semibold text-ink">
-                    Send feedback
-                  </h2>
-                  <p className="mt-1 text-sm leading-relaxed text-muted">
-                    Bugs, confusing steps, or ideas — we read every note.
-                  </p>
-                </div>
+                <h2 id={titleId} className="text-lg font-semibold text-ink">
+                  Share itinerary
+                </h2>
                 <button
                   type="button"
                   onClick={close}
                   className="rounded-xl px-2 py-1 text-sm font-semibold text-muted hover:bg-background hover:text-ink"
-                  aria-label="Close feedback"
+                  aria-label="Close share dialog"
                 >
                   ✕
                 </button>
@@ -126,52 +138,49 @@ export default function FeedbackButton() {
               {status === "sent" ? (
                 <div className="mt-5 space-y-4">
                   <p className="rounded-2xl border border-primary/20 bg-primary-muted px-4 py-3.5 text-sm leading-relaxed text-ink">
-                    Thanks — your feedback is on its way.
+                    Sent — they should see it in their inbox shortly.
                   </p>
                   <button type="button" onClick={close} className={btnPrimaryClassName}>
                     Done
                   </button>
                 </div>
               ) : (
-                <form onSubmit={onSubmit} className="mt-5 space-y-4">
+                <form onSubmit={onShare} className="mt-5 space-y-4">
                   <label className={labelClassName}>
-                    Your feedback
-                    <textarea
-                      rows={5}
-                      required
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder="What happened, or what would make TripNestly better?"
-                      className={`${inputClassName} min-h-[8rem] resize-y`}
-                    />
-                  </label>
-
-                  <label className={labelClassName}>
-                    Email{" "}
-                    <span className="font-normal text-muted">(optional, for follow-up)</span>
+                    Email to
                     <input
                       type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
+                      required
+                      value={to}
+                      onChange={(e) => setTo(e.target.value)}
+                      placeholder="friend@example.com"
                       className={inputClassName}
                       autoComplete="email"
                     />
                   </label>
-
+                  <label className={labelClassName}>
+                    Note{" "}
+                    <span className="font-normal text-muted">(optional)</span>
+                    <textarea
+                      rows={3}
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Here’s our family plan for Paris!"
+                      className={`${inputClassName} resize-y`}
+                    />
+                  </label>
                   {error && (
                     <p className="rounded-2xl border border-error/20 bg-error-muted px-4 py-3 text-sm text-error">
                       {error}
                     </p>
                   )}
-
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="submit"
                       disabled={status === "sending"}
                       className={btnPrimaryClassName}
                     >
-                      {status === "sending" ? "Sending…" : "Send feedback"}
+                      {status === "sending" ? "Sending…" : "Send itinerary"}
                     </button>
                     <button type="button" onClick={close} className={btnGhostClassName}>
                       Cancel
@@ -187,16 +196,27 @@ export default function FeedbackButton() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(true);
-          if (status === "sent") resetForm();
-        }}
-        className="fixed bottom-6 left-6 z-30 rounded-2xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-ink shadow-soft transition hover:border-primary/40 hover:bg-primary-muted hover:text-primary"
-      >
-        Feedback
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => {
+            setOpen(true);
+            if (status === "sent") resetShareForm();
+          }}
+          className={btnSecondaryClassName}
+        >
+          Share by email
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onDownload}
+          className={btnPrimaryClassName}
+        >
+          Download PDF
+        </button>
+      </div>
       {dialog}
     </>
   );
