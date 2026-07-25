@@ -53,7 +53,7 @@ export class PlacesApiError extends Error {
 
 /** Prefer Places-specific key; fall back to the Maps key already used elsewhere. */
 export function resolvePlacesApiKey(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Partial<NodeJS.ProcessEnv> = process.env,
 ): string | undefined {
   const places = env.GOOGLE_PLACES_API_KEY?.trim();
   if (places) return places;
@@ -101,7 +101,7 @@ export type GetTopActivitiesOptions = {
   maxResults?: number;
   /** Injected for tests. */
   fetchImpl?: typeof fetch;
-  env?: NodeJS.ProcessEnv;
+  env?: Partial<NodeJS.ProcessEnv>;
 };
 
 export async function getTopActivities(
