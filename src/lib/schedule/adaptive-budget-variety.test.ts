@@ -78,15 +78,18 @@ describe("balanced afternoon → dinner gap", () => {
 });
 
 describe("balanced food budget", () => {
-  it("does not name restaurants for balanced breakfast or lunch", () => {
+  it("names lunch and dinner when there are no dietary restrictions", () => {
     expect(usesNamedRestaurant(plan(), "breakfast")).toBe(false);
-    expect(usesNamedRestaurant(plan(), "lunch")).toBe(false);
+    expect(usesNamedRestaurant(plan(), "lunch")).toBe(true);
     expect(usesNamedRestaurant(plan(), "dinner")).toBe(true);
     expect(usesNamedRestaurant(plan({ budgetStyle: "splurge" }), "lunch")).toBe(true);
+    expect(
+      usesNamedRestaurant(plan({ dietaryRestrictions: "Vegetarian" }), "lunch"),
+    ).toBe(false);
   });
 
   it("prices balanced days well below three full restaurant meals", () => {
-    const trip = plan();
+    const trip = plan({ dietaryRestrictions: "Vegetarian" });
     const { raw } = planTrip(trip);
     const city = detectCity(trip.destination);
     const meals = raw.days[0].activities

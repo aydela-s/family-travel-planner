@@ -17,6 +17,10 @@ export type ItineraryActivity = {
   notes?: string;
   location?: ActivityLocation;
   activityCost?: number;
+  /** Google Places id when sourced from Places (FAM-59/60 UI). */
+  placeId?: string;
+  rating?: number;
+  reviewCount?: number;
   slotKind?: import("@/lib/planning-engine/types").SlotKind;
   landmarkIntensity?: import("@/config/city-pricing").LandmarkIntensity;
   interestTags?: import("@/config/city-pricing").LandmarkInterestTag[];
@@ -83,6 +87,8 @@ export type RawItinerary = {
     day: number;
     activities: {
       time: string;
+      /** Set by the day scheduler (meal anchors / nap windows). */
+      endTime?: string;
       title: string;
       type: ActivityType;
       notes?: string;

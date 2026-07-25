@@ -59,4 +59,12 @@ describe("accommodationPlanningTips — FAM-6", () => {
     });
     expect(day1.join("|")).not.toBe(day2.join("|"));
   });
+
+  it("returns at most one tip per day", () => {
+    const tips = accommodationPlanningTips(plan(), 1, {
+      landmarkNames: ["Louvre Museum"],
+      cookingDinner: true,
+    });
+    expect(tips.length).toBeLessThanOrEqual(1);
+  });
 });

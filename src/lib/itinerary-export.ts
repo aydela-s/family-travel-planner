@@ -1,17 +1,87 @@
 import { BRAND } from "@/config/brand";
 import {
   formatMoney,
+  formatPlaceRatingBadge,
   formatTime12h,
+  formatTimeCompact,
   formatTripDate,
   oneLineNote,
 } from "@/lib/format";
-import { Itinerary } from "@/types/itinerary";
+import { Itinerary, ItineraryActivity } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
 export type ItineraryExportContext = {
   itinerary: Itinerary;
   plan?: Pick<TripPlan, "adults" | "children" | "startDate" | "endDate">;
 };
+
+const TYPE_ICON: Record<ItineraryActivity["type"], string> = {
+  meal: "🍽️",
+  activity: "🎯",
+  rest: "☕",
+  nap: "😴",
+  travel: "🚶",
+};
+
+function moneyWhole(amount: number, symbol: string): string {
+  return `${symbol}${Math.round(amount).toLocaleString()}`;
+}
+
+/** Compact summary + expanded detail lines (same structure as the day-card UI). */
+export function formatCompactActivityLines(
+  activity: ItineraryActivity,
+  currencySymbol: string,
+  opts: { asciiStar?: boolean } = {},
+): { summary: string; details: string[] } {
+  const icon = TYPE_ICON[activity.type] ?? "";
+  const badge = formatPlaceRatingBadge(activity.rating, activity.reviewCount);
+  const badgeText =
+    badge && opts.asciiStar ? badge.replace(/^★/, "*") : badge;
+  const paid =
+    activity.activityCost != null && activity.activityCost > 0
+      ? moneyWhole(activity.activityCost, currencySymbol)
+      : "";
+
+  const summaryParts = [
+    formatTimeCompact(activity.time),
+    icon,
+    activity.title,
+    badgeText,
+    paid,
+  ].filter(Boolean);
+  const summary = summaryParts.join("  ");
+
+  const details: string[] = [];
+  if (activity.endTime) {
+    details.push(`${formatTime12h(activity.time)} – ${formatTime12h(activity.endTime)}`);
+  }
+  if (activity.location?.name) {
+    // Prefer place name / place id over raw coordinates (coords can land on the wrong building).
+    if (activity.placeId) {
+      details.push(
+        `Maps: https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location.name)}&query_place_id=${encodeURIComponent(activity.placeId)}`,
+      );
+    } else if (!/\barea\b/i.test(activity.location.name)) {
+      details.push(
+        `Maps: https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location.name)}`,
+      );
+    } else if (
+      Number.isFinite(activity.location.lat) &&
+      Number.isFinite(activity.location.lng)
+    ) {
+      details.push(
+        `Maps: https://www.google.com/maps/search/?api=1&query=${activity.location.lat},${activity.location.lng}`,
+      );
+    }
+  }
+  if (activity.notes) {
+    const note = oneLineNote(activity.notes, 140);
+    if (note && !/^Day\s+\d+\s+[—–-]/i.test(note.trim())) {
+      details.push(note);
+    }
+  }
+  return { summary, details };
+}
 
 /** Cover date line like "July 8–14" (same year) or full range when years differ. */
 export function formatCoverDateRange(startIso: string, endIso: string): string {
@@ -73,6 +143,7 @@ export function buildCoverContent(ctx: ItineraryExportContext): {
 export function formatItineraryPlainText(ctx: ItineraryExportContext): string {
   const { itinerary } = ctx;
   const cover = buildCoverContent(ctx);
+  const symbol = itinerary.currencySymbol;
   const lines: string[] = [
     cover.destination,
     cover.dateRange,
@@ -86,27 +157,25 @@ export function formatItineraryPlainText(ctx: ItineraryExportContext): string {
   ];
 
   for (const day of itinerary.days) {
-    lines.push(`Day ${day.day} — ${day.formattedDate || formatTripDate(day.date)}`);
+    const c = day.costBreakdown;
+    lines.push(
+      `Day ${day.day} · ${day.formattedDate || formatTripDate(day.date)}  ${moneyWhole(c.total, symbol)}`,
+    );
+    lines.push(
+      `Food ${moneyWhole(c.food, symbol)}  ·  Transport ${moneyWhole(c.transport, symbol)}  ·  Activities ${moneyWhole(c.activities, symbol)}`,
+    );
     lines.push("");
     for (const a of day.activities) {
-      const time = a.endTime
-        ? `${formatTime12h(a.time)} – ${formatTime12h(a.endTime)}`
-        : formatTime12h(a.time);
-      lines.push(`${time}  ${a.title}`);
-      if (a.location?.name) lines.push(`  📍 ${a.location.name}`);
-      if (a.notes) lines.push(`  ${oneLineNote(a.notes, 120)}`);
+      const { summary, details } = formatCompactActivityLines(a, symbol);
+      lines.push(summary);
+      for (const d of details) lines.push(`  ${d}`);
     }
-    const c = day.costBreakdown;
-    lines.push("");
-    lines.push(
-      `Daily total: ${formatMoney(c.total, c.currency, itinerary.currencySymbol)}`,
-    );
     lines.push("");
   }
 
   const tripTotal = itinerary.days.reduce((s, d) => s + d.costs.total, 0);
   lines.push(
-    `Estimated trip total: ${formatMoney(tripTotal, itinerary.currency, itinerary.currencySymbol)}`,
+    `Estimated trip total: ${formatMoney(tripTotal, itinerary.currency, symbol)}`,
   );
   return lines.join("\n").trim() + "\n";
 }

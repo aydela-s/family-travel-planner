@@ -1,7 +1,6 @@
 import { CityConfig, Landmark, LandmarkAgeTag, OnSiteMeal } from "@/config/city-pricing";
 import { addDays } from "@/lib/format";
 import {
-  activityNoteForFamily,
   getFamilyAgeProfile,
   pickLandmarkForFamily,
   suggestActivityTitle,
@@ -22,6 +21,7 @@ import {
   breakfastLabel,
   dinnerLabel,
   lunchLabel,
+  napOverlapsLunchWindow,
   onSiteCafeLabel,
   slotActivityType,
   usesNamedRestaurant,
@@ -201,20 +201,23 @@ function fillSlot(
     }
     case "morning_activity": {
       const base = suggestActivityTitle(ctx.morning.name, plan, "morning");
-      const notes = activityNoteForFamily(plan, day);
       return tagged(
         {
           time: slot.defaultTime,
           title: activityTitlePrefix(adjustment, base),
           type,
-          notes: adjustment.summaryNote
-            ? `${notes} Tailored to your request: ${adjustment.summaryNote}`
-            : notes,
+          ...(adjustment.summaryNote
+            ? { notes: `Tailored to your request: ${adjustment.summaryNote}` }
+            : {}),
         },
         ctx.morning,
       );
     }
     case "lunch": {
+      if (napOverlapsLunchWindow(plan)) {
+        const meal = lunchLabel(plan, ctx.lunch.name, null);
+        return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
+      }
       const onSite = shouldPreferOnSiteCafe(plan, "lunch")
         ? landmarkWithOnSiteMeal([ctx.morning, ctx.lunch], "lunch")
         : null;

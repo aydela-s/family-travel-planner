@@ -23,6 +23,10 @@ export type CityRestaurant = {
   budgetStyles: BudgetStyle[];
   /** Short why-this-spot note shown on the itinerary. */
   familyNote: string;
+  /** Optional Google rating (used when the family has no dietary filter). */
+  rating?: number;
+  /** Optional Google Places id for Maps deep-links. */
+  placeId?: string;
 };
 
 /** Curated family-friendly restaurants keyed by city id (see city-pricing). */

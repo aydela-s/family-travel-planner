@@ -1,177 +1,306 @@
 "use client";
 
+import type { ReactNode } from "react";
 import PlanSelectionChips from "@/components/PlanSelectionChips";
 import ShareItineraryControls from "@/components/ShareItineraryControls";
 import {
-  displayLocation,
   formatMoney,
+  formatPlaceRatingBadge,
   formatTime12h,
-  formatTimeOfDayLabel,
-  getTimeOfDay,
+  formatTimeCompact,
   oneLineNote,
 } from "@/lib/format";
 import { getBudgetStyleLabelPlain, getTravelStyleLabel } from "@/lib/format-labels";
 import { Itinerary, ItineraryActivity, ItineraryDay } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
-const typeConfig: Record<
-  ItineraryActivity["type"],
-  { icon: string; label: string; dot: string; card: string }
-> = {
-  meal: {
-    icon: "🍽️",
-    label: "Meal",
-    dot: "bg-itinerary-meal",
-    card: "border-accent/25 bg-accent-muted/60",
-  },
-  activity: {
-    icon: "🎯",
-    label: "Activity",
-    dot: "bg-itinerary-activity",
-    card: "border-border bg-surface",
-  },
-  rest: {
-    icon: "☕",
-    label: "Rest",
-    dot: "bg-itinerary-rest",
-    card: "border-secondary/30 bg-secondary-muted/70",
-  },
-  nap: {
-    icon: "😴",
-    label: "Rest",
-    dot: "bg-itinerary-rest animate-pulse-soft",
-    card: "border-secondary/40 bg-secondary-muted",
-  },
-  travel: {
-    icon: "🚶",
-    label: "Activity",
-    dot: "bg-itinerary-transport",
-    card: "border-border bg-background",
-  },
+type TypeStyle = {
+  icon: ReactNode;
+  row: string;
+  iconWrap: string;
 };
 
-function TimelineItem({ activity, currencySymbol }: { activity: ItineraryActivity; currencySymbol: string }) {
-  const cfg = typeConfig[activity.type];
-  const isNap = activity.type === "nap";
-  const isMeal = activity.type === "meal";
-
+function MealIcon() {
   return (
-    <li className="relative pl-9 sm:pl-11">
-      <span className={`absolute left-0 top-5 h-3.5 w-3.5 rounded-full ring-4 ring-white ${cfg.dot}`} />
-      <article
-        className={`rounded-2xl border p-4 shadow-sm transition hover:shadow-md sm:p-5 ${cfg.card} ${
-          isNap ? "shadow-secondary/20 shadow-md" : isMeal ? "shadow-accent/10" : ""
-        }`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <time className="rounded-lg bg-surface/90 px-2.5 py-1 text-sm font-bold tabular-nums text-ink shadow-sm">
-            {formatTime12h(activity.time)}
-            {activity.endTime ? ` – ${formatTime12h(activity.endTime)}` : ""}
-          </time>
-          <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-            <span>{cfg.icon}</span> {cfg.label}
-            <span className="rounded-md bg-background px-1.5 py-0.5 text-[10px] font-bold text-muted">
-              {formatTimeOfDayLabel(activity.timeOfDay ?? getTimeOfDay(activity.time))}
-            </span>
-          </span>
-        </div>
-        <h4 className="mt-3 text-base font-bold leading-snug text-ink sm:text-lg">
-          {activity.title}
-        </h4>
-        {activity.location && (
-          <p className="mt-1.5 text-xs font-semibold tracking-wide text-muted">
-            📍 {displayLocation(activity.location.name)}
-          </p>
-        )}
-        {activity.notes && (
-          <p className="mt-2 truncate text-sm text-muted">{oneLineNote(activity.notes)}</p>
-        )}
-        {activity.activityCost != null && activity.activityCost > 0 && (
-          <p className="mt-2 text-xs font-medium text-muted">
-            Family activity est. {formatMoney(activity.activityCost, "", currencySymbol)}
-          </p>
-        )}
-      </article>
-    </li>
+    <svg viewBox="0 0 24 24" className="block h-3.5 w-3.5 shrink-0" fill="none" aria-hidden>
+      <path
+        d="M8 3v8M8 11v10M6 3v5a2 2 0 0 0 4 0V3M16 3v7c0 1.5 1 2 2 2v9M16 3c0 3 0 5-2 7"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
-function CostBreakdown({ day, symbol }: { day: ItineraryDay; symbol: string }) {
-  const c = day.costBreakdown;
-  const showAccTips = day.accommodationTips.length > 0;
+function ActivityIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="block h-3.5 w-3.5 shrink-0" fill="none" aria-hidden>
+      <path
+        d="M12 21s7-4.8 7-10.5a7 7 0 1 0-14 0C5 16.2 12 21 12 21Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="10.5" r="2.25" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+function NapIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="block h-3.5 w-3.5 shrink-0" fill="none" aria-hidden>
+      <path
+        d="M12 4.5A6.5 6.5 0 1 0 18.2 14.2 5.25 5.25 0 0 1 12 4.5Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function RestIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="block h-3.5 w-3.5 shrink-0" fill="none" aria-hidden>
+      <path
+        d="M6 15h12M8 15V9a4 4 0 0 1 8 0v6M9 19h6"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TravelIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="block h-3.5 w-3.5 shrink-0" fill="none" aria-hidden>
+      <path
+        d="M4 16h16M7 16V8l5-3 5 3v8M9 16v3M15 16v3"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ExpandChevron() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" aria-hidden>
+      <path
+        d="M5 7.5 10 12.5 15 7.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+const typeStyle: Record<ItineraryActivity["type"], TypeStyle> = {
+  meal: {
+    icon: <MealIcon />,
+    row: "bg-accent-muted/50",
+    iconWrap: "bg-accent text-white",
+  },
+  activity: {
+    icon: <ActivityIcon />,
+    row: "bg-primary-muted/40",
+    iconWrap: "bg-itinerary-activity text-white",
+  },
+  rest: {
+    icon: <RestIcon />,
+    row: "bg-secondary-muted/80",
+    iconWrap: "bg-itinerary-rest text-white",
+  },
+  nap: {
+    icon: <NapIcon />,
+    row: "bg-secondary-muted/80",
+    iconWrap: "bg-itinerary-rest text-white",
+  },
+  travel: {
+    icon: <TravelIcon />,
+    row: "bg-surface",
+    iconWrap: "bg-muted text-white",
+  },
+};
+
+function moneyWhole(amount: number, symbol: string): string {
+  return `${symbol}${Math.round(amount).toLocaleString()}`;
+}
+
+/** Age-band boilerplate like "Day 3 — mixed ages (ages 9–14)." */
+function isBoilerplateAgeNote(note: string): boolean {
+  return /^Day\s+\d+\s+[—–-]/i.test(note.trim());
+}
+
+/** Google Maps URL preferring place id / place name over raw coordinates. */
+function mapsUrl(activity: ItineraryActivity): string | null {
+  // Naps/rests are at the stay — a hotel pin is confusing next to "Nap & Quiet Time".
+  if (activity.type === "nap" || activity.type === "rest") return null;
+
+  const name = activity.location?.name?.trim();
+  const lat = activity.location?.lat;
+  const lng = activity.location?.lng;
+
+  // Grocery pins are synthetic ("Supermarket near Belmont Park") — pin the map
+  // on the anchor coords so Maps doesn't fall back to the user's current city.
+  if (/supermarket|grocery/i.test(activity.title) || /supermarket|grocery/i.test(name ?? "")) {
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return `https://www.google.com/maps/search/Supermarket/@${lat},${lng},15z`;
+    }
+    return null;
+  }
+
+  if (activity.placeId) {
+    const query = encodeURIComponent(name || "place");
+    return `https://www.google.com/maps/search/?api=1&query=${query}&query_place_id=${encodeURIComponent(activity.placeId)}`;
+  }
+  if (name && !/\barea\b/i.test(name)) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`;
+  }
+  if (activity.location && Number.isFinite(lat) && Number.isFinite(lng)) {
+    return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  }
+  return null;
+}
+
+function locationAlreadyInTitle(title: string, locationName: string): boolean {
+  const t = title.toLowerCase();
+  const n = locationName.toLowerCase().trim();
+  if (!n) return true;
+  if (t.includes(n)) return true;
+  const stem = n.replace(/\s+(park|museum|area|café|cafe)$/i, "").trim();
+  return stem.length > 3 && t.includes(stem);
+}
+
+function TimelineItem({
+  activity,
+  currencySymbol,
+}: {
+  activity: ItineraryActivity;
+  currencySymbol: string;
+}) {
+  const style = typeStyle[activity.type];
+  const ratingBadge = formatPlaceRatingBadge(activity.rating, activity.reviewCount);
+  const paid =
+    activity.activityCost != null && activity.activityCost > 0
+      ? moneyWhole(activity.activityCost, currencySymbol)
+      : null;
+  const rawNote = activity.notes ? oneLineNote(activity.notes) : "";
+  const detailNote = rawNote && !isBoilerplateAgeNote(rawNote) ? rawNote : "";
+  const maps = mapsUrl(activity);
+  const hasDetails = Boolean(detailNote || activity.endTime || maps);
 
   return (
-    <div className="mt-6 space-y-4">
-      <div className="rounded-2xl border border-border bg-background p-4 sm:p-5">
-        <h4 className="text-sm font-bold uppercase tracking-wider text-muted">
-          Estimated daily cost
-        </h4>
-
-        <dl className="mt-3 space-y-2 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-muted">🍽️ Food</dt>
-            <dd className="font-semibold text-ink">{formatMoney(c.food, c.currency, symbol)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted">🚗 Transport</dt>
-            <dd className="font-semibold text-ink">{formatMoney(c.transport, c.currency, symbol)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted">🎯 Activities</dt>
-            <dd className="font-semibold text-ink">{formatMoney(c.activities, c.currency, symbol)}</dd>
-          </div>
-          <div className="flex justify-between border-t border-border pt-2 text-base">
-            <dt className="font-bold text-ink">Daily total</dt>
-            <dd className="font-bold text-itinerary-budget">{formatMoney(c.total, c.currency, symbol)}</dd>
-          </div>
-        </dl>
-
-        {c.note && (
-          <p className="mt-3 rounded-xl border border-secondary/25 bg-secondary-muted px-3 py-2 text-xs leading-relaxed text-ink">
-            {c.note}
-          </p>
+    <details className={`group border-b border-border/80 last:border-b-0 ${style.row}`}>
+      <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-3.5 marker:content-none sm:gap-3 sm:px-4 [&::-webkit-details-marker]:hidden">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${style.iconWrap}`}
+        >
+          {style.icon}
+        </span>
+        <time className="w-12 shrink-0 text-xs font-medium tabular-nums text-muted sm:w-14">
+          {formatTimeCompact(activity.time)}
+        </time>
+        <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-ink sm:text-base">
+          {activity.title}
+          {ratingBadge && (
+            <span className="ml-2 whitespace-nowrap rounded-md bg-background/80 px-1.5 py-0.5 text-xs font-semibold text-muted">
+              {ratingBadge}
+            </span>
+          )}
+        </span>
+        {paid && (
+          <span className="shrink-0 text-sm font-semibold tabular-nums text-ink">{paid}</span>
         )}
-        {day.metrics.transportLabel && (
-          <p className="mt-3 rounded-xl bg-surface px-3 py-2 text-xs leading-relaxed text-muted">
-            <strong>Movement:</strong> {day.metrics.transportLabel}
-          </p>
-        )}
-      </div>
+        <span
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background text-ink shadow-sm transition group-open:rotate-180 group-open:border-primary group-open:bg-primary group-open:text-white"
+          aria-hidden
+        >
+          <ExpandChevron />
+        </span>
+      </summary>
 
-      {showAccTips && (
-        <div className="rounded-2xl border border-primary/20 bg-primary-muted p-4 sm:p-5">
-          <h4 className="text-sm font-bold text-primary">🏠 Stay & meal tips</h4>
-          <ul className="mt-2 space-y-1.5 text-sm leading-relaxed text-ink">
-            {day.accommodationTips.map((tip) => (
-              <li key={tip} className="flex gap-2">
-                <span aria-hidden>•</span>
-                <span>{tip}</span>
-              </li>
-            ))}
-          </ul>
+      {hasDetails && (
+        <div className="space-y-1.5 px-3 pb-3.5 pl-[3.25rem] text-sm text-muted sm:px-4 sm:pl-[4.25rem]">
+          {activity.endTime && (
+            <p>
+              {formatTime12h(activity.time)} – {formatTime12h(activity.endTime)}
+            </p>
+          )}
+          {maps && activity.location && (
+            <p>
+              <a
+                href={maps}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {locationAlreadyInTitle(activity.title, activity.location.name)
+                  ? "Open in Google Maps"
+                  : `Open ${activity.location.name} in Maps`}
+              </a>
+            </p>
+          )}
+          {detailNote && <p className="leading-relaxed">{detailNote}</p>}
         </div>
       )}
+    </details>
+  );
+}
+
+function DayCostTiles({ day, symbol }: { day: ItineraryDay; symbol: string }) {
+  const c = day.costBreakdown;
+
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      {(
+        [
+          ["Food", c.food],
+          ["Transport", c.transport],
+          ["Activities", c.activities],
+        ] as const
+      ).map(([label, amount]) => (
+        <div
+          key={label}
+          className="rounded-xl border border-border bg-background px-2.5 py-2.5 text-center sm:px-3 sm:py-3"
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted sm:text-xs">
+            {label}
+          </p>
+          <p className="mt-0.5 text-base font-bold tabular-nums text-ink sm:text-lg">
+            {moneyWhole(amount, symbol)}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
 
-function DayCard({
-  day,
-  symbol,
-}: {
-  day: ItineraryDay;
-  symbol: string;
-}) {
+function DayCard({ day, symbol }: { day: ItineraryDay; symbol: string }) {
+  const total = moneyWhole(day.costBreakdown.total, symbol);
+
   return (
     <section className="animate-fade-in overflow-hidden rounded-3xl border border-border bg-surface shadow-[var(--shadow-card)]">
-      <header className="border-b border-border bg-primary-muted/40 px-5 py-5 sm:px-6">
-        <p className="text-xs font-bold uppercase tracking-widest text-primary">Day {day.day}</p>
-        <h3 className="mt-1 text-xl font-bold text-ink sm:text-2xl">{day.formattedDate}</h3>
+      <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-5 sm:px-6">
+        <h3 className="min-w-0 text-xl font-bold text-ink sm:text-2xl">
+          Day {day.day} · {day.formattedDate}
+        </h3>
+        <p className="shrink-0 text-2xl font-bold tabular-nums text-ink sm:text-3xl">{total}</p>
       </header>
 
-      <div className="space-y-6 p-5 sm:p-6">
-        <ol className="relative space-y-5">
-          <div className="absolute bottom-3 left-[6px] top-3 w-0.5 bg-gradient-to-b from-primary/40 via-border to-transparent sm:left-[7px]" />
+      <div className="space-y-5 p-5 sm:p-6">
+        <DayCostTiles day={day} symbol={symbol} />
+
+        <div className="overflow-hidden rounded-2xl border border-border">
           {day.activities.map((a) => (
             <TimelineItem
               key={`${a.time}-${a.type}-${a.title}`}
@@ -179,9 +308,7 @@ function DayCard({
               currencySymbol={symbol}
             />
           ))}
-        </ol>
-
-        <CostBreakdown day={day} symbol={symbol} />
+        </div>
       </div>
     </section>
   );
@@ -239,7 +366,7 @@ export default function ItineraryDisplay({
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Your trip</p>
           <p className="mt-1 text-sm text-muted">{itinerary.tripStartFormatted}</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-            {displayLocation(itinerary.destinationCity)}
+            {itinerary.destinationCity}
           </h2>
           <p className="mt-1 text-muted">
             {itinerary.days.length} day{itinerary.days.length !== 1 ? "s" : ""} ·{" "}

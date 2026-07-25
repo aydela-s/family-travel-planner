@@ -47,6 +47,8 @@ export type SkeletonSlot = DayIntent;
 
 export type RawActivity = {
   time: string;
+  /** Set by the day scheduler (meal anchors / nap windows). */
+  endTime?: string;
   title: string;
   type: ActivityType;
   notes?: string;

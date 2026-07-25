@@ -29,30 +29,34 @@ function plan(children: number[]): TripPlan {
 
 describe("meal timing business rules", () => {
   describe("lunch — age-conditional windows", () => {
-    it("uses 11:30–12:00 when oldest child is 7 or younger", () => {
+    it("uses 11:30–12:00 when oldest child is 5 or under", () => {
       const window = lunchTimeWindow(plan([2, 5]));
       expect(window.minMin).toBe(11 * 60 + 30);
       expect(window.maxMin).toBe(12 * 60);
       expect(lunchDefaultTime(plan([2, 5]))).toBe("11:45");
     });
 
-    it("uses 12:00–13:30 when oldest child is over 7", () => {
-      const window = lunchTimeWindow(plan([9, 12]));
+    it("uses ~noon (12:00–13:30) when oldest child is over 5", () => {
+      const window = lunchTimeWindow(plan([4, 8]));
       expect(window.minMin).toBe(12 * 60);
       expect(window.maxMin).toBe(13 * 60 + 30);
-      expect(lunchDefaultTime(plan([9, 12]))).toBe("12:30");
+      expect(lunchDefaultTime(plan([4, 8]))).toBe("12:00");
     });
 
-    it("uses the older-kid lunch window for adults only", () => {
-      expect(lunchDefaultTime(plan([]))).toBe("12:30");
+    it("uses the noon lunch window for adults only", () => {
+      expect(lunchDefaultTime(plan([]))).toBe("12:00");
     });
 
     it("never schedules lunch before the cursor", () => {
       expect(clampLunchStart(13 * 60, plan([4]))).toBe(13 * 60);
     });
 
-    it("pulls lunch into the window when cursor allows", () => {
+    it("pulls lunch into the early window when oldest is ≤5", () => {
       expect(clampLunchStart(11 * 60, plan([4]))).toBe(11 * 60 + 30);
+    });
+
+    it("pulls lunch to noon when oldest is over 5", () => {
+      expect(clampLunchStart(11 * 60, plan([6]))).toBe(12 * 60);
     });
 
     it("keeps a late cursor when the window has already passed", () => {

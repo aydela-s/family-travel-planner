@@ -1,4 +1,4 @@
-import { CityConfig, Landmark, LandmarkAgeTag, LandmarkIntensity } from "@/config/city-pricing";
+import { CityConfig, Landmark, LandmarkAgeTag, LandmarkIntensity, LandmarkInterestTag } from "@/config/city-pricing";
 import { CLUSTER_PREFER_SCORE_MARGIN, clusterRadiusKm } from "@/config/cluster-distances";
 import { haversineKm } from "@/lib/maps/directions";
 import { landmarksForStyle } from "@/lib/pricing/budget-style";
@@ -127,6 +127,18 @@ export function landmarkAgeScore(landmark: Landmark, profile: FamilyAgeProfile):
     else score -= 12;
   }
 
+  // Toddler/young-child soft-play should not win when older kids are on the trip.
+  if (
+    (profile.hasTween || profile.hasTeen) &&
+    !hasTag(landmark, "tween") &&
+    !hasTag(landmark, "teen")
+  ) {
+    const onlyYoung =
+      landmark.ageTags.length > 0 &&
+      landmark.ageTags.every((t) => t === "toddler" || t === "child");
+    if (onlyYoung) score -= 45;
+  }
+
   if (profile.isMixedAges) {
     const overlap = profile.bands.filter((t) => hasTag(landmark, t)).length;
     score += overlap * 8;
@@ -158,7 +170,8 @@ export function landmarkInterestScore(landmark: Landmark, plan: TripPlan): numbe
     // Primary wizard tags (e.g. playgrounds) outrank secondary aliases (e.g. museums from Interactive).
     score += primary.has(tag) ? 36 : 14;
   }
-  if (hits === 0) return -18;
+  // Hard miss: do not let proximity alone schedule playgrounds when the family asked for beaches.
+  if (hits === 0) return -80;
   // Specialized kid interests should beat scenic park aliases when both are selected.
   const wantsKidPlay =
     primary.has("playgrounds") ||
@@ -169,6 +182,16 @@ export function landmarkInterestScore(landmark: Landmark, plan: TripPlan): numbe
     landmark.interestTags.includes("indoor-play");
   if (wantsKidPlay && isKidPlay) {
     score += 28;
+  }
+  // Soft-penalize playground-led parks when the family did not ask for play/parks.
+  if (
+    !wantsKidPlay &&
+    !primary.has("parks") &&
+    !wanted.includes("parks") &&
+    isKidPlay &&
+    !landmark.interestTags.some((t) => primary.has(t))
+  ) {
+    score -= 24;
   }
   if (primary.has("interactive") && landmark.interestTags.includes("interactive")) {
     score += 20;
@@ -256,16 +279,19 @@ function preferOpenPool(
   alreadyPicked: Landmark[],
   radiusKm: number,
   visitWindow?: VisitWindow,
+  wantedTags: LandmarkInterestTag[] = [],
 ): Landmark[] {
   if (!visitWindow) return pool;
 
   const openIn = (list: Landmark[]) =>
     list.filter((l) => isLandmarkOpenForVisit(l, visitWindow));
+  const matchesInterest = (l: Landmark) =>
+    wantedTags.length === 0 || l.interestTags.some((t) => wantedTags.includes(t));
 
   const openPool = openIn(pool);
   if (openPool.length > 0) return openPool;
 
-  let wider = cityLandmarks.filter((l) => !pickedNames.has(l.name));
+  let wider = cityLandmarks.filter((l) => !pickedNames.has(l.name) && matchesInterest(l));
   if (alreadyPicked.length > 0) {
     const nearby = wider.filter(
       (l) => minDistanceKmToPicked(l, alreadyPicked) <= radiusKm,
@@ -371,6 +397,11 @@ export function pickLandmarkForFamily(
   if (pool.length === 0) {
     pool = withoutTripUsed(city.landmarks);
   }
+  // Prefer landmarks that match at least one selected interest when interests are set.
+  if (wantedTags.length > 0) {
+    const matching = pool.filter((l) => l.interestTags.some((t) => wantedTags.includes(t)));
+    if (matching.length > 0) pool = matching;
+  }
   // Exhausted unused landmarks — allow reuse rather than failing.
   if (pool.length === 0) {
     pool = stylePool.filter((l) => !pickedNames.has(l.name));
@@ -397,7 +428,10 @@ export function pickLandmarkForFamily(
         (l) =>
           !pickedNames.has(l.name) &&
           !tripExcluded.has(l.name) &&
-          minDistanceKmToPicked(l, alreadyPicked) <= radiusKm,
+          minDistanceKmToPicked(l, alreadyPicked) <= radiusKm &&
+          // Do not reintroduce playgrounds/parks when the family only asked for beaches.
+          (wantedTags.length === 0 ||
+            l.interestTags.some((t) => wantedTags.includes(t))),
       );
       // Prefer nearby unused city landmarks when the style pool has none in range.
       if (nearby.length > 0) {
@@ -413,6 +447,7 @@ export function pickLandmarkForFamily(
     alreadyPicked,
     radiusKm,
     opts.visitWindow,
+    wantedTags,
   );
 
   const ranked = [...pool]
@@ -485,21 +520,10 @@ export function uncoveredAgeBands(
   return profile.bands.filter((b) => !covered.has(b));
 }
 
-export function activityNoteForFamily(plan: TripPlan, day: number): string {
-  const profile = getFamilyAgeProfile(plan);
-  if (!plan.children.length) {
-    return `Day ${day} — planned for ${plan.adults} adult${plan.adults > 1 ? "s" : ""}.`;
-  }
-  if (profile.isMixedAges) {
-    return `Day ${day} — mixed ages (${profile.ageSummary}).`;
-  }
-  if (profile.hasTeen && !profile.hasToddler) {
-    return `Day ${day} — good for teens and adults.`;
-  }
-  if (profile.hasToddler) {
-    return `Day ${day} — toddler-friendly pacing.`;
-  }
-  return `Day ${day} — tailored for ${profile.ageSummary}.`;
+export function activityNoteForFamily(_plan: TripPlan, _day: number): string {
+  // Age-band boilerplate ("Day 3 — mixed ages…") was repeated on every activity
+  // and added no useful day-level information — keep the hook for callers/tests.
+  return "";
 }
 
 export function suggestActivityTitle(

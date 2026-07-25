@@ -136,7 +136,7 @@ function formatEnd(endMin: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/** Pull landmark name from titles like "Explore Louvre Museum". */
+/** Pull landmark name from titles like "Explore Louvre Museum" or "… near Belmont Park". */
 export function extractLandmarkFromTitle(title: string): string | null {
   const cafe = title.match(
     /^(?:Breakfast|Lunch|Dinner) at (.+?)(?:\s+café|\s+cafe)?$/i,
@@ -147,6 +147,11 @@ export function extractLandmarkFromTitle(title: string): string | null {
     /^(?:Explore|Visit|Family time at|Outdoor time:|Museum & culture:)\s+(.+)$/i,
   );
   if (match) return match[1].trim();
+
+  // Meal / rest copy: "Pastries or café breakfast near Fleet Science Center"
+  const near = title.match(/\bnear\s+(.+)$/i);
+  if (near) return near[1].trim();
+
   // Fallback: strip a leading "Something: " prefix from adjust actions.
   const colon = title.match(/^[^:]+:\s*(.+)$/);
   if (colon && colon[1].length > 3) return colon[1].trim();

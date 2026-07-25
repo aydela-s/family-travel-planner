@@ -81,7 +81,8 @@ function processRawActivities(
     }
   }
 
-  return scheduled.map(({ endTime: _e, ...rest }) => rest);
+  // Keep endTime so nap-window validation and enrich can use the scheduled span.
+  return scheduled;
 }
 
 export function fixRawDayActivities(
@@ -156,7 +157,8 @@ function mergeEnrichedSchedule(
       time: a.time,
       title: a.title,
       type: a.type,
-      notes: a.notes,
+      // Prefer rescheduled nap notes (actual downtime window) over typed preference copy.
+      notes: a.type === "nap" ? (a.notes ?? base.notes) : (a.notes ?? base.notes),
       endTime: a.endTime,
       slotKind: a.slotKind ?? base.slotKind,
       landmarkIntensity: a.landmarkIntensity ?? base.landmarkIntensity,

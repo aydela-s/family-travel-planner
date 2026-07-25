@@ -155,13 +155,24 @@ function budgetScore(restaurant: CityRestaurant, style: BudgetStyle | ""): numbe
   return -8;
 }
 
-function proximityScore(restaurant: CityRestaurant, near: Landmark | null): number {
+function proximityScore(
+  restaurant: CityRestaurant,
+  near: Landmark | null,
+  prioritizeNearby: boolean,
+): number {
   if (!near) return 0;
   const km = haversineKm(near.lat, near.lng, restaurant.lat, restaurant.lng);
-  if (km <= 1.5) return 14;
-  if (km <= 3) return 8;
-  if (km <= 6) return 3;
-  return -4;
+  const boost = prioritizeNearby ? 2 : 1;
+  if (km <= 1.5) return 14 * boost;
+  if (km <= 3) return 8 * boost;
+  if (km <= 6) return 3 * boost;
+  return -4 * boost;
+}
+
+function ratingScore(restaurant: CityRestaurant, prioritizeRating: boolean): number {
+  if (!prioritizeRating) return 0;
+  const rating = restaurant.rating ?? 4.2;
+  return Math.round((rating - 4) * 50);
 }
 
 export type PickRestaurantOptions = {
@@ -179,10 +190,12 @@ function scoreRestaurant(
   near: Landmark | null,
   index: number,
 ): number {
+  const noDiet = parseDietaryTags(plan.dietaryRestrictions).length === 0;
   return (
     ageScore(restaurant, profile) +
     budgetScore(restaurant, plan.budgetStyle) +
-    proximityScore(restaurant, near) +
+    proximityScore(restaurant, near, noDiet) +
+    ratingScore(restaurant, noDiet) +
     ((index + 1) % 7) * 0.01
   );
 }

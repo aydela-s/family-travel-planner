@@ -19,16 +19,13 @@ function youngestChildAge(plan: TripPlan): number | null {
   return Math.min(...plan.children);
 }
 
-/** P1: oldest ≤ 7 → 11:30–12:00; oldest 7+ (or adults only) → 12:00–13:30 */
+/** P1: early lunch (before noon) only when oldest child is 5 or under; else ~12:00. */
 export function lunchTimeWindow(plan: TripPlan): MealTimeWindow {
   const oldest = oldestChildAge(plan);
-  if (oldest === null || oldest > 7) {
-    return { minMin: 12 * 60, maxMin: 13 * 60 + 30, defaultMin: 12 * 60 + 30 };
-  }
-  if (oldest < 7) {
+  if (oldest !== null && oldest <= 5) {
     return { minMin: 11 * 60 + 30, maxMin: 12 * 60, defaultMin: 11 * 60 + 45 };
   }
-  return { minMin: 12 * 60, maxMin: 12 * 60, defaultMin: 12 * 60 };
+  return { minMin: 12 * 60, maxMin: 13 * 60 + 30, defaultMin: 12 * 60 };
 }
 
 export function lunchDefaultTime(plan: TripPlan): string {

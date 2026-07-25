@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCoverContent,
+  formatCompactActivityLines,
   formatCoverDateRange,
   formatFamilyCoverLines,
   formatItineraryPlainText,
@@ -94,6 +95,32 @@ describe("itinerary export — FAM-50", () => {
     expect(cover.generatedBy).toMatch(/TripNestly/);
   });
 
+  it("formats compact expanded activity lines for export", () => {
+    const { summary, details } = formatCompactActivityLines(
+      {
+        time: "10:00",
+        endTime: "12:00",
+        title: "Explore Belmont Park",
+        type: "activity",
+        timeOfDay: "morning",
+        notes: "Half-day at the boardwalk.",
+        location: { name: "Belmont Park", lat: 0, lng: 0 },
+        rating: 4.6,
+        reviewCount: 17936,
+        activityCost: 60,
+      },
+      "$",
+      { asciiStar: true },
+    );
+    expect(summary).toMatch(/10:00a/);
+    expect(summary).toContain("Explore Belmont Park");
+    expect(summary).toContain("*4.6 (18k)");
+    expect(summary).toContain("$60");
+    expect(details[0]).toBe("10:00 AM – 12:00 PM");
+    expect(details[1]).toMatch(/Maps: https:\/\/www\.google\.com\/maps/);
+    expect(details[2]).toContain("Half-day at the boardwalk");
+  });
+
   it("includes day schedule details in the plain-text email body", () => {
     const text = formatItineraryPlainText({
       itinerary: sampleItinerary(),
@@ -107,8 +134,12 @@ describe("itinerary export — FAM-50", () => {
     expect(text).toContain("Paris");
     expect(text).toContain("Day 1");
     expect(text).toContain("Explore Louvre");
-    expect(text).toContain("Louvre Museum");
-    expect(text).toMatch(/10:00 AM/);
+    expect(text).toMatch(/Maps: https:\/\/www\.google\.com\/maps/);
+    expect(text).toMatch(/10:00a/);
+    expect(text).toMatch(/10:00 AM – 11:30 AM/);
+    expect(text).toMatch(/Food \$40/);
+    expect(text).toMatch(/Transport \$20/);
+    expect(text).toMatch(/Activities \$50/);
   });
 
   it("validates share emails and builds a pdf filename", () => {

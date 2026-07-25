@@ -2,11 +2,13 @@ import { CityRestaurant } from "@/config/city-restaurants";
 import { BudgetStyle, TripPlan } from "@/types/trip-plan";
 import { SlotKind } from "@/lib/planning-engine/types";
 import { AdjustmentContext } from "@/lib/planning-engine/day-adjustment";
+import { lunchTimeWindow } from "@/lib/planning-engine/meal-timing";
 import {
   matchesDietaryNeeds,
   matchesDietaryOptions,
   parseDietaryTags,
 } from "@/lib/planning-engine/restaurant-picker";
+import { getNapWindow, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 
 /** P0 #5–6: breakfast slot only when accommodation does not cover it */
 export function requiresBreakfastSlot(plan: TripPlan): boolean {
@@ -78,16 +80,31 @@ function namedMealNotes(
 
 /**
  * When budget style should name a restaurant for this meal.
- * Save/balanced: bakery/picnic for breakfast & lunch; restaurant mainly at dinner.
- * Splurge (Treat Ourselves): restaurant meals throughout the day.
+ * Save: picnic/bakery for breakfast & lunch; restaurant mainly at dinner.
+ * Splurge: restaurant meals throughout the day.
+ * No dietary restrictions: name lunch + dinner near the day's activities
+ * so the family isn't bouncing across town for a generic "area" meal.
  */
 export function usesNamedRestaurant(
   plan: TripPlan,
   meal: "breakfast" | "lunch" | "dinner",
 ): boolean {
   if (plan.budgetStyle === "splurge") return true;
+  if (plan.budgetStyle === "save") return meal === "dinner";
+  const noDiet = parseDietaryTags(plan.dietaryRestrictions).length === 0;
+  if (noDiet && (meal === "lunch" || meal === "dinner")) return true;
   if (plan.budgetStyle === "balanced" && meal === "dinner") return true;
   return false;
+}
+
+/** True when a stay-home nap overlaps (or abuts) the family's lunch window. */
+export function napOverlapsLunchWindow(plan: TripPlan): boolean {
+  if (!shouldIncludeNaps(plan)) return false;
+  const nap = getNapWindow(plan);
+  if (!nap) return false;
+  const lunch = lunchTimeWindow(plan);
+  // Inclusive on the lunch max so a noon nap after an 11:30–12:00 lunch still counts.
+  return nap.startMin <= lunch.maxMin && nap.endMin > lunch.minMin;
 }
 
 /** Meal at a venue café / food court (landmark.onSiteMeals). */
@@ -188,6 +205,14 @@ export function lunchLabel(
   spot: string,
   restaurant?: CityRestaurant | null,
 ): { title: string; notes: string } {
+  // Nap during lunch hours → eat at the stay (takeout/delivery) instead of a restaurant hop.
+  if (napOverlapsLunchWindow(plan)) {
+    return {
+      title: "Takeout or delivery lunch at your stay",
+      notes: "Nap overlaps lunch — order delivery or grab takeout to eat where you're resting.",
+    };
+  }
+
   if (plan.accommodationType === "airbnb_with_kitchen") {
     return {
       title: `Picnic lunch near ${spot}`,

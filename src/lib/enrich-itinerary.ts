@@ -110,11 +110,26 @@ function applyOpeningHoursNotes(
   });
 }
 
+/** Landmark names already used on earlier days (for adjust-day re-enrich). */
+function landmarkNamesFromPreviousDays(itinerary: Itinerary, adjustDay: number): Set<string> {
+  const names = new Set<string>();
+  for (const day of itinerary.days) {
+    if (day.day >= adjustDay) continue;
+    for (const a of day.activities) {
+      if (a.type !== "activity" || !a.location?.name) continue;
+      if (isGroceryActivity(a) || isUnpaidTimelineActivity(a)) continue;
+      names.add(a.location.name);
+    }
+  }
+  return names;
+}
+
 async function enrichDay(
   rawDay: RawItinerary["days"][0],
   plan: TripPlan,
   city: CityConfig,
   dayIndex: number,
+  tripExcludedLandmarks: Set<string> = new Set(),
 ): Promise<ItineraryDay> {
   const date = addDays(plan.startDate, dayIndex);
   let activitySlot = 0;
@@ -132,6 +147,7 @@ async function enrichDay(
     if (home && activityUsesStayHome(act)) {
       act.location = home;
       act.activityCost = 0;
+      if (plan.stayPlaceId) act.placeId = plan.stayPlaceId;
       return act;
     }
 
@@ -148,6 +164,7 @@ async function enrichDay(
           lng: named?.lng ?? anchor.lng,
         };
         act.activityCost = 0;
+        if (named?.placeId) act.placeId = named.placeId;
         return act;
       }
       const startMin = parseTimeToMinutes(a.time);
@@ -158,8 +175,10 @@ async function enrichDay(
         matched ??
         pickLandmarkForFamily(city, plan, rawDay.day, activitySlot, pickedLandmarks, {
           visitWindow: { startMin, endMin },
+          excludeNames: tripExcludedLandmarks,
         });
       pickedLandmarks.push(landmark);
+      tripExcludedLandmarks.add(landmark.name);
       activitySlot += 1;
       act.location = {
         name: landmark.name,
@@ -167,10 +186,14 @@ async function enrichDay(
         lng: landmark.lng,
       };
       act.activityCost = familyActivityCost(landmark, plan.adults, plan.children);
+      if (landmark.placeId) act.placeId = landmark.placeId;
+      if (typeof landmark.rating === "number") act.rating = landmark.rating;
+      if (typeof landmark.reviewCount === "number") act.reviewCount = landmark.reviewCount;
     } else if (a.type === "meal") {
       const restaurant = findRestaurantByName(city, a.title);
-      const cafeLandmark = extractLandmarkFromTitle(a.title)
-        ? findLandmarkByName(city.landmarks, extractLandmarkFromTitle(a.title)!)
+      const titleLandmarkName = extractLandmarkFromTitle(a.title);
+      const titleLandmark = titleLandmarkName
+        ? findLandmarkByName(city.landmarks, titleLandmarkName)
         : undefined;
       if (restaurant) {
         act.location = {
@@ -178,12 +201,17 @@ async function enrichDay(
           lat: restaurant.lat,
           lng: restaurant.lng,
         };
-      } else if (cafeLandmark && /café|cafe/i.test(a.title)) {
+        if (restaurant.placeId) act.placeId = restaurant.placeId;
+        if (typeof restaurant.rating === "number") act.rating = restaurant.rating;
+      } else if (titleLandmark) {
+        // Honor "near Fleet Science Center" / café copy — don't fall back to landmarks[0].
+        const cafeStyle = /café|cafe|pastries|bakery/i.test(a.title);
         act.location = {
-          name: `${cafeLandmark.name} café`,
-          lat: cafeLandmark.lat,
-          lng: cafeLandmark.lng,
+          name: cafeStyle ? `${titleLandmark.name} café` : `${titleLandmark.name} area`,
+          lat: titleLandmark.lat,
+          lng: titleLandmark.lng,
         };
+        if (titleLandmark.placeId) act.placeId = titleLandmark.placeId;
       } else {
         // Prefer anchoring meals near an already-picked activity, not a fresh random landmark.
         const anchor = pickedLandmarks[pickedLandmarks.length - 1] ?? city.landmarks[0]!;
@@ -192,12 +220,14 @@ async function enrichDay(
           lat: anchor.lat + 0.004,
           lng: anchor.lng - 0.004,
         };
+        if (anchor.placeId) act.placeId = anchor.placeId;
       }
       act.activityCost = 0;
     } else {
       const homeRest = stayHomeLocation(plan);
       if (homeRest) {
         act.location = homeRest;
+        if (plan.stayPlaceId) act.placeId = plan.stayPlaceId;
       } else {
         const anchor = pickedLandmarks[0] ?? city.landmarks[0]!;
         act.location = {
@@ -328,14 +358,26 @@ export async function enrichItinerary(
 
   if (options?.adjustDay && options.previousItinerary) {
     const adjustIndex = prepared.days.findIndex((d) => d.day === options.adjustDay);
-    const newDay = await enrichDay(prepared.days[adjustIndex], plan, city, adjustIndex);
+    const tripExcluded = landmarkNamesFromPreviousDays(
+      options.previousItinerary,
+      options.adjustDay,
+    );
+    const newDay = await enrichDay(
+      prepared.days[adjustIndex]!,
+      plan,
+      city,
+      adjustIndex,
+      tripExcluded,
+    );
     days = options.previousItinerary.days.map((d) =>
       d.day === options.adjustDay ? newDay : d,
     );
   } else {
-    days = await Promise.all(
-      prepared.days.map((d, index) => enrichDay(d, plan, city, index)),
-    );
+    const tripExcluded = new Set<string>();
+    days = [];
+    for (let index = 0; index < prepared.days.length; index++) {
+      days.push(await enrichDay(prepared.days[index]!, plan, city, index, tripExcluded));
+    }
   }
 
   if (options?.adjustDay && options.previousItinerary) {

@@ -146,6 +146,23 @@ describe("FAM-7 — interest matching", () => {
     expect(pick.interestTags).toContain("zoos");
     expect(pick.name).toBe("San Diego Zoo");
   });
+
+  it("does not schedule playgrounds when only Beaches & Waterfronts is selected", () => {
+    const sanDiego = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
+    const plan = basePlan({
+      children: [5, 10],
+      interests: ["Beaches & Waterfronts"],
+      budgetStyle: "balanced",
+      stayLat: 32.767,
+      stayLng: -117.247,
+    });
+    const morning = pickLandmarkForFamily(sanDiego, plan, 1, 0, []);
+    const afternoon = pickLandmarkForFamily(sanDiego, plan, 1, 1, [morning]);
+    for (const pick of [morning, afternoon]) {
+      expect(pick.interestTags).toContain("beaches");
+      expect(pick.name).not.toMatch(/Playground|Kate Sessions|Play City|Fun Box/i);
+    }
+  });
 });
 
 describe("FAM-7 — stay proximity", () => {
@@ -224,6 +241,12 @@ describe("FAM-7 — enrich title ↔ location match", () => {
     expect(extractLandmarkFromTitle("Explore Balboa Park")).toBe("Balboa Park");
     expect(extractLandmarkFromTitle("Family time at San Diego Zoo")).toBe("San Diego Zoo");
     expect(extractLandmarkFromTitle("Visit USS Midway Museum")).toBe("USS Midway Museum");
+    expect(
+      extractLandmarkFromTitle("Pastries or café breakfast near Fleet Science Center"),
+    ).toBe("Fleet Science Center");
+    expect(extractLandmarkFromTitle("Picnic or sandwich lunch near Belmont Park")).toBe(
+      "Belmont Park",
+    );
   });
 
   it("findLandmarkByName resolves extracted titles to catalog entries", () => {

@@ -116,6 +116,36 @@ describe("ageTags scoring — Phase 5", () => {
     );
   });
 
+  it("penalizes toddler/child-only soft play when a tween is on the trip", () => {
+    const profile = getFamilyAgeProfile(planWithChildren([3, 10]));
+    const playCity = landmark({
+      name: "Play City",
+      ageTags: ["toddler", "child"],
+      interestTags: ["indoor-play", "playgrounds"],
+    });
+    const forEveryone = landmark({
+      name: "Science Center",
+      ageTags: ["toddler", "child", "tween", "teen"],
+      interestTags: ["interactive", "museums"],
+    });
+    expect(landmarkAgeScore(forEveryone, profile)).toBeGreaterThan(
+      landmarkAgeScore(playCity, profile),
+    );
+  });
+
+  it("avoids Play City Eastlake when older kids are on a San Diego trip", () => {
+    const sanDiego = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
+    const plan = {
+      ...planWithChildren([3, 10]),
+      destination: "San Diego",
+      budgetStyle: "balanced" as const,
+      interests: ["Playgrounds & Indoor Play"],
+    };
+    const pick = pickLandmarkForFamily(sanDiego, plan, 1, 0, []);
+    expect(pick.name).not.toBe("Play City Eastlake");
+    expect(pick.ageTags.some((t) => t === "tween" || t === "teen")).toBe(true);
+  });
+
   it("pickLandmarkForFamily prefers toddler-tagged stops for toddler-only trips", () => {
     const paris = CITY_CONFIGS.find((c) => c.id === "paris")!;
     const plan = { ...planWithChildren([2]), budgetStyle: "save" as const };

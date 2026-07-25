@@ -12,6 +12,7 @@ import {
   packedLongerDurationForTags,
 } from "@/lib/schedule/interest-category-defaults";
 import { getNapWindow, getRegularNapWindows, napDurationMin, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
+import { formatMeridiemTime } from "@/lib/planning-engine/nap-options";
 import { PACKED_EXTRA_MIN_DURATION_MIN } from "@/lib/schedule/travel-style";
 import {
   defaultDurationMin,
@@ -27,6 +28,7 @@ import {
 
 type RawActivity = {
   time: string;
+  endTime?: string;
   title: string;
   type: ActivityType;
   notes?: string;
@@ -422,7 +424,7 @@ function travelIntoOptional(item: RawActivity, requestedTravel: number, plan: Tr
  * Place an optional stop (packed extra / stroll). For packed extras, try shorter
  * durations and shrink the prior afternoon activity so the third stop survives naps.
  */
-function placeOptionalActivity<T extends RawActivity & { endTime: string }>(
+function placeOptionalActivity<T extends RawActivity>(
   item: T,
   opts: {
     cursor: number;
@@ -432,7 +434,7 @@ function placeOptionalActivity<T extends RawActivity & { endTime: string }>(
     dinnerMin: number;
     latestDinnerStart: number;
     latestItemEnd: number;
-    result: T[];
+    result: Array<RawActivity & { endTime: string }>;
   },
 ): { activity: T & { endTime: string }; cursor: number } | null {
   const { plan, hasGrocery, dinnerMin, latestDinnerStart, latestItemEnd, result } = opts;
@@ -507,7 +509,7 @@ function placeOptionalActivity<T extends RawActivity & { endTime: string }>(
  * Linear day scheduler — walks activities in list order (no nap-bucket drops).
  * Dinner and grocery are anchored to the evening; optional intents may be skipped.
  */
-export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { endTime?: string }>(
+export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
   activities: T[],
   plan: TripPlan,
   travelAfterEach: number[] = [],
@@ -564,7 +566,16 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
 
   for (let i = 0; i < required.length; i++) {
     const item = required[i];
-    const travel = result.length > 0 ? nextTravel() : 0;
+    const travelRaw = result.length > 0 ? nextTravel() : 0;
+    // Stay-home lunch → stay-home nap: no transit gap (was slipping 12:00 naps to 12:10).
+    const travel =
+      item.type === "nap" &&
+      result.length > 0 &&
+      /takeout or delivery lunch at your stay|cook dinner at your rental/i.test(
+        result[result.length - 1]!.title,
+      )
+        ? 0
+        : travelRaw;
     const lunchIdx = required.findIndex((a, j) => j > i && isDaytimeMeal(a));
     let start: number;
     const thisNapWindow =
@@ -756,16 +767,34 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     }
 
     if (item.type === "nap" && thisNapWindow) {
-      // Stay inside the typed window; only the high-intensity recovery bonus may run past it.
-      const withinWindow = Math.max(45, thisNapWindow.endMin - start);
+      // Stay inside the typed window for the core nap; recovery bonus may run slightly past it.
       const intended = napDurationMin(plan, thisNapWindow);
       const bonus = Math.max(0, duration - intended);
-      duration = Math.min(duration, withinWindow + bonus);
+      const room = thisNapWindow.endMin - start;
+      if (room >= 20) {
+        duration = Math.min(intended + bonus, room + bonus);
+      } else if (room > 0) {
+        duration = Math.max(20, room) + bonus;
+      } else {
+        start = Math.max(thisNapWindow.startMin, thisNapWindow.endMin - intended);
+        duration = Math.max(20, thisNapWindow.endMin - start) + bonus;
+      }
     }
 
+    const span = scheduleSpan(start, duration);
     const scheduled = {
       ...item,
-      ...scheduleSpan(start, duration),
+      ...span,
+      ...(item.type === "nap" && thisNapWindow
+        ? {
+            // Always echo the family's chosen window in the note (not travel-slip clock times).
+            notes: `Protected downtime ${formatMeridiemTime(thisNapWindow.startMin)}–${formatMeridiemTime(thisNapWindow.endMin)}.`,
+          }
+        : item.type === "nap"
+          ? {
+              notes: `Protected downtime ${formatMeridiemTime(start)}–${formatMeridiemTime(start + duration)}.`,
+            }
+          : {}),
     };
     result.push(scheduled);
     cursor = parseTimeToMinutes(scheduled.endTime);

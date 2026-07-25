@@ -212,12 +212,11 @@ export function accommodationPlanningTips(
       ? []
       : [...base.slice((day - 1) % base.length), ...base.slice(0, (day - 1) % base.length)];
 
-  const merged: string[] = [];
+  // One tip per day — avoid repeating near-identical stay bullets on every card.
   for (const tip of [...contextual, ...rotated]) {
-    if (!merged.includes(tip)) merged.push(tip);
-    if (merged.length >= 3) break;
+    if (tip.trim()) return [tip];
   }
-  return merged;
+  return [];
 }
 
 /** @deprecated Use getAccommodationLabel from @/lib/format-labels directly — kept for the one remaining (dead) caller in itinerary.ts */

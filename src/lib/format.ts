@@ -39,6 +39,15 @@ export function formatTime12h(time24: string): string {
   return `${hour12}:${m.toString().padStart(2, "0")} ${period}`;
 }
 
+/** Compact summary-row time — e.g. "8:00a", "12:30p". */
+export function formatTimeCompact(time24: string): string {
+  const [h, m] = time24.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return time24;
+  const hour12 = h % 12 || 12;
+  const period = h >= 12 ? "p" : "a";
+  return `${hour12}:${m.toString().padStart(2, "0")}${period}`;
+}
+
 /** Morning 06:00–11:59, Afternoon 12:00–17:59, Evening 18:00–22:00 */
 export function getTimeOfDay(time24: string): TimeOfDay {
   const hour = parseInt(time24.split(":")[0] ?? "12", 10);
@@ -95,4 +104,43 @@ export function displayLocation(name: string): string {
 export function formatMoney(amount: number, currency: string, symbol: string): string {
   if (currency === "JPY") return `${symbol}${Math.round(amount).toLocaleString()}`;
   return `${symbol}${amount.toFixed(2)}`;
+}
+
+function ratingText(rating: number): string {
+  const rounded = Math.round(rating * 10) / 10;
+  return Number.isInteger(rounded) ? rounded.toFixed(1) : String(rounded);
+}
+
+/** Compact review count — 3421 → "3.4k". */
+export function formatReviewCountShort(count: number): string {
+  if (count < 1000) return String(count);
+  const k = count / 1000;
+  const text = k >= 10 ? k.toFixed(0) : k.toFixed(1).replace(/\.0$/, "");
+  return `${text}k`;
+}
+
+/** e.g. "Rated 4.7 · 2,300 reviews" — empty when rating is missing. */
+export function formatPlaceRating(
+  rating: number | undefined,
+  reviewCount: number | undefined,
+): string {
+  if (typeof rating !== "number" || !Number.isFinite(rating)) return "";
+  const text = ratingText(rating);
+  if (typeof reviewCount === "number" && reviewCount > 0) {
+    return `Rated ${text} · ${reviewCount.toLocaleString()} reviews`;
+  }
+  return `Rated ${text}`;
+}
+
+/** Compact badge — e.g. "★4.5 (3.4k)". Empty when rating is missing. */
+export function formatPlaceRatingBadge(
+  rating: number | undefined,
+  reviewCount: number | undefined,
+): string {
+  if (typeof rating !== "number" || !Number.isFinite(rating)) return "";
+  const text = ratingText(rating);
+  if (typeof reviewCount === "number" && reviewCount > 0) {
+    return `★${text} (${formatReviewCountShort(reviewCount)})`;
+  }
+  return `★${text}`;
 }
