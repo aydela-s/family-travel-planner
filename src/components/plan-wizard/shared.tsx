@@ -191,7 +191,7 @@ export const activityInterestOptions = [
   { label: "Nature & Scenic Views", emoji: "🌿" },
   { label: "History & Landmarks", emoji: "🏛️" },
   { label: "Museums & Art", emoji: "🎨" },
-  { label: "Playgrounds", emoji: "🛝" },
+  { label: "Playgrounds & Indoor Play", emoji: "🛝" },
   { label: "Zoos & Aquariums", emoji: "🦁" },
   { label: "Theme Parks", emoji: "🎢" },
   { label: "Interactive Museums", emoji: "🧪" },

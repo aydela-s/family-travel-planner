@@ -18,6 +18,8 @@ export type ItineraryActivity = {
   location?: ActivityLocation;
   activityCost?: number;
   slotKind?: import("@/lib/planning-engine/types").SlotKind;
+  landmarkIntensity?: import("@/config/city-pricing").LandmarkIntensity;
+  interestTags?: import("@/config/city-pricing").LandmarkInterestTag[];
 };
 
 export type DayCostBreakdown = {
@@ -86,6 +88,7 @@ export type RawItinerary = {
       notes?: string;
       slotKind?: import("@/lib/planning-engine/types").SlotKind;
       landmarkIntensity?: import("@/config/city-pricing").LandmarkIntensity;
+      interestTags?: import("@/config/city-pricing").LandmarkInterestTag[];
     }[];
   }[];
 };

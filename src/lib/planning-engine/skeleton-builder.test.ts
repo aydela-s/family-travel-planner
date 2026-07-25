@@ -54,10 +54,28 @@ describe("buildDayIntents — Phase 1 skeleton alignment", () => {
     expect(kinds).toContain("dinner");
   });
 
-  it("packed day has three pre-dinner activities and no evening stroll", () => {
+  it("skips evening stroll for young kids when a nap already fills the afternoon", () => {
+    const kinds = slotKinds(
+      basePlan({
+        travelStyle: "balanced",
+        children: [3, 5],
+        naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
+      }),
+    );
+    expect(kinds).toContain("afternoon_activity");
+    expect(kinds).not.toContain("evening_rest");
+  });
+
+  it("packed day has three pre-dinner activities, no evening stroll, and no midday rest", () => {
     const kinds = slotKinds(basePlan({ travelStyle: "packed" }));
     expect(kinds.filter((k) => k === "morning_activity" || k === "afternoon_activity" || k === "extra_activity")).toHaveLength(3);
     expect(kinds).not.toContain("evening_rest");
+    expect(kinds).not.toContain("midday_rest");
+  });
+
+  it("balanced day keeps a midday rest when naps are off", () => {
+    const kinds = slotKinds(basePlan({ travelStyle: "balanced", naps: [] }));
+    expect(kinds).toContain("midday_rest");
   });
 
   it("relaxed day has calm activity and a soft evening stroll", () => {

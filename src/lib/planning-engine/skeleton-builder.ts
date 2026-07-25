@@ -48,7 +48,8 @@ export function buildDaySkeleton(
   slots.push(intent("morning_activity", morningActivityDefaultTime(plan)));
   slots.push(intent("lunch", lunchDefaultTime(plan)));
 
-  if (!includeNapForDay(plan, adjustment)) {
+  // Packed days stay dense — skip the idle midday recharge between lunch and afternoon.
+  if (!includeNapForDay(plan, adjustment) && intensity.style !== "packed") {
     slots.push(intent("midday_rest", "13:30"));
   }
 
@@ -61,7 +62,8 @@ export function buildDaySkeleton(
       slots.push(intent("calm_activity", "15:30"));
     }
   } else if (intensity.includeAfternoonActivity) {
-    slots.push(intent("afternoon_activity", "15:30"));
+    // Post-lunch start — schedule fills theme parks through to dinner.
+    slots.push(intent("afternoon_activity", "13:15"));
   }
 
   if (intensity.includeExtraActivity) {
@@ -69,9 +71,14 @@ export function buildDaySkeleton(
   }
 
   // Balanced/relaxed: soft evening filler so the day doesn't go quiet from ~3pm to dinner.
+  // Skip when every child is young and a nap already fills the afternoon.
+  const allYoungKids =
+    plan.children.length > 0 && plan.children.every((age) => age <= 7);
+  const youngKidsWithNap = allYoungKids && includeNapForDay(plan, adjustment);
   if (
     !intensity.includeExtraActivity &&
-    (intensity.style === "balanced" || intensity.style === "relaxed")
+    (intensity.style === "balanced" || intensity.style === "relaxed") &&
+    !youngKidsWithNap
   ) {
     slots.push(intent("evening_rest", "16:45"));
   }

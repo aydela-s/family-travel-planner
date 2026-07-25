@@ -51,6 +51,8 @@ export type RawActivity = {
   slotKind?: SlotKind;
   /** Set on activity slots from the landmark catalog — drives recovery rest. */
   landmarkIntensity?: LandmarkIntensity;
+  /** Landmark interest tags — category defaults in docs/interest-categories.md. */
+  interestTags?: import("@/config/city-pricing").LandmarkInterestTag[];
 };
 
 export type DayLandmarkContext = {

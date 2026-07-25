@@ -59,7 +59,7 @@ describe("day intent priorities", () => {
   });
 
   it("tags filled skeleton activities with slotKind", () => {
-    const { raw } = planTrip(basePlan({ travelStyle: "packed" }));
+    const { raw } = planTrip(basePlan({ travelStyle: "packed", interests: ["Museums & Art"] }));
     const kinds = raw.days[0].activities.map((a) => a.slotKind).filter(Boolean);
     expect(kinds).toContain("morning_activity");
     expect(kinds).toContain("lunch");

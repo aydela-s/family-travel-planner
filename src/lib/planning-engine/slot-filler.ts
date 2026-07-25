@@ -9,7 +9,8 @@ import {
   VisitWindow,
 } from "@/lib/schedule/family-profile";
 import { morningActivityDefaultTime } from "@/lib/planning-engine/skeleton-builder";
-import { overlapsStrollerNap } from "@/lib/schedule/nap-policy";
+import { getNapWindow, overlapsStrollerNap, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
+import { minutesToTime } from "@/lib/schedule/timeline";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
 import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import {
@@ -93,8 +94,20 @@ export function buildLandmarkContext(
     activityMins,
     visitDate,
   );
-  const afternoonWindow = visitWindowFromTime("15:30", activityMins, visitDate);
-  const extraWindow = visitWindowFromTime("16:15", activityMins, visitDate);
+  // When a nap is scheduled, afternoon openness checks must use the post-nap window
+  // (not a fixed 15:30) or museums that close mid-afternoon get wrongly filtered out.
+  const nap = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
+  const afternoonStart = nap
+    ? minutesToTime(Math.min(nap.endMin + 15, 16 * 60))
+    : "13:15";
+  // Theme parks need a long open window from post-lunch through late afternoon.
+  const afternoonDurationMin = Math.max(activityMins, 240);
+  const afternoonWindow = visitWindowFromTime(afternoonStart, afternoonDurationMin, visitDate);
+  const extraWindow = visitWindowFromTime(
+    nap ? minutesToTime(Math.min(nap.endMin + 15 + activityMins + 15, 17 * 60)) : "16:15",
+    activityMins,
+    visitDate,
+  );
   const profile = getFamilyAgeProfile(plan);
   const excludeNames = usedLandmarks;
 
@@ -111,20 +124,23 @@ export function buildLandmarkContext(
     excludeNames,
     strollerQuiet: overlapsStrollerNap(plan, afternoonWindow.startMin, afternoonWindow.endMin),
   });
-  const extra = pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon], {
-    visitWindow: extraWindow,
-    preferBand: nextPreferBand(profile, [morning, afternoon], day, 2),
-    excludeNames,
-    strollerQuiet: overlapsStrollerNap(plan, extraWindow.startMin, extraWindow.endMin),
-  });
-  const lunch = pickLandmarkForFamily(city, plan, offset, 3, [morning, afternoon], {
-    preferBand: null,
-    excludeNames,
-  });
-  const dinner = pickLandmarkForFamily(city, plan, offset, 4, [morning, afternoon, lunch], {
-    preferBand: null,
-    excludeNames,
-  });
+  // Theme parks are half-day — don't stack a third stop on the same day.
+  const themeDay =
+    morning.interestTags.includes("theme-parks") ||
+    afternoon.interestTags.includes("theme-parks");
+  const extra = themeDay
+    ? undefined
+    : pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon], {
+        visitWindow: extraWindow,
+        preferBand: nextPreferBand(profile, [morning, afternoon], day, 2),
+        excludeNames,
+        strollerQuiet: overlapsStrollerNap(plan, extraWindow.startMin, extraWindow.endMin),
+      });
+  // Theme-park afternoons are half-day: lunch at/near the park so the visit
+  // starts right after lunch instead of after a cross-city transfer.
+  const themeAfternoon = afternoon.interestTags.includes("theme-parks");
+  const lunch = themeAfternoon ? afternoon : morning;
+  const dinner = afternoon;
 
   usedLandmarks.add(morning.name);
   usedLandmarks.add(afternoon.name);
@@ -153,12 +169,13 @@ function fillSlot(
   const type = slotActivityType(slot.kind);
   const intensity = getIntensityConfig(plan);
   const tagged = (
-    activity: Omit<RawActivity, "slotKind" | "landmarkIntensity">,
-    landmarkIntensity?: RawActivity["landmarkIntensity"],
+    activity: Omit<RawActivity, "slotKind" | "landmarkIntensity" | "interestTags">,
+    landmark?: Pick<Landmark, "intensity" | "interestTags">,
   ): RawActivity => ({
     ...activity,
     slotKind: slot.kind,
-    ...(landmarkIntensity ? { landmarkIntensity } : {}),
+    ...(landmark?.intensity ? { landmarkIntensity: landmark.intensity } : {}),
+    ...(landmark?.interestTags?.length ? { interestTags: landmark.interestTags } : {}),
   });
 
   switch (slot.kind) {
@@ -194,7 +211,7 @@ function fillSlot(
             ? `${notes} Tailored to your request: ${adjustment.summaryNote}`
             : notes,
         },
-        ctx.morning.intensity,
+        ctx.morning,
       );
     }
     case "lunch": {
@@ -257,7 +274,7 @@ function fillSlot(
                 ? "Short walks, stroller-friendly."
                 : "Light exploring between stops.",
         },
-        ctx.afternoon.intensity,
+        ctx.afternoon,
       );
     case "calm_activity":
       return tagged({
@@ -274,7 +291,7 @@ function fillSlot(
           type,
           notes: "Extra stop for a packed day.",
         },
-        (ctx.extra ?? ctx.afternoon).intensity,
+        ctx.extra ?? ctx.afternoon,
       );
     case "grocery":
       return tagged({
@@ -284,6 +301,17 @@ function fillSlot(
         notes: "Pick up ingredients on the way back.",
       });
     case "evening_rest": {
+      // All-young-kid trips: stay-based downtime — don't invent another walking landmark.
+      const allYoungKids =
+        plan.children.length > 0 && plan.children.every((age) => age <= 7);
+      if (allYoungKids) {
+        return tagged({
+          time: slot.defaultTime,
+          title: day === totalDays ? "Pack up & unwind at your hotel" : "Quiet time at your hotel",
+          type,
+          notes: "Rest at your stay before dinner — better than another walk with little ones.",
+        });
+      }
       const hour = parseInt(slot.defaultTime.split(":")[0] ?? "17", 10);
       const strollLabel = hour >= 18 ? "Evening stroll" : "Afternoon stroll";
       return tagged({
@@ -327,7 +355,14 @@ export function fillDaySkeleton(
   usedRestaurants: Set<string> = new Set(),
 ): RawActivity[] {
   const adjustment = getAdjustmentContext(adjustNote, day);
-  return slots.map((slot) =>
+  const themeDay =
+    ctx.morning.interestTags.includes("theme-parks") ||
+    ctx.afternoon.interestTags.includes("theme-parks");
+  const effectiveSlots =
+    themeDay || !ctx.extra
+      ? slots.filter((s) => s.kind !== "extra_activity")
+      : slots;
+  return effectiveSlots.map((slot) =>
     fillSlot(slot, plan, city, ctx, day, totalDays, adjustment, usedRestaurants),
   );
 }

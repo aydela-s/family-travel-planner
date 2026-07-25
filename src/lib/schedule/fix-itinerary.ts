@@ -13,6 +13,7 @@ import { getFamilyAgeProfile } from "@/lib/schedule/family-profile";
 import {
   anchorDinnerTimes,
   hasCookDinnerAtHome,
+  NAP_START_SLIP_MAX_MIN,
   resolveGroceryMealConflicts,
   rescheduleActivitiesWithMealAnchors,
   validateMealPlan,
@@ -158,6 +159,8 @@ function mergeEnrichedSchedule(
       notes: a.notes,
       endTime: a.endTime,
       slotKind: a.slotKind ?? base.slotKind,
+      landmarkIntensity: a.landmarkIntensity ?? base.landmarkIntensity,
+      interestTags: a.interestTags ?? base.interestTags,
       timeOfDay: getTimeOfDay(a.time) as TimeOfDay,
     };
   });
@@ -169,12 +172,14 @@ export function rescheduleEnrichedActivities(
   plan: TripPlan,
   segmentDurations: number[] = [],
 ): ItineraryActivity[] {
-  const raw = activities.map(({ time, title, type, notes, slotKind }) => ({
-    time,
-    title,
-    type,
-    notes,
-    ...(slotKind ? { slotKind } : {}),
+  const raw = activities.map((a) => ({
+    time: a.time,
+    title: a.title,
+    type: a.type,
+    notes: a.notes,
+    ...(a.slotKind ? { slotKind: a.slotKind } : {}),
+    ...(a.landmarkIntensity ? { landmarkIntensity: a.landmarkIntensity } : {}),
+    ...(a.interestTags?.length ? { interestTags: a.interestTags } : {}),
   }));
   const travelGaps = travelGapsFromSegments(activities, segmentDurations, plan);
 
@@ -228,8 +233,15 @@ export function validateRawDay(
       const window = windows[idx];
       if (!window) return;
       const start = parseTimeToMinutes(nap.time);
-      const end = start + napDurationMin(plan, window);
-      if (start < window.startMin - 5 || end > window.endMin + 5) {
+      // Prefer endTime from the scheduler when present (includes intentional lunch-fit slip).
+      const end = nap.endTime
+        ? parseTimeToMinutes(nap.endTime)
+        : start + napDurationMin(plan, window);
+      // Allow lunch-fit slip + a small hard-floor push after lunch without re-scheduling
+      // the whole day (re-running used to drop packed extras → packed looked like balanced).
+      const latestStart = window.startMin + NAP_START_SLIP_MAX_MIN + 20;
+      const latestEnd = window.endMin + NAP_START_SLIP_MAX_MIN + 20;
+      if (start < window.startMin - 5 || start > latestStart || end > latestEnd) {
         issues.push({ code: "nap_wrong_window", message: "Nap outside user preference window" });
       }
     });

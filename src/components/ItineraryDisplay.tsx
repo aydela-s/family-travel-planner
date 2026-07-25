@@ -10,7 +10,7 @@ import {
   getTimeOfDay,
   oneLineNote,
 } from "@/lib/format";
-import { getBudgetStyleLabel } from "@/lib/format-labels";
+import { getBudgetStyleLabelPlain, getTravelStyleLabel } from "@/lib/format-labels";
 import { Itinerary, ItineraryActivity, ItineraryDay } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -243,7 +243,9 @@ export default function ItineraryDisplay({
           </h2>
           <p className="mt-1 text-muted">
             {itinerary.days.length} day{itinerary.days.length !== 1 ? "s" : ""} ·{" "}
-            {getBudgetStyleLabel(itinerary.budgetStyle)} trip
+            {plan
+              ? `${getTravelStyleLabel(plan.travelStyle)} pace · ${getBudgetStyleLabelPlain(itinerary.budgetStyle)} budget`
+              : `${getBudgetStyleLabelPlain(itinerary.budgetStyle)} budget`}
           </p>
         </div>
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackToTopButton from "@/components/BackToTopButton";
 import { TripNestlyLogo } from "@/components/TripNestlyLogo";
 import { BRAND } from "@/config/brand";
 
@@ -199,6 +200,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <BackToTopButton />
     </main>
   );
 }

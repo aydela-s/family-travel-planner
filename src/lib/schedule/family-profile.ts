@@ -2,7 +2,10 @@ import { CityConfig, Landmark, LandmarkAgeTag, LandmarkIntensity } from "@/confi
 import { CLUSTER_PREFER_SCORE_MARGIN, clusterRadiusKm } from "@/config/cluster-distances";
 import { haversineKm } from "@/lib/maps/directions";
 import { landmarksForStyle } from "@/lib/pricing/budget-style";
-import { interestTagsFromPlan } from "@/lib/schedule/interest-map";
+import {
+  interestTagsFromPlan,
+  primaryInterestTagsFromPlan,
+} from "@/lib/schedule/interest-map";
 import { isLandmarkOpenForVisit, VisitWindow } from "@/lib/schedule/landmark-hours";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -146,9 +149,31 @@ export function landmarkBandTargetScore(
 export function landmarkInterestScore(landmark: Landmark, plan: TripPlan): number {
   const wanted = interestTagsFromPlan(plan.interests);
   if (wanted.length === 0) return 4;
-  const hits = wanted.filter((tag) => landmark.interestTags.includes(tag)).length;
+  const primary = primaryInterestTagsFromPlan(plan.interests);
+  let score = 0;
+  let hits = 0;
+  for (const tag of wanted) {
+    if (!landmark.interestTags.includes(tag)) continue;
+    hits += 1;
+    // Primary wizard tags (e.g. playgrounds) outrank secondary aliases (e.g. museums from Interactive).
+    score += primary.has(tag) ? 36 : 14;
+  }
   if (hits === 0) return -18;
-  return hits * 22;
+  // Specialized kid interests should beat scenic park aliases when both are selected.
+  const wantsKidPlay =
+    primary.has("playgrounds") ||
+    wanted.includes("playgrounds") ||
+    wanted.includes("indoor-play");
+  const isKidPlay =
+    landmark.interestTags.includes("playgrounds") ||
+    landmark.interestTags.includes("indoor-play");
+  if (wantsKidPlay && isKidPlay) {
+    score += 28;
+  }
+  if (primary.has("interactive") && landmark.interestTags.includes("interactive")) {
+    score += 20;
+  }
+  return score;
 }
 
 export function stayProximityScore(landmark: Landmark, plan: TripPlan): number {
@@ -322,9 +347,21 @@ export function pickLandmarkForFamily(
     opts.excludeNames instanceof Set ? opts.excludeNames : (opts.excludeNames ?? []),
   );
   const radiusKm = clusterRadiusKm(plan);
+  const wantedTags = interestTagsFromPlan(plan.interests);
+  // Afternoon/extra slots normally stay in the cheap tier; expand when the family
+  // asked for playgrounds / interactive stops that often sit in mid-tier pricing.
+  const expandActivityTier =
+    slotIndex <= 2 &&
+    (wantedTags.includes("playgrounds") ||
+      wantedTags.includes("indoor-play") ||
+      wantedTags.includes("interactive"));
 
   const stylePool = landmarksForStyle(city.landmarks, (l) => l.adultPrice, plan.budgetStyle, {
-    allowPremiumPick: slotIndex === 0,
+    allowPremiumPick:
+      slotIndex === 0 ||
+      expandActivityTier ||
+      // Packed extras need the mid/premium pool or free parks recycle across days.
+      (plan.travelStyle === "packed" && slotIndex <= 2),
   });
 
   const withoutTripUsed = (list: Landmark[]) =>
@@ -343,6 +380,12 @@ export function pickLandmarkForFamily(
   }
   if (pool.length === 0) {
     pool = stylePool.length > 0 ? stylePool : city.landmarks;
+  }
+
+  // Theme parks are half-day commitments — afternoon (not morning-before-lunch, not short extras).
+  if (slotIndex === 0 || slotIndex >= 2) {
+    const withoutTheme = pool.filter((l) => !l.interestTags.includes("theme-parks"));
+    if (withoutTheme.length > 0) pool = withoutTheme;
   }
 
   if (alreadyPicked.length > 0) {
@@ -384,6 +427,11 @@ export function pickLandmarkForFamily(
 
       if (opts.strollerQuiet) {
         score += strollerQuietScore(lm);
+      }
+
+      // Strongly prefer unused trip landmarks when the pool had to allow reuse.
+      if (tripExcluded.has(lm.name)) {
+        score -= 100;
       }
 
       // First morning stop: lean harder toward the stay when we have coordinates.

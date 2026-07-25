@@ -60,6 +60,8 @@ function landmarkNamesFromItinerary(
         /^(?:Explore|Visit|Family time at|Outdoor time:|Museum & culture:)\s+(.+)$/i,
       );
       if (match?.[1]) names.add(match[1].trim());
+      const near = activity.title.match(/\bnear\s+(.+)$/i);
+      if (near?.[1]) names.add(near[1].trim());
     }
   }
   return names;

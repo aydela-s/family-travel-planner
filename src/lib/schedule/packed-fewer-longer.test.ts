@@ -7,6 +7,10 @@ import {
   rescheduleActivitiesWithMealAnchors,
 } from "@/lib/schedule/meal-planning";
 import { validateDaySchedule } from "@/lib/schedule/schedule-invariants";
+import {
+  INTEREST_CATEGORY_DEFAULTS,
+  packedLongerDurationForTags,
+} from "@/lib/schedule/interest-category-defaults";
 import { PACKED_LONGER_ACTIVITY_MIN } from "@/lib/schedule/travel-style";
 import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { TripPlan } from "@/types/trip-plan";
@@ -51,6 +55,7 @@ describe("packed fewer/longer activities — P1", () => {
           title: "Morning",
           type: "activity" as const,
           slotKind: "morning_activity" as const,
+          // Untagged → PACKED_LONGER_ACTIVITY_MIN fallback.
         },
         {
           time: "10:35",
@@ -79,17 +84,58 @@ describe("packed fewer/longer activities — P1", () => {
     );
   });
 
-  it("keeps 75-minute activities when the packed extra stop fits", () => {
+  it("lengthens tagged stops to category duration maxima from interest-categories.md", () => {
+    const plan = packedPlan();
+    const scheduled = applyPackedFewerLonger(
+      [
+        {
+          time: "09:00",
+          endTime: "10:15",
+          title: "Trail",
+          type: "activity" as const,
+          slotKind: "morning_activity" as const,
+          interestTags: ["nature" as const],
+        },
+        {
+          time: "10:35",
+          endTime: "11:35",
+          title: "Lunch",
+          type: "meal" as const,
+          slotKind: "lunch" as const,
+        },
+        {
+          time: "11:55",
+          endTime: "13:10",
+          title: "Playground",
+          type: "activity" as const,
+          slotKind: "afternoon_activity" as const,
+          interestTags: ["playgrounds" as const],
+        },
+      ],
+      plan,
+    );
+
+    expect(activityDurationMin(scheduled.find((a) => a.slotKind === "morning_activity")!)).toBe(
+      packedLongerDurationForTags(["nature"]),
+    );
+    expect(activityDurationMin(scheduled.find((a) => a.slotKind === "afternoon_activity")!)).toBe(
+      INTEREST_CATEGORY_DEFAULTS.playgrounds.durationMax,
+    );
+  });
+
+  it("keeps short afternoon/extra stops when the packed extra fits (morning may fill to lunch)", () => {
     const plan = packedPlan({ children: [12, 15] });
     const { raw } = planTrip(plan);
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
 
     expect(scheduled.some((a) => a.slotKind === "extra_activity")).toBe(true);
-    const activities = scheduled.filter(
-      (a) => a.type === "activity" && !isGroceryActivity(a),
+    const later = scheduled.filter(
+      (a) =>
+        (a.slotKind === "afternoon_activity" || a.slotKind === "extra_activity") &&
+        !isGroceryActivity(a),
     );
-    expect(activities.length).toBeGreaterThanOrEqual(3);
-    expect(activities.every((a) => activityDurationMin(a) <= 80)).toBe(true);
+    expect(later.length).toBeGreaterThanOrEqual(2);
+    expect(later.every((a) => activityDurationMin(a) <= 80)).toBe(true);
     expect(validateDaySchedule(scheduled, plan)).toEqual([]);
   });
 
@@ -114,8 +160,20 @@ describe("packed fewer/longer activities — P1", () => {
       expect(activities.length).toBeGreaterThanOrEqual(3);
     } else {
       expect(activities.length).toBe(2);
-      for (const activity of activities) {
-        expect(activityDurationMin(activity)).toBeGreaterThanOrEqual(PACKED_LONGER_ACTIVITY_MIN);
+      const theme = activities.filter((a) => a.interestTags?.includes("theme-parks"));
+      if (theme.length > 0) {
+        // Theme half-day day — longer adventure is the park, not stretched mornings.
+        for (const activity of theme) {
+          expect(activityDurationMin(activity)).toBeGreaterThanOrEqual(
+            INTEREST_CATEGORY_DEFAULTS["theme-parks"].durationMin,
+          );
+        }
+      } else {
+        for (const activity of activities) {
+          expect(activityDurationMin(activity)).toBeGreaterThanOrEqual(
+            packedLongerDurationForTags(activity.interestTags),
+          );
+        }
       }
     }
     expect(validateDaySchedule(scheduled, plan)).toEqual([]);
@@ -139,7 +197,8 @@ describe("packed fewer/longer activities — P1", () => {
     );
     expect(packedSched.some((a) => a.slotKind === "extra_activity")).toBe(true);
     expect(balancedSched.some((a) => a.slotKind === "extra_activity")).toBe(false);
-    expect(balancedSched.some((a) => a.slotKind === "evening_rest")).toBe(true);
+    // Young kids + nap: balanced skips evening stroll filler (real stops only).
+    expect(balancedSched.some((a) => a.slotKind === "evening_rest")).toBe(false);
     expect(validateDaySchedule(balancedSched, balanced)).toEqual([]);
     expect(validateDaySchedule(packedSched, packed)).toEqual([]);
   });

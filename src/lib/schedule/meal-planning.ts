@@ -1,4 +1,4 @@
-import { LandmarkIntensity } from "@/config/city-pricing";
+import { LandmarkInterestTag, LandmarkIntensity } from "@/config/city-pricing";
 import { isOptionalActivity } from "@/lib/planning-engine/day-intent";
 import {
   dinnerTimeWindow,
@@ -7,8 +7,12 @@ import {
 import { SlotKind } from "@/lib/planning-engine/types";
 import { TripPlan } from "@/types/trip-plan";
 import { ActivityType } from "@/types/itinerary";
+import {
+  INTEREST_CATEGORY_DEFAULTS,
+  packedLongerDurationForTags,
+} from "@/lib/schedule/interest-category-defaults";
 import { getNapWindow, getRegularNapWindows, napDurationMin, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
-import { PACKED_LONGER_ACTIVITY_MIN } from "@/lib/schedule/travel-style";
+import { PACKED_EXTRA_MIN_DURATION_MIN } from "@/lib/schedule/travel-style";
 import {
   defaultDurationMin,
   defaultTravelMin,
@@ -28,6 +32,7 @@ type RawActivity = {
   notes?: string;
   slotKind?: SlotKind;
   landmarkIntensity?: LandmarkIntensity;
+  interestTags?: LandmarkInterestTag[];
 };
 
 const GROCERY = /\bgrocery\b/i;
@@ -48,6 +53,11 @@ export const NAP_START_SLIP_MAX_MIN = 30;
 export const LUNCH_EARLY_FLEX_MIN = 45;
 /** Absolute earliest lunch when flexing early for a nap (11:00). */
 export const LUNCH_EARLY_ABSOLUTE_MIN = 11 * 60;
+/**
+ * Picnic / café lunch is almost always at or beside the morning stop — don't insert
+ * a full city hop between them (that was forcing overlaps or lunch past its window).
+ */
+export const NEAR_STOP_LUNCH_TRANSFER_MIN = 5;
 
 /**
  * Prefer the typed nap start; if a full lunch (≥40 min) cannot begin near the
@@ -82,6 +92,17 @@ export function lunchFloorBeforeNap(plan: TripPlan): number {
   return Math.max(LUNCH_EARLY_ABSOLUTE_MIN, minMin - LUNCH_EARLY_FLEX_MIN);
 }
 
+/** Travel gap into lunch — short when eating at/near the previous activity stop. */
+function transferIntoLunch(
+  previous: RawActivity | undefined,
+  defaultTravel: number,
+): number {
+  if (previous?.type === "activity") {
+    return Math.min(defaultTravel, NEAR_STOP_LUNCH_TRANSFER_MIN);
+  }
+  return defaultTravel;
+}
+
 
 export function isGroceryActivity(a: RawActivity): boolean {
   // Title only — cook-at-home notes say "Grocery-based dinner" and must not match.
@@ -107,14 +128,26 @@ function isLengthenablePackedActivity(a: RawActivity): boolean {
   return true;
 }
 
+function isThemeParkActivity(a: RawActivity): boolean {
+  return Boolean(a.interestTags?.includes("theme-parks"));
+}
+
 function packedActivityDuration(
   item: RawActivity,
   plan: TripPlan,
   fewerLonger: boolean,
 ): number {
   const base = itemDurationMin(item, plan);
+  // Theme parks are half-day commitments after lunch — don't run 4h before the meal.
+  if (
+    isThemeParkActivity(item) &&
+    item.slotKind === "afternoon_activity" &&
+    isLengthenablePackedActivity(item)
+  ) {
+    return Math.max(base, INTEREST_CATEGORY_DEFAULTS["theme-parks"].durationMin);
+  }
   if (fewerLonger && isLengthenablePackedActivity(item)) {
-    return Math.max(base, PACKED_LONGER_ACTIVITY_MIN);
+    return Math.max(base, packedLongerDurationForTags(item.interestTags));
   }
   return base;
 }
@@ -133,10 +166,11 @@ export function applyPackedFewerLonger<T extends RawActivity & { endTime: string
     if (isLengthenablePackedActivity(item)) {
       const start = parseTimeToMinutes(item.time);
       const current = parseTimeToMinutes(item.endTime) - start;
-      if (current < PACKED_LONGER_ACTIVITY_MIN) {
+      const target = packedLongerDurationForTags(item.interestTags);
+      if (current < target) {
         out[i] = {
           ...item,
-          endTime: minutesToTime(start + PACKED_LONGER_ACTIVITY_MIN),
+          endTime: minutesToTime(start + target),
         };
       }
     }
@@ -359,13 +393,114 @@ function scheduleOne<T extends RawActivity>(
   item: T,
   start: number,
   plan: TripPlan,
+  durationMin?: number,
 ): T & { endTime: string } {
-  const duration = itemDurationMin(item, plan);
+  const duration = durationMin ?? itemDurationMin(item, plan);
   return {
     ...item,
     time: minutesToTime(start),
     endTime: minutesToTime(start + duration),
   };
+}
+
+function optionalTryDurations(item: RawActivity, plan: TripPlan): number[] {
+  const base = itemDurationMin(item, plan);
+  if (plan.travelStyle !== "packed" || item.slotKind !== "extra_activity") {
+    return [base];
+  }
+  return [...new Set([base, 60, 50, PACKED_EXTRA_MIN_DURATION_MIN])].sort((a, b) => b - a);
+}
+
+/** Cap transfer into a packed extra so a far landmark can't erase the third stop. */
+function travelIntoOptional(item: RawActivity, requestedTravel: number, plan: TripPlan): number {
+  if (item.slotKind !== "extra_activity") return requestedTravel;
+  const base = defaultTravelMin(plan);
+  return Math.min(requestedTravel, Math.max(base, 35));
+}
+
+/**
+ * Place an optional stop (packed extra / stroll). For packed extras, try shorter
+ * durations and shrink the prior afternoon activity so the third stop survives naps.
+ */
+function placeOptionalActivity<T extends RawActivity & { endTime: string }>(
+  item: T,
+  opts: {
+    cursor: number;
+    travel: number;
+    plan: TripPlan;
+    hasGrocery: boolean;
+    dinnerMin: number;
+    latestDinnerStart: number;
+    latestItemEnd: number;
+    result: T[];
+  },
+): { activity: T & { endTime: string }; cursor: number } | null {
+  const { plan, hasGrocery, dinnerMin, latestDinnerStart, latestItemEnd, result } = opts;
+  let cursor = opts.cursor;
+  const travel = travelIntoOptional(item, opts.travel, plan);
+  // After the extra, dinner transfer stays the real gap (or default) — not the capped inbound hop.
+  const travelAfter = opts.travel;
+
+  const fits = (end: number) => {
+    if (end > latestItemEnd) return false;
+    const trialDinner = dinnerStartFromCursor(end + travelAfter, plan, hasGrocery, dinnerMin);
+    return trialDinner <= latestDinnerStart;
+  };
+
+  const tryAtCursor = (startCursor: number) => {
+    for (const duration of optionalTryDurations(item, plan)) {
+      const start = startCursor + travel;
+      const end = start + duration;
+      if (!fits(end)) continue;
+      return {
+        activity: scheduleOne(item, start, plan, duration),
+        cursor: end,
+      };
+    }
+    return null;
+  };
+
+  const direct = tryAtCursor(cursor);
+  if (direct) return direct;
+
+  // Packed: free room by shortening the last real activity, then retry a short extra.
+  if (plan.travelStyle !== "packed" || item.slotKind !== "extra_activity") {
+    return null;
+  }
+
+  for (let i = result.length - 1; i >= 0; i--) {
+    const prior = result[i]!;
+    if (!isLengthenablePackedActivity(prior)) continue;
+    const priorStart = parseTimeToMinutes(prior.time);
+    const priorEnd = parseTimeToMinutes(prior.endTime);
+    const minKeep = 50;
+    // Need: priorEnd + travel + extraMin + (reserved via latestItemEnd) ≤ latestItemEnd
+    const maxPriorEnd = latestItemEnd - travel - PACKED_EXTRA_MIN_DURATION_MIN;
+    // travel here is already capped for packed extras
+    if (maxPriorEnd < priorStart + minKeep) continue;
+    if (maxPriorEnd >= priorEnd) continue;
+
+    result[i] = {
+      ...prior,
+      endTime: minutesToTime(maxPriorEnd),
+    };
+    // Shift anything after the shortened stop (usually nothing before optionals).
+    let shiftCursor = maxPriorEnd;
+    for (let j = i + 1; j < result.length; j++) {
+      const next = result[j]!;
+      const nextDur = parseTimeToMinutes(next.endTime) - parseTimeToMinutes(next.time);
+      const nextStart = shiftCursor + defaultTravelMin(plan);
+      result[j] = {
+        ...next,
+        ...scheduleSpan(nextStart, nextDur),
+      };
+      shiftCursor = nextStart + nextDur;
+    }
+    cursor = shiftCursor;
+    return tryAtCursor(cursor);
+  }
+
+  return null;
 }
 
 /**
@@ -398,6 +533,14 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
   const dinnerDuration = defaultDurationMin("meal", plan);
   const latestDinnerStart = dinnerMax - dinnerDuration;
   const hasGrocery = groceryItems.length > 0;
+  // Reserve travel (and grocery) after the last daytime stop — used while placing
+  // required items (theme parks fill until dinner) and when placing optionals.
+  const reservedAfterLast = hasGrocery
+    ? GROCERY_DURATION_MIN +
+      defaultTravelMin(plan) +
+      Math.max(defaultTravelMin(plan), GROCERY_TO_DINNER_BUFFER_MIN)
+    : defaultTravelMin(plan);
+  const latestItemEnd = latestDinnerStart - reservedAfterLast;
 
   const result: (T & { endTime: string })[] = [];
   let cursor = 8 * 60;
@@ -440,7 +583,8 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       }
     } else if (isDaytimeMeal(item)) {
       const { maxMin: lunchMax, minMin } = lunchTimeWindow(plan);
-      const natural = cursor + travel;
+      const lunchTravel = transferIntoLunch(result[result.length - 1], travel);
+      const natural = cursor + lunchTravel;
       // When nap follows, start lunch early enough for a full 40-minute meal —
       // allow a bit of early flex before the age window when needed.
       if (napRequiredIdx > i && resolvedNapStart != null) {
@@ -473,10 +617,47 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
       needsRecoveryRest = false;
     }
 
+    // Packed + early mornings: fill toward lunch, but never overrun the lunch window.
+    if (
+      plan.travelStyle === "packed" &&
+      item.slotKind === "morning_activity" &&
+      isLengthenablePackedActivity(item) &&
+      !isThemeParkActivity(item)
+    ) {
+      const lunchMin = lunchTimeWindow(plan).minMin;
+      const lunchTransfer = defaultTravelMin(plan);
+      const fillUntil = lunchMin - lunchTransfer;
+      if (fillUntil > start) {
+        const room = fillUntil - start;
+        // Stretch into empty morning time, but cap so lunch can still start on time.
+        duration = Math.min(Math.max(duration, Math.min(room, 3 * 60)), room);
+      }
+    }
+
+    // Theme parks: run from right after lunch through dinner — no idle afternoon gap.
+    if (
+      isThemeParkActivity(item) &&
+      item.slotKind === "afternoon_activity" &&
+      isLengthenablePackedActivity(item) &&
+      latestItemEnd > start
+    ) {
+      duration = latestItemEnd - start;
+    }
+
     // Finish earlier activities in time for the (possibly slipped) nap start.
+    // When lunch sits before the nap, priors must end before that early lunch — not only before nap
+    // (otherwise lunch is pulled to 11:00 while morning still runs until 11:30).
     if (item.type !== "nap" && napRequiredIdx > i && resolvedNapStart != null) {
       const gap = defaultTravelMin(plan);
-      const mustEndBy = resolvedNapStart - gap;
+      let mustEndBy = resolvedNapStart - gap;
+      if (lunchIdx > i && lunchIdx < napRequiredIdx && !isDaytimeMeal(item)) {
+        const lunchFloor = lunchFloorBeforeNap(plan);
+        const { maxMin: lunchMax } = lunchTimeWindow(plan);
+        const latestLunchStart = resolvedNapStart - gap - MIN_LUNCH_DURATION_MIN;
+        const lunchStartCap = Math.max(lunchFloor, Math.min(lunchMax, latestLunchStart));
+        const lunchTransfer = transferIntoLunch(item, gap);
+        mustEndBy = Math.min(mustEndBy, lunchStartCap - lunchTransfer);
+      }
       if (isDaytimeMeal(item)) {
         const lunchFloor = lunchFloorBeforeNap(plan);
         // Prefer moving lunch earlier over shrinking below a usable meal.
@@ -506,7 +687,14 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     if (lunchIdx > i && item.type !== "nap") {
       const { maxMin: lunchMax } = lunchTimeWindow(plan);
       const gap = defaultTravelMin(plan);
-      let budget = lunchMax - gap;
+      const lunchTransfer = transferIntoLunch(item, gap);
+      let lunchStartDeadline = lunchMax;
+      if (napRequiredIdx > lunchIdx && resolvedNapStart != null) {
+        const lunchFloor = lunchFloorBeforeNap(plan);
+        const latestLunchStart = resolvedNapStart - gap - MIN_LUNCH_DURATION_MIN;
+        lunchStartDeadline = Math.max(lunchFloor, Math.min(lunchMax, latestLunchStart));
+      }
+      let budget = lunchStartDeadline - lunchTransfer;
       for (let k = lunchIdx - 1; k > i; k--) {
         budget -= gap + 20;
       }
@@ -515,6 +703,56 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
         start = Math.max(cursor + (result.length > 0 ? gap : 0), maxEnd - 20);
       }
       duration = Math.min(duration, Math.max(20, maxEnd - start));
+    }
+
+    // Hard invariant: never start before the previous item ends (+ transfer).
+    // For near-stop lunch, trim the previous activity rather than overlapping it.
+    if (result.length > 0) {
+      const lunchTransfer = isDaytimeMeal(item)
+        ? transferIntoLunch(result[result.length - 1], travel)
+        : travel;
+      const earliest = cursor + lunchTransfer;
+      if (start < earliest) {
+        if (isDaytimeMeal(item)) {
+          const { maxMin: lunchMax } = lunchTimeWindow(plan);
+          const targetStart = Math.min(Math.max(start, lunchFloorBeforeNap(plan)), lunchMax);
+          const prev = result[result.length - 1]!;
+          const prevStart = parseTimeToMinutes(prev.time);
+          const prevEndNeeded = targetStart - lunchTransfer;
+          if (prevEndNeeded >= prevStart + 20) {
+            const trimmed = {
+              ...prev,
+              ...scheduleSpan(prevStart, prevEndNeeded - prevStart),
+            };
+            result[result.length - 1] = trimmed;
+            cursor = prevEndNeeded;
+            start = Math.max(targetStart, cursor + lunchTransfer);
+            start = Math.min(start, lunchMax);
+          } else {
+            // Still keep lunch in-window when possible by ending prior ASAP.
+            const tightEnd = Math.max(prevStart + 15, Math.min(cursor, lunchMax - lunchTransfer));
+            if (tightEnd > prevStart) {
+              result[result.length - 1] = {
+                ...prev,
+                ...scheduleSpan(prevStart, tightEnd - prevStart),
+              };
+              cursor = tightEnd;
+            }
+            start = Math.min(Math.max(cursor + lunchTransfer, start), lunchMax);
+          }
+        } else {
+          start = earliest;
+        }
+      }
+    }
+
+    // If lunch still sits before a nap, re-clamp duration after any start push/trim.
+    if (isDaytimeMeal(item) && napRequiredIdx > i && resolvedNapStart != null) {
+      const gap = defaultTravelMin(plan);
+      const mustEndBy = resolvedNapStart - gap;
+      if (start + duration > mustEndBy) {
+        duration = Math.max(20, mustEndBy - start);
+      }
     }
 
     if (item.type === "nap" && thisNapWindow) {
@@ -537,31 +775,26 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     }
   }
 
+  const eveningTravel = result.length > 0 ? defaultTravelMin(plan) : 0;
+  // latestItemEnd already computed above for theme-park fill + optional placement.
+
   for (const item of optionalToPlace) {
     const travel = nextTravel();
-    const trial = scheduleOne(item, cursor + travel, plan);
-    const trialEnd = parseTimeToMinutes(trial.endTime);
-    const trialDinner = dinnerStartFromCursor(
-      trialEnd + defaultTravelMin(plan),
+    const placed = placeOptionalActivity(item, {
+      cursor,
+      travel,
       plan,
       hasGrocery,
       dinnerMin,
-    );
-    if (trialDinner <= latestDinnerStart) {
-      result.push(trial);
-      cursor = trialEnd;
+      latestDinnerStart,
+      latestItemEnd,
+      result,
+    });
+    if (placed) {
+      result.push(placed.activity);
+      cursor = placed.cursor;
     }
   }
-
-  const eveningTravel = result.length > 0 ? defaultTravelMin(plan) : 0;
-  // Reserve travel (and grocery) after the last stop — do not double-count travel by
-  // comparing lastEnd+travel against latestDinner-travel (that was dropping packed extras).
-  const reservedAfterLast = hasGrocery
-    ? GROCERY_DURATION_MIN +
-      defaultTravelMin(plan) +
-      Math.max(defaultTravelMin(plan), GROCERY_TO_DINNER_BUFFER_MIN)
-    : defaultTravelMin(plan);
-  const latestItemEnd = latestDinnerStart - reservedAfterLast;
 
   // Trim trailing stops until dinner can start on time with a real meal duration.
   while (result.length > 0 && cursor > latestItemEnd) {
@@ -598,10 +831,13 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity & { en
     break;
   }
 
-  // Lengthen remaining stops when packed and the optional extra was skipped (or trimmed off).
+  // Lengthen remaining stops when packed lost the third stop — except theme-park
+  // half-days, where the park itself is the longer adventure.
+  const resultHasThemePark = result.some(isThemeParkActivity);
   if (
     plan.travelStyle === "packed" &&
-    !result.some((a) => a.slotKind === "extra_activity")
+    !result.some((a) => a.slotKind === "extra_activity") &&
+    !resultHasThemePark
   ) {
     const lengthened = applyPackedFewerLonger(result, plan);
     result.length = 0;

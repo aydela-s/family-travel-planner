@@ -105,6 +105,14 @@ describe("FAM-7 — interest matching", () => {
       "museums",
       "zoos",
     ]);
+    expect(interestTagsFromPlan(["Nature & Scenic Views"])).toEqual(["nature"]);
+    expect(interestTagsFromPlan(["Playgrounds & Indoor Play"]).sort()).toEqual(
+      ["indoor-play", "playgrounds"].sort(),
+    );
+    // Legacy wizard chip still maps after rename.
+    expect(interestTagsFromPlan(["Playgrounds"]).sort()).toEqual(
+      ["indoor-play", "playgrounds"].sort(),
+    );
   });
 
   it("scores interest hits positively and misses negatively", () => {

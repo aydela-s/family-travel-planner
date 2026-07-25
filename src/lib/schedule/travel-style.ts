@@ -1,7 +1,9 @@
 import { TripPlan, TravelStyle } from "@/types/trip-plan";
 
 /** When packed drops to fewer stops, stretch remaining activities to this length. */
-export const PACKED_LONGER_ACTIVITY_MIN = 105;
+export const PACKED_LONGER_ACTIVITY_MIN = 120;
+/** Shortest packed extra stop we'll still schedule rather than dropping it. */
+export const PACKED_EXTRA_MIN_DURATION_MIN = 45;
 
 export type IntensityConfig = {
   style: TravelStyle | "";

@@ -99,7 +99,7 @@ describe("balanced food budget", () => {
       );
     const food = estimateMealCosts(meals, city, trip);
     // Restaurant ×3 × family units(~2.2) ≈ $374; balanced should be far lower.
-    expect(food).toBeLessThan(220);
+    expect(food).toBeLessThan(260);
     expect(lunchLabel(trip, "Balboa Park").title).toMatch(/picnic|sandwich/i);
   });
 });

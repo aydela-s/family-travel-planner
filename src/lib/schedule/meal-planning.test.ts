@@ -191,6 +191,69 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
     expect(validateDaySchedule(scheduled, plan)).toEqual([]);
   });
 
+  it("never lets lunch overlap a long morning activity before a noon nap (Funbox regression)", () => {
+    const plan = balancedPlan([3, 5], {
+      destination: "San Diego",
+      naps: [{ startTime: "12:00 PM", endTime: "1:30 PM", type: "regular" }],
+      interests: ["Playgrounds & Indoor Play"],
+      transportationType: "taxis",
+    });
+    // Skeleton-style times that previously produced 10:00–11:30 activity overlapping 11:00 lunch.
+    const activities = [
+      {
+        time: "08:00",
+        title: "Pastries or café breakfast near Funbox (Plaza Bonita, National City)",
+        type: "meal" as ActivityType,
+        slotKind: "breakfast" as const,
+      },
+      {
+        time: "10:00",
+        title: "Family time at Funbox (Plaza Bonita, National City)",
+        type: "activity" as ActivityType,
+        slotKind: "morning_activity" as const,
+        landmarkIntensity: "high" as LandmarkIntensity,
+      },
+      {
+        time: "11:00",
+        title: "Picnic or sandwich lunch near Funbox (Plaza Bonita, National City)",
+        type: "meal" as ActivityType,
+        slotKind: "lunch" as const,
+      },
+      {
+        time: "12:00",
+        title: "Nap & Quiet Time",
+        type: "nap" as ActivityType,
+      },
+      {
+        time: "15:30",
+        title: "Explore Mission Bay Park",
+        type: "activity" as ActivityType,
+        slotKind: "afternoon_activity" as const,
+      },
+      {
+        time: "17:30",
+        title: "Dinner at Evolution Fast Food",
+        type: "meal" as ActivityType,
+        slotKind: "dinner" as const,
+      },
+    ];
+    const scheduled = rescheduleActivitiesWithMealAnchors(activities, plan);
+    expect(activitiesOverlap(scheduled)).toBe(false);
+    for (let i = 1; i < scheduled.length; i++) {
+      expect(parseTimeToMinutes(scheduled[i]!.time)).toBeGreaterThanOrEqual(
+        parseTimeToMinutes(scheduled[i - 1]!.endTime!),
+      );
+    }
+    const morning = scheduled.find((a) => /Funbox/i.test(a.title) && a.type === "activity")!;
+    const lunch = scheduled.find((a) => /lunch|picnic/i.test(a.title))!;
+    expect(parseTimeToMinutes(lunch.time)).toBeGreaterThanOrEqual(
+      parseTimeToMinutes(morning.endTime!),
+    );
+    expect(validateDaySchedule(scheduled, plan).filter((v) => v.code === "overlap" || v.code === "time_travel")).toEqual(
+      [],
+    );
+  });
+
   it("fixRawDayActivities produces a valid day schedule", () => {
     const plan = balancedPlan([5, 10]);
     const { raw } = planTrip(plan);

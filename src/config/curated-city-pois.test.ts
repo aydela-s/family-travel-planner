@@ -17,6 +17,14 @@ const CORE_INTEREST_TAGS: LandmarkInterestTag[] = [
 
 const GOLD_STANDARD_CITY_IDS = ["san-diego", "london"] as const;
 
+describe("curated restaurants stay open (FAM-67)", () => {
+  it("does not list permanently closed Native Foods Cafe for San Diego", () => {
+    const names = (CITY_RESTAURANTS["san-diego"] ?? []).map((r) => r.name.toLowerCase());
+    expect(names.some((n) => n.includes("native foods"))).toBe(false);
+    expect(names).toContain("mr. charlie's");
+  });
+});
+
 describe("curated city POI gold standard (FAM-62)", () => {
   for (const cityId of GOLD_STANDARD_CITY_IDS) {
     it(`${cityId} has a deep landmark pool with core interest coverage`, () => {

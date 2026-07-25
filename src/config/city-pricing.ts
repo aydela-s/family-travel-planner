@@ -3,7 +3,7 @@ export type TaxiProvider = "uber" | "lyft" | "bolt" | "gett";
 export type LandmarkAgeTag = "toddler" | "child" | "tween" | "teen";
 export type LandmarkIntensity = "low" | "medium" | "high";
 
-/** Wizard interest categories — keep in sync with interest-map label mapping. */
+/** Wizard interest categories — keep in sync with interest-map + docs/interest-categories.md. */
 export type LandmarkInterestTag =
   | "parks"
   | "beaches"
@@ -11,6 +11,8 @@ export type LandmarkInterestTag =
   | "history"
   | "museums"
   | "playgrounds"
+  /** Indoor playgrounds, soft play, bounce houses / inflatable parks. */
+  | "indoor-play"
   | "zoos"
   | "theme-parks"
   | "interactive"
@@ -262,7 +264,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         hoursByWeekday: { 2: null },
         intensity: "medium",
         ageTags: ["toddler", "child"],
-        interestTags: ["interactive", "museums", "playgrounds"],
+        interestTags: ["interactive", "museums", "playgrounds", "indoor-play"],
         indoor: true,
       },
       {
@@ -310,6 +312,65 @@ export const CITY_CONFIGS: CityConfig[] = [
         ageTags: ["toddler", "child", "tween", "teen"],
         interestTags: ["parks", "sports", "beaches", "playgrounds"],
         indoor: false,
+      },
+      {
+        name: "Waterfront Park Playground",
+        lat: 32.7265,
+        lng: -117.1728,
+        adultPrice: 0,
+        openingHours: { open: "06:00", close: "20:00" },
+        intensity: "medium",
+        ageTags: ["toddler", "child"],
+        interestTags: ["playgrounds", "parks"],
+        indoor: false,
+      },
+      {
+        name: "Kate Sessions Park",
+        lat: 32.8115,
+        lng: -117.2365,
+        adultPrice: 0,
+        openingHours: { open: "07:00", close: "20:00" },
+        onSiteMeals: ["lunch"],
+        intensity: "low",
+        ageTags: ["toddler", "child", "tween"],
+        interestTags: ["playgrounds", "parks", "nature"],
+        indoor: false,
+      },
+      {
+        name: "Funbox (Plaza Bonita, National City)",
+        lat: 32.6558,
+        lng: -117.0654,
+        adultPrice: 20,
+        ticketSourceUrl: "https://funbox.com/nationalcity",
+        pricedAsOf: "2026-07-01",
+        ticketTiers: [
+          { maxAgeInclusive: 2, price: 0 },
+          { maxAgeInclusive: 5, price: 15 },
+          { maxAgeInclusive: null, price: 20 },
+        ],
+        openingHours: { open: "10:00", close: "20:00" },
+        onSiteMeals: ["lunch"],
+        intensity: "high",
+        ageTags: ["toddler", "child", "tween"],
+        interestTags: ["indoor-play", "playgrounds", "entertainment"],
+        indoor: true,
+      },
+      {
+        name: "Play City Eastlake",
+        lat: 32.6475,
+        lng: -116.9685,
+        adultPrice: 14,
+        ticketSourceUrl: "https://playcityeastlake.com/",
+        pricedAsOf: "2026-07-01",
+        ticketTiers: [
+          { maxAgeInclusive: 0, price: 0 },
+          { maxAgeInclusive: null, price: 14 },
+        ],
+        openingHours: { open: "10:00", close: "20:00" },
+        intensity: "high",
+        ageTags: ["toddler", "child"],
+        interestTags: ["indoor-play", "playgrounds", "entertainment"],
+        indoor: true,
       },
     ],
   },
@@ -498,6 +559,17 @@ export const CITY_CONFIGS: CityConfig[] = [
         ageTags: ["toddler", "child"],
         interestTags: ["playgrounds", "parks"],
         indoor: false,
+      },
+      {
+        name: "Gambado Chelsea Soft Play",
+        lat: 51.4825,
+        lng: -0.1795,
+        adultPrice: 14,
+        openingHours: { open: "09:30", close: "18:00" },
+        intensity: "high",
+        ageTags: ["toddler", "child"],
+        interestTags: ["indoor-play", "playgrounds", "entertainment"],
+        indoor: true,
       },
       {
         name: "London Zoo",

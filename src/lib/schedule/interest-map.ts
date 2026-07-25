@@ -2,14 +2,20 @@ import type { LandmarkInterestTag } from "@/config/city-pricing";
 
 export type { LandmarkInterestTag };
 
-/** Wizard interest label → catalog interest key(s). */
+/**
+ * Wizard interest label → catalog interest key(s).
+ * Category membership rules: docs/interest-categories.md
+ */
 export const INTEREST_LABEL_TO_TAGS: Record<string, LandmarkInterestTag[]> = {
   "Parks & Gardens": ["parks"],
   "Beaches & Waterfronts": ["beaches"],
-  "Nature & Scenic Views": ["nature", "parks"],
+  // Nature excludes manicured parks/gardens (see interest-categories.md).
+  "Nature & Scenic Views": ["nature"],
   "History & Landmarks": ["history"],
   "Museums & Art": ["museums"],
-  Playgrounds: ["playgrounds", "parks"],
+  // Outdoor playgrounds + indoor soft play / bounce houses (parks alias omitted on purpose).
+  Playgrounds: ["playgrounds", "indoor-play"],
+  "Playgrounds & Indoor Play": ["playgrounds", "indoor-play"],
   "Zoos & Aquariums": ["zoos"],
   "Theme Parks": ["theme-parks"],
   "Interactive Museums": ["interactive", "museums"],
@@ -28,4 +34,14 @@ export function interestTagsFromPlan(interests: string[]): LandmarkInterestTag[]
     }
   }
   return [...tags];
+}
+
+/** First tag for each wizard label — weighted higher than secondary aliases. */
+export function primaryInterestTagsFromPlan(interests: string[]): Set<LandmarkInterestTag> {
+  const tags = new Set<LandmarkInterestTag>();
+  for (const label of interests) {
+    const primary = INTEREST_LABEL_TO_TAGS[label]?.[0];
+    if (primary) tags.add(primary);
+  }
+  return tags;
 }
