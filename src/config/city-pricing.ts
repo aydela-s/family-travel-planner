@@ -66,6 +66,10 @@ export type Landmark = {
   /** Wizard interest categories this stop satisfies (FAM-7). */
   interestTags: LandmarkInterestTag[];
   indoor: boolean;
+  /** Google Places id when sourced from Places (FAM-59). */
+  placeId?: string;
+  rating?: number;
+  reviewCount?: number;
 };
 
 export type CityConfig = {

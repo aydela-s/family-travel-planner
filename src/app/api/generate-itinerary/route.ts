@@ -3,6 +3,7 @@ import { enrichItineraryTipsWithAi } from "@/lib/ai/enrich-tips";
 import { shouldEnrichItineraryWithAi } from "@/lib/ai/config";
 import { enrichItinerary, isDemoMode } from "@/lib/enrich-itinerary";
 import { isValidTripPlan, normalizeRawItinerary } from "@/lib/itinerary";
+import { resolvePlanningCity } from "@/lib/maps/places-city-config";
 import { planTrip } from "@/lib/planning-engine";
 import { AdjustActionId } from "@/lib/planning-engine/adjust-types";
 import { resolveStayOntoPlan } from "@/lib/planning-engine/resolve-stay";
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
     plan = await resolveStayOntoPlan(plan);
 
     const useDemo = body.demo === true || isDemoMode();
+    const city = await resolvePlanningCity(plan);
 
     const enrichedDay = body.existingItinerary?.days.find((d) => d.day === body.adjustDay);
 
@@ -72,6 +74,7 @@ export async function POST(request: Request) {
         ? toRawItinerary(body.existingItinerary)
         : undefined,
       enrichedDay,
+      cityOverride: city,
     });
 
     const normalized = normalizeRawItinerary(raw, effectivePlan);
@@ -81,6 +84,7 @@ export async function POST(request: Request) {
       adjustAction: body.adjustAction,
       previousItinerary: body.existingItinerary,
       transportNote,
+      cityOverride: city,
     });
 
     // Optional AI tips via Vercel AI Gateway — never blocks the deterministic plan.

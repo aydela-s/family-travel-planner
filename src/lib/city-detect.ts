@@ -4,6 +4,10 @@ function normalize(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+export function isCuratedCityId(cityId: string): boolean {
+  return CITY_CONFIGS.some((c) => c.id === cityId);
+}
+
 export function detectCity(destination: string): CityConfig {
   const normalized = normalize(destination);
   if (!normalized) return DEFAULT_CITY;

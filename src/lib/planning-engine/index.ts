@@ -1,3 +1,4 @@
+import { CityConfig } from "@/config/city-pricing";
 import { detectCity } from "@/lib/city-detect";
 import { getTripDayCount, normalizeRawItinerary } from "@/lib/itinerary";
 import { fixRawDayActivities } from "@/lib/schedule/fix-itinerary";
@@ -69,13 +70,13 @@ function landmarkNamesFromItinerary(
 
 function buildDayActivities(
   plan: TripPlan,
+  city: CityConfig,
   day: number,
   totalDays: number,
   adjustNote?: string,
   usedRestaurants: Set<string> = new Set(),
   usedLandmarks: Set<string> = new Set(),
 ): RawItinerary["days"][0]["activities"] {
-  const city = detectCity(plan.destination);
   const adjustment = getAdjustmentContext(adjustNote, day);
   const slots = buildDaySkeleton(plan, day, totalDays, adjustment);
   const ctx = buildLandmarkContext(city, plan, day, totalDays, adjustNote, usedLandmarks);
@@ -125,7 +126,7 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
   }
 
   let workingPlan = effectivePlan(plan, options);
-  const city = detectCity(workingPlan.destination);
+  const city = options?.cityOverride ?? detectCity(workingPlan.destination);
   let transportNote: string | undefined;
 
   const transitResolved = resolveTransitSelection(workingPlan, city);
@@ -176,6 +177,7 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
                 day: d.day,
                 activities: buildDayActivities(
                   workingPlan,
+                  city,
                   d.day,
                   dayCount,
                   options.adjustNote,
@@ -199,6 +201,7 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
         day: i + 1,
         activities: buildDayActivities(
           p,
+          city,
           i + 1,
           dayCount,
           undefined,

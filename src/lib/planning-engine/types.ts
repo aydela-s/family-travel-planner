@@ -1,4 +1,4 @@
-import { Landmark, LandmarkIntensity } from "@/config/city-pricing";
+import { CityConfig, Landmark, LandmarkIntensity } from "@/config/city-pricing";
 import { AdjustActionId } from "@/lib/planning-engine/adjust-types";
 import { ActivityType, ItineraryDay, RawItinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
@@ -14,6 +14,8 @@ export type PlanOptions = {
   adjustNote?: string;
   existingItinerary?: RawItinerary;
   enrichedDay?: ItineraryDay;
+  /** Prefer curated or Places-built city over detectCity (FAM-59). */
+  cityOverride?: CityConfig;
 };
 
 /** Ordered slot in a deterministic day skeleton — filled after structure is built */

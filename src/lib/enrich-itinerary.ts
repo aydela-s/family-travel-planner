@@ -294,6 +294,8 @@ export type EnrichOptions = {
   adjustNote?: string;
   previousItinerary?: Itinerary;
   transportNote?: string;
+  /** Places-built or curated city override (FAM-59). */
+  cityOverride?: CityConfig;
 };
 
 function validateBeforeDisplay(days: ItineraryDay[], plan: TripPlan): ItineraryDay[] {
@@ -313,7 +315,7 @@ export async function enrichItinerary(
   plan: TripPlan,
   options?: EnrichOptions,
 ): Promise<Itinerary> {
-  const city = detectCity(plan.destination);
+  const city = options?.cityOverride ?? detectCity(plan.destination);
   const normalized = normalizeRawItinerary(raw, plan);
   const prepared = prepareItineraryForEnrich(
     normalized,
