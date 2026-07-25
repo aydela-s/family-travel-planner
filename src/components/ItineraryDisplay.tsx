@@ -228,6 +228,12 @@ export default function ItineraryDisplay({
         </div>
       )}
 
+      {itinerary.transportNote && (
+        <div className="rounded-2xl border border-primary/20 bg-primary-muted px-4 py-3.5 text-sm leading-relaxed text-ink">
+          {itinerary.transportNote}
+        </div>
+      )}
+
       <header className="space-y-4 border-b border-border pb-6">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">Your trip</p>

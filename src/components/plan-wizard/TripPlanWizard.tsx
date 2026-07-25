@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import BackToTopButton from "@/components/BackToTopButton";
+import { useFeedbackVisibility } from "@/components/FeedbackVisibility";
 import ItineraryDisplay from "@/components/ItineraryDisplay";
 import LoadingScreen from "@/components/LoadingScreen";
 import { TripNestlyLogo } from "@/components/TripNestlyLogo";
@@ -99,6 +100,7 @@ type GenerateParams = GenerateItineraryOptions & {
 export default function TripPlanWizard() {
   const searchParams = useSearchParams();
   const shareId = searchParams.get("share");
+  const { setAllowed: setFeedbackAllowed } = useFeedbackVisibility();
   const [stepIndex, setStepIndex] = useState(0);
   const [stepDirection, setStepDirection] = useState<"forward" | "back">("forward");
   const [formData, setFormData] = useState<TripPlan>(initialTripPlan);
@@ -117,6 +119,13 @@ export default function TripPlanWizard() {
   const isFirstStep = stepIndex === 0;
   const isLastStep = stepIndex === TOTAL_STEPS - 1;
   const progress = ((stepIndex + 1) / TOTAL_STEPS) * 100;
+
+  // Feedback launcher: hide on destination (step 1); show from dates onward + result views.
+  useEffect(() => {
+    const show = stepIndex >= 1 || Boolean(itinerary) || Boolean(shareId);
+    setFeedbackAllowed(show);
+    return () => setFeedbackAllowed(false);
+  }, [stepIndex, itinerary, shareId, setFeedbackAllowed]);
 
   useEffect(() => {
     if (!shareId) return;
@@ -242,9 +251,20 @@ export default function TripPlanWizard() {
         throw new Error(data.error ?? "Failed to generate itinerary.");
       }
 
-      const { demo: _demo, ...itineraryData } = data as Itinerary & { demo?: boolean };
+      const { demo: _demo, transportationType: effectiveTransport, ...itineraryData } =
+        data as Itinerary & {
+          demo?: boolean;
+          transportationType?: TripPlan["transportationType"];
+        };
       setItinerary(itineraryData as Itinerary);
       setIsDemo(demo || Boolean(data.demo));
+
+      if (effectiveTransport && effectiveTransport !== formData.transportationType) {
+        setFormData((current) => ({
+          ...current,
+          transportationType: effectiveTransport,
+        }));
+      }
 
       if (params.relaxed || params.adjustAction) {
         setFormData((current) => ({

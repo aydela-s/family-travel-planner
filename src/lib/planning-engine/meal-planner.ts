@@ -90,6 +90,18 @@ export function usesNamedRestaurant(
   return false;
 }
 
+/** Meal at a venue café / food court (landmark.onSiteMeals). */
+export function onSiteCafeLabel(
+  meal: "breakfast" | "lunch" | "dinner",
+  landmarkName: string,
+): { title: string; notes: string } {
+  const capitalized = meal.charAt(0).toUpperCase() + meal.slice(1);
+  return {
+    title: `${capitalized} at ${landmarkName} café`,
+    notes: `Eat on-site so you don’t need a separate restaurant stop.`,
+  };
+}
+
 /** Restaurant-tier copy when no named place is available — driven by Budget Style. */
 function restaurantMealLabel(
   style: BudgetStyle | "",

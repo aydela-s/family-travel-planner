@@ -58,9 +58,9 @@ export function landmarksForStyle<T>(
 export function budgetStyleNote(style: BudgetStyle | ""): string {
   switch (style) {
     case "save":
-      return "Kept things light and mostly free today — right in line with your Save Money style.";
+      return "Kept things light and mostly free today — right in line with your Save style.";
     case "splurge":
-      return "A few premium picks today, right in line with your Treat Ourselves style.";
+      return "A few premium picks today, right in line with your Splurge style.";
     default:
       return "A mix of free and paid experiences today, balanced with your style.";
   }

@@ -109,25 +109,31 @@ export function OptionCard({
   description,
   onClick,
   icon,
+  disabled = false,
 }: {
   selected: boolean;
   label: string;
   description?: string;
   onClick: () => void;
   icon?: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
+      aria-disabled={disabled}
       className={`rounded-2xl border p-4 text-left transition ${
-        selected
-          ? "border-primary bg-primary-muted ring-2 ring-primary/20"
-          : "border-border bg-surface hover:border-primary/30 hover:bg-primary-muted/50"
+        disabled
+          ? "cursor-not-allowed border-border bg-background opacity-55"
+          : selected
+            ? "border-primary bg-primary-muted ring-2 ring-primary/20"
+            : "border-border bg-surface hover:border-primary/30 hover:bg-primary-muted/50"
       }`}
     >
       {icon && <div className="mb-3 text-primary">{icon}</div>}
-      <span className="font-semibold text-ink">{label}</span>
+      <span className={`font-semibold ${disabled ? "text-muted" : "text-ink"}`}>{label}</span>
       {description ? (
         <p className="mt-1 text-sm leading-relaxed text-muted">{description}</p>
       ) : null}

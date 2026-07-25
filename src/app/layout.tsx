@@ -3,6 +3,7 @@ import { Poppins } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import FeedbackButton from "@/components/FeedbackButton";
+import { FeedbackVisibilityProvider } from "@/components/FeedbackVisibility";
 import { BRAND } from "@/config/brand";
 import "./globals.css";
 
@@ -33,8 +34,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${poppins.variable} antialiased`}>
-        {children}
-        <FeedbackButton />
+        <FeedbackVisibilityProvider>
+          {children}
+          <FeedbackButton />
+        </FeedbackVisibilityProvider>
         <SpeedInsights />
         <Analytics />
       </body>

@@ -9,7 +9,7 @@ const budgetStyleOptions: {
   {
     value: "save",
     emoji: "💰",
-    label: "Save Money",
+    label: "Save",
   },
   {
     value: "balanced",
@@ -19,7 +19,7 @@ const budgetStyleOptions: {
   {
     value: "splurge",
     emoji: "✨",
-    label: "Treat Ourselves",
+    label: "Splurge",
   },
 ];
 

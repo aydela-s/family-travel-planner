@@ -166,14 +166,23 @@ async function enrichDay(
         lat: landmark.lat,
         lng: landmark.lng,
       };
-      act.activityCost = familyActivityCost(landmark.adultPrice, plan.adults, plan.children);
+      act.activityCost = familyActivityCost(landmark, plan.adults, plan.children);
     } else if (a.type === "meal") {
       const restaurant = findRestaurantByName(city, a.title);
+      const cafeLandmark = extractLandmarkFromTitle(a.title)
+        ? findLandmarkByName(city.landmarks, extractLandmarkFromTitle(a.title)!)
+        : undefined;
       if (restaurant) {
         act.location = {
           name: restaurant.name,
           lat: restaurant.lat,
           lng: restaurant.lng,
+        };
+      } else if (cafeLandmark && /café|cafe/i.test(a.title)) {
+        act.location = {
+          name: `${cafeLandmark.name} café`,
+          lat: cafeLandmark.lat,
+          lng: cafeLandmark.lng,
         };
       } else {
         // Prefer anchoring meals near an already-picked activity, not a fresh random landmark.
@@ -284,6 +293,7 @@ export type EnrichOptions = {
   adjustAction?: import("@/lib/planning-engine/adjust-types").AdjustActionId;
   adjustNote?: string;
   previousItinerary?: Itinerary;
+  transportNote?: string;
 };
 
 function validateBeforeDisplay(days: ItineraryDay[], plan: TripPlan): ItineraryDay[] {
@@ -351,6 +361,7 @@ export async function enrichItinerary(
     currency: city.currency,
     currencySymbol: city.currencySymbol,
     pricingDisclaimer: PRICING_DISCLAIMER,
+    transportNote: options?.transportNote,
     budgetStyle: plan.budgetStyle,
     days,
   };

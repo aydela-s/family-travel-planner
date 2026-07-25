@@ -195,7 +195,9 @@ describe("restaurant picker — FAM-46", () => {
     const light = meals.filter((m) => !/dinner/i.test(m.title));
     expect(light.length).toBeGreaterThan(0);
     for (const meal of light) {
-      expect(meal.title.toLowerCase()).toMatch(/pastries|bakery|picnic|sandwich|café breakfast/);
+      expect(meal.title.toLowerCase()).toMatch(
+        /pastries|bakery|picnic|sandwich|café breakfast|café/,
+      );
     }
   });
 

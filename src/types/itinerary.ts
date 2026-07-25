@@ -69,6 +69,8 @@ export type Itinerary = {
   currency: string;
   currencySymbol: string;
   pricingDisclaimer: string;
+  /** Shown when the planner fell back from public transit to taxis. */
+  transportNote?: string;
   budgetStyle: import("./trip-plan").BudgetStyle | "";
   days: ItineraryDay[];
 };

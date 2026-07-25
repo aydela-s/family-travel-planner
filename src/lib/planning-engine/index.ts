@@ -7,6 +7,11 @@ import { AdjustActionId } from "@/lib/planning-engine/adjust-types";
 import { getAdjustmentContext } from "@/lib/planning-engine/day-adjustment";
 import { buildDaySkeleton } from "@/lib/planning-engine/skeleton-builder";
 import { buildLandmarkContext, fillDaySkeleton } from "@/lib/planning-engine/slot-filler";
+import {
+  resolveTransitSelection,
+  switchPlanToTaxis,
+  transitScheduleIsDifficult,
+} from "@/lib/planning-engine/transit-mode";
 import { PlanOptions } from "@/lib/planning-engine/types";
 import { validatePlannedItinerary } from "@/lib/planning-engine/validators";
 import { RawItinerary } from "@/types/itinerary";
@@ -15,6 +20,8 @@ import { TripPlan } from "@/types/trip-plan";
 export type PlanTripResult = {
   raw: RawItinerary;
   plan: TripPlan;
+  /** Shown when we fell back from public transit to taxis. */
+  transportNote?: string;
 };
 
 function effectivePlan(plan: TripPlan, options?: PlanOptions): TripPlan {
@@ -116,6 +123,13 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
   }
 
   let workingPlan = effectivePlan(plan, options);
+  const city = detectCity(workingPlan.destination);
+  let transportNote: string | undefined;
+
+  const transitResolved = resolveTransitSelection(workingPlan, city);
+  workingPlan = transitResolved.plan;
+  if (transitResolved.transportNote) transportNote = transitResolved.transportNote;
+
   const dayCount = getTripDayCount(workingPlan.startDate, workingPlan.endDate);
 
   if (
@@ -139,6 +153,7 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
         ),
       },
       plan: workingPlan,
+      transportNote,
     };
   }
 
@@ -170,28 +185,41 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
         ),
       },
       plan: workingPlan,
+      transportNote,
     };
   }
 
-  const usedRestaurants = new Set<string>();
-  const usedLandmarks = new Set<string>();
-  const raw: RawItinerary = {
-    days: Array.from({ length: dayCount }, (_, i) => ({
-      day: i + 1,
-      activities: buildDayActivities(
-        workingPlan,
-        i + 1,
-        dayCount,
-        undefined,
-        usedRestaurants,
-        usedLandmarks,
-      ),
-    })),
-  };
+  function buildFullRaw(p: TripPlan): RawItinerary {
+    const usedRestaurants = new Set<string>();
+    const usedLandmarks = new Set<string>();
+    return {
+      days: Array.from({ length: dayCount }, (_, i) => ({
+        day: i + 1,
+        activities: buildDayActivities(
+          p,
+          i + 1,
+          dayCount,
+          undefined,
+          usedRestaurants,
+          usedLandmarks,
+        ),
+      })),
+    };
+  }
+
+  let raw = buildFullRaw(workingPlan);
+
+  if (transitScheduleIsDifficult(raw, workingPlan, city)) {
+    const fallback = switchPlanToTaxis(workingPlan, city);
+    workingPlan = fallback.plan;
+    transportNote = fallback.transportNote;
+    raw = buildFullRaw(workingPlan);
+  }
 
   return {
     raw: normalizeRawItinerary(raw, workingPlan),
     plan: workingPlan,
+    transportNote,
   };
 }
 

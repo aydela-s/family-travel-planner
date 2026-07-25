@@ -46,9 +46,9 @@ export function getAccommodationLabel(type: AccommodationType | ""): string {
 }
 
 export const BUDGET_STYLE_LABELS: Record<BudgetStyle, { emoji: string; label: string }> = {
-  save: { emoji: "💰", label: "Save Money" },
+  save: { emoji: "💰", label: "Save" },
   balanced: { emoji: "⚖️", label: "Balanced" },
-  splurge: { emoji: "✨", label: "Treat Ourselves" },
+  splurge: { emoji: "✨", label: "Splurge" },
 };
 
 export function getBudgetStyleLabel(style: BudgetStyle | ""): string {

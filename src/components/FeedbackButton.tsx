@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
+import { useFeedbackVisibility } from "@/components/FeedbackVisibility";
 import {
   btnGhostClassName,
   btnPrimaryClassName,
@@ -14,6 +15,7 @@ type Status = "idle" | "sending" | "sent" | "error";
 
 export default function FeedbackButton() {
   const pathname = usePathname();
+  const { allowed } = useFeedbackVisibility();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [message, setMessage] = useState("");
@@ -26,6 +28,10 @@ export default function FeedbackButton() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!allowed && open) setOpen(false);
+  }, [allowed, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,7 +89,8 @@ export default function FeedbackButton() {
   }
 
   // Dedicated /feedback page already has the form — don’t stack a floating launcher.
-  if (pathname === "/feedback") {
+  // Wizard opts in from step 2 onward via FeedbackVisibilityProvider.
+  if (pathname === "/feedback" || !allowed) {
     return null;
   }
 

@@ -56,6 +56,7 @@ const hoursCity: CityConfig = {
   lat: 32.72,
   lng: -117.16,
   aliases: ["hours test"],
+  transitQuality: "limited",
   taxiProviders: [{ name: "uber", label: "Uber", multiplier: 1 }],
   transport: {
     baseFare: 3,

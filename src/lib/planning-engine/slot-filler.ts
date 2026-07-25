@@ -1,4 +1,5 @@
-import { CityConfig, LandmarkAgeTag } from "@/config/city-pricing";
+import { CityConfig, Landmark, LandmarkAgeTag, OnSiteMeal } from "@/config/city-pricing";
+import { addDays } from "@/lib/format";
 import {
   activityNoteForFamily,
   getFamilyAgeProfile,
@@ -20,16 +21,46 @@ import {
   breakfastLabel,
   dinnerLabel,
   lunchLabel,
+  onSiteCafeLabel,
   slotActivityType,
   usesNamedRestaurant,
 } from "@/lib/planning-engine/meal-planner";
-import { pickRestaurantForMeal } from "@/lib/planning-engine/restaurant-picker";
+import {
+  parseDietaryTags,
+  pickRestaurantForMeal,
+} from "@/lib/planning-engine/restaurant-picker";
 import { DayLandmarkContext, RawActivity, DayIntent } from "@/lib/planning-engine/types";
 import { TripPlan } from "@/types/trip-plan";
 
-function visitWindowFromTime(startTime: string, durationMin: number): VisitWindow {
+function visitWindowFromTime(
+  startTime: string,
+  durationMin: number,
+  visitDate: string,
+): VisitWindow {
   const startMin = parseTimeToMinutes(startTime);
-  return { startMin, endMin: startMin + durationMin };
+  return { startMin, endMin: startMin + durationMin, visitDate };
+}
+
+function landmarkWithOnSiteMeal(
+  landmarks: Array<Landmark | undefined>,
+  meal: OnSiteMeal,
+): Landmark | null {
+  for (const landmark of landmarks) {
+    if (landmark?.onSiteMeals?.includes(meal)) return landmark;
+  }
+  return null;
+}
+
+/**
+ * On-site café is a convenience for light meals — not when we should name a
+ * restaurant (splurge / balanced dinner), honor dietary picks, or keep save dinner casual.
+ */
+function shouldPreferOnSiteCafe(plan: TripPlan, meal: OnSiteMeal): boolean {
+  if (parseDietaryTags(plan.dietaryRestrictions).length > 0) return false;
+  if (usesNamedRestaurant(plan, meal)) return false;
+  if (meal === "dinner" && plan.budgetStyle === "save") return false;
+  if (meal === "lunch" && plan.accommodationType === "airbnb_with_kitchen") return false;
+  return true;
 }
 
 /** Rotate preferred bands so mixed-age days cover toddler, tween, teen, etc. */
@@ -56,9 +87,14 @@ export function buildLandmarkContext(
   const adjustment = getAdjustmentContext(adjustNote, day);
   const offset = day + adjustment.landmarkOffset;
   const activityMins = getIntensityConfig(plan).activityDurationMin;
-  const morningWindow = visitWindowFromTime(morningActivityDefaultTime(plan), activityMins);
-  const afternoonWindow = visitWindowFromTime("15:30", activityMins);
-  const extraWindow = visitWindowFromTime("16:15", activityMins);
+  const visitDate = addDays(plan.startDate, day - 1);
+  const morningWindow = visitWindowFromTime(
+    morningActivityDefaultTime(plan),
+    activityMins,
+    visitDate,
+  );
+  const afternoonWindow = visitWindowFromTime("15:30", activityMins, visitDate);
+  const extraWindow = visitWindowFromTime("16:15", activityMins, visitDate);
   const profile = getFamilyAgeProfile(plan);
   const excludeNames = usedLandmarks;
 
@@ -127,6 +163,13 @@ function fillSlot(
 
   switch (slot.kind) {
     case "breakfast": {
+      const onSite = shouldPreferOnSiteCafe(plan, "breakfast")
+        ? landmarkWithOnSiteMeal([ctx.morning], "breakfast")
+        : null;
+      if (onSite) {
+        const meal = onSiteCafeLabel("breakfast", onSite.name);
+        return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
+      }
       const restaurant = usesNamedRestaurant(plan, "breakfast")
         ? pickRestaurantForMeal(city, plan, {
             meal: "breakfast",
@@ -155,6 +198,13 @@ function fillSlot(
       );
     }
     case "lunch": {
+      const onSite = shouldPreferOnSiteCafe(plan, "lunch")
+        ? landmarkWithOnSiteMeal([ctx.morning, ctx.lunch], "lunch")
+        : null;
+      if (onSite) {
+        const meal = onSiteCafeLabel("lunch", onSite.name);
+        return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
+      }
       const restaurant = usesNamedRestaurant(plan, "lunch")
         ? pickRestaurantForMeal(city, plan, {
             meal: "lunch",
@@ -242,7 +292,15 @@ function fillSlot(
         type,
         notes: "Easy pace before dinner.",
       });
-    }    case "dinner": {
+    }
+    case "dinner": {
+      const onSite = shouldPreferOnSiteCafe(plan, "dinner")
+        ? landmarkWithOnSiteMeal([ctx.afternoon, ctx.dinner, ctx.extra], "dinner")
+        : null;
+      if (onSite) {
+        const meal = onSiteCafeLabel("dinner", onSite.name);
+        return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
+      }
       const restaurant = pickRestaurantForMeal(city, plan, {
         meal: "dinner",
         day,

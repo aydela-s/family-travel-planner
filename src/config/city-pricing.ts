@@ -20,11 +20,28 @@ export type LandmarkInterestTag =
   | "sports"
   | "spas";
 
-/** Simple daily hours — Phase 2 soft validation; weekday variation can come later. */
+/** Simple daily hours — used when hoursByWeekday has no entry for that day. */
 export type LandmarkOpeningHours = {
   open: string;
   close: string;
 };
+
+/**
+ * Per-weekday hours. Keys match `Date#getDay()` (0=Sun … 6=Sat).
+ * `null` = closed that weekday. Missing key falls back to `openingHours`.
+ */
+export type HoursByWeekday = Partial<
+  Record<0 | 1 | 2 | 3 | 4 | 5 | 6, LandmarkOpeningHours | null>
+>;
+
+/** Age-band ticket prices from the venue (curated). `maxAgeInclusive: null` = adult. */
+export type TicketTier = {
+  maxAgeInclusive: number | null;
+  price: number;
+};
+
+/** Meal slots the venue can cover on-site (café / food court). */
+export type OnSiteMeal = "breakfast" | "lunch" | "dinner";
 
 export type Landmark = {
   name: string;
@@ -32,6 +49,16 @@ export type Landmark = {
   lng: number;
   adultPrice: number;
   openingHours: LandmarkOpeningHours;
+  /** Optional weekday schedule; overrides openingHours when set for that day. */
+  hoursByWeekday?: HoursByWeekday;
+  /** Optional curated ticket table; otherwise adultPrice + age multipliers. */
+  ticketTiers?: TicketTier[];
+  /** Official ticket page used for curated prices (documentation). */
+  ticketSourceUrl?: string;
+  /** ISO date when ticketTiers were last verified. */
+  pricedAsOf?: string;
+  /** When set, meal planner may schedule that meal at this venue's café. */
+  onSiteMeals?: OnSiteMeal[];
   intensity: LandmarkIntensity;
   ageTags: LandmarkAgeTag[];
   /** Wizard interest categories this stop satisfies (FAM-7). */
@@ -48,6 +75,13 @@ export type CityConfig = {
   lat: number;
   lng: number;
   aliases: string[];
+  /**
+   * How suitable public transit is for family day-to-day travel.
+   * - good: Public transit selectable normally
+   * - limited: selectable with a warning; engine may fall back to taxis
+   * - none: Public transit shown grayed out (not selectable)
+   */
+  transitQuality: "good" | "limited" | "none";
   taxiProviders: { name: TaxiProvider; label: string; multiplier: number }[];
   transport: {
     baseFare: number;
@@ -81,6 +115,7 @@ export const CITY_CONFIGS: CityConfig[] = [
     lat: 32.7157,
     lng: -117.1611,
     aliases: ["san diego", "san diego ca", "san diego california"],
+    transitQuality: "limited",
     taxiProviders: [
       { name: "uber", label: "Uber", multiplier: 1.0 },
       { name: "lyft", label: "Lyft", multiplier: 0.95 },
@@ -103,6 +138,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         lng: -117.1446,
         adultPrice: 0,
         openingHours: { open: "08:00", close: "20:00" },
+        onSiteMeals: ["lunch"],
         intensity: "low",
         ageTags: ["toddler", "child", "tween", "teen"],
         interestTags: ["parks", "museums", "playgrounds"],
@@ -112,8 +148,17 @@ export const CITY_CONFIGS: CityConfig[] = [
         name: "San Diego Zoo",
         lat: 32.7353,
         lng: -117.149,
-        adultPrice: 65,
+        adultPrice: 72,
+        // Approx general admission from sandiegozoo.org (verify periodically).
+        ticketSourceUrl: "https://zoo.sandiegozoo.org/tickets",
+        pricedAsOf: "2026-07-01",
+        ticketTiers: [
+          { maxAgeInclusive: 2, price: 0 },
+          { maxAgeInclusive: 11, price: 62 },
+          { maxAgeInclusive: null, price: 72 },
+        ],
         openingHours: { open: "09:00", close: "17:00" },
+        onSiteMeals: ["lunch"],
         intensity: "high",
         ageTags: ["toddler", "child", "tween"],
         interestTags: ["zoos"],
@@ -134,8 +179,16 @@ export const CITY_CONFIGS: CityConfig[] = [
         name: "USS Midway Museum",
         lat: 32.7137,
         lng: -117.1751,
-        adultPrice: 32,
+        adultPrice: 36,
+        ticketSourceUrl: "https://www.midway.org/visit/tickets-passes/",
+        pricedAsOf: "2026-07-01",
+        ticketTiers: [
+          { maxAgeInclusive: 5, price: 0 },
+          { maxAgeInclusive: 12, price: 26 },
+          { maxAgeInclusive: null, price: 36 },
+        ],
         openingHours: { open: "10:00", close: "17:00" },
+        onSiteMeals: ["lunch"],
         intensity: "medium",
         ageTags: ["tween", "teen"],
         interestTags: ["museums", "history", "interactive"],
@@ -146,7 +199,17 @@ export const CITY_CONFIGS: CityConfig[] = [
         lat: 32.7308,
         lng: -117.147,
         adultPrice: 25,
+        ticketSourceUrl: "https://www.fleetscience.org/tickets",
+        pricedAsOf: "2026-07-01",
+        ticketTiers: [
+          { maxAgeInclusive: 2, price: 0 },
+          { maxAgeInclusive: 12, price: 18 },
+          { maxAgeInclusive: null, price: 25 },
+        ],
         openingHours: { open: "10:00", close: "17:00" },
+        // Typically closed Tuesdays.
+        hoursByWeekday: { 2: null },
+        onSiteMeals: ["lunch"],
         intensity: "medium",
         ageTags: ["toddler", "child", "tween"],
         interestTags: ["interactive", "museums"],
@@ -158,9 +221,94 @@ export const CITY_CONFIGS: CityConfig[] = [
         lng: -117.2525,
         adultPrice: 20,
         openingHours: { open: "11:00", close: "20:00" },
+        onSiteMeals: ["lunch", "dinner"],
         intensity: "high",
         ageTags: ["child", "tween", "teen"],
         interestTags: ["theme-parks", "beaches", "entertainment"],
+        indoor: false,
+      },
+      {
+        name: "Birch Aquarium at Scripps",
+        lat: 32.8663,
+        lng: -117.2506,
+        adultPrice: 30,
+        ticketSourceUrl: "https://aquarium.ucsd.edu/tickets",
+        pricedAsOf: "2026-07-01",
+        ticketTiers: [
+          { maxAgeInclusive: 2, price: 0 },
+          { maxAgeInclusive: 17, price: 25 },
+          { maxAgeInclusive: null, price: 30 },
+        ],
+        openingHours: { open: "09:00", close: "17:00" },
+        onSiteMeals: ["lunch"],
+        intensity: "medium",
+        ageTags: ["toddler", "child", "tween"],
+        interestTags: ["zoos", "interactive", "nature"],
+        indoor: true,
+      },
+      {
+        name: "The New Children's Museum",
+        lat: 32.7105,
+        lng: -117.1638,
+        adultPrice: 18,
+        ticketSourceUrl: "https://thinkplaycreate.org/visit/",
+        pricedAsOf: "2026-07-01",
+        ticketTiers: [
+          { maxAgeInclusive: 0, price: 0 },
+          { maxAgeInclusive: null, price: 18 },
+        ],
+        openingHours: { open: "10:00", close: "16:00" },
+        // Closed Tuesdays.
+        hoursByWeekday: { 2: null },
+        intensity: "medium",
+        ageTags: ["toddler", "child"],
+        interestTags: ["interactive", "museums", "playgrounds"],
+        indoor: true,
+      },
+      {
+        name: "Old Town San Diego",
+        lat: 32.7552,
+        lng: -117.197,
+        adultPrice: 0,
+        openingHours: { open: "10:00", close: "17:00" },
+        onSiteMeals: ["lunch", "dinner"],
+        intensity: "medium",
+        ageTags: ["child", "tween", "teen"],
+        interestTags: ["history", "shopping", "food-markets"],
+        indoor: false,
+      },
+      {
+        name: "Liberty Public Market",
+        lat: 32.7402,
+        lng: -117.2165,
+        adultPrice: 0,
+        openingHours: { open: "10:00", close: "19:00" },
+        onSiteMeals: ["breakfast", "lunch", "dinner"],
+        intensity: "low",
+        ageTags: ["toddler", "child", "tween", "teen"],
+        interestTags: ["food-markets", "shopping"],
+        indoor: true,
+      },
+      {
+        name: "Torrey Pines State Natural Reserve",
+        lat: 32.9216,
+        lng: -117.2532,
+        adultPrice: 0,
+        openingHours: { open: "07:15", close: "19:00" },
+        intensity: "low",
+        ageTags: ["child", "tween", "teen"],
+        interestTags: ["nature", "parks", "beaches"],
+        indoor: false,
+      },
+      {
+        name: "Mission Bay Park",
+        lat: 32.7773,
+        lng: -117.2107,
+        adultPrice: 0,
+        openingHours: { open: "06:00", close: "22:00" },
+        intensity: "medium",
+        ageTags: ["toddler", "child", "tween", "teen"],
+        interestTags: ["parks", "sports", "beaches", "playgrounds"],
         indoor: false,
       },
     ],
@@ -174,6 +322,7 @@ export const CITY_CONFIGS: CityConfig[] = [
     lat: 48.8566,
     lng: 2.3522,
     aliases: ["paris", "paris france"],
+    transitQuality: "good",
     taxiProviders: [
       { name: "uber", label: "Uber", multiplier: 1.05 },
       { name: "bolt", label: "Bolt", multiplier: 0.9 },
@@ -267,6 +416,7 @@ export const CITY_CONFIGS: CityConfig[] = [
     lat: 51.5074,
     lng: -0.1278,
     aliases: ["london", "london uk", "london england"],
+    transitQuality: "good",
     taxiProviders: [
       { name: "uber", label: "Uber", multiplier: 1.0 },
       { name: "bolt", label: "Bolt", multiplier: 0.92 },
@@ -349,6 +499,72 @@ export const CITY_CONFIGS: CityConfig[] = [
         interestTags: ["playgrounds", "parks"],
         indoor: false,
       },
+      {
+        name: "London Zoo",
+        lat: 51.5353,
+        lng: -0.1534,
+        adultPrice: 35,
+        openingHours: { open: "10:00", close: "17:00" },
+        intensity: "high",
+        ageTags: ["toddler", "child", "tween"],
+        interestTags: ["zoos"],
+        indoor: false,
+      },
+      {
+        name: "SEA LIFE London Aquarium",
+        lat: 51.5018,
+        lng: -0.1197,
+        adultPrice: 32,
+        openingHours: { open: "10:00", close: "17:00" },
+        intensity: "medium",
+        ageTags: ["toddler", "child", "tween"],
+        interestTags: ["zoos", "interactive"],
+        indoor: true,
+      },
+      {
+        name: "Borough Market",
+        lat: 51.5055,
+        lng: -0.091,
+        adultPrice: 0,
+        openingHours: { open: "10:00", close: "17:00" },
+        intensity: "medium",
+        ageTags: ["child", "tween", "teen"],
+        interestTags: ["food-markets", "shopping"],
+        indoor: false,
+      },
+      {
+        name: "Greenwich Park",
+        lat: 51.4769,
+        lng: -0.0005,
+        adultPrice: 0,
+        openingHours: { open: "06:00", close: "21:00" },
+        intensity: "low",
+        ageTags: ["toddler", "child", "tween", "teen"],
+        interestTags: ["parks", "nature", "history", "playgrounds"],
+        indoor: false,
+      },
+      {
+        name: "Queen Elizabeth Olympic Park",
+        lat: 51.5434,
+        lng: -0.0165,
+        adultPrice: 0,
+        openingHours: { open: "06:00", close: "22:00" },
+        intensity: "medium",
+        ageTags: ["child", "tween", "teen"],
+        interestTags: ["parks", "sports", "entertainment"],
+        indoor: false,
+      },
+      {
+        name: "Coram's Fields",
+        lat: 51.5242,
+        lng: -0.12,
+        adultPrice: 0,
+        openingHours: { open: "09:00", close: "19:00" },
+        intensity: "low",
+        ageTags: ["toddler", "child"],
+        interestTags: ["playgrounds", "parks"],
+        indoor: false,
+      },
     ],
   },
   {
@@ -360,6 +576,7 @@ export const CITY_CONFIGS: CityConfig[] = [
     lat: 32.0853,
     lng: 34.7818,
     aliases: ["tel aviv", "tel aviv israel"],
+    transitQuality: "good",
     taxiProviders: [
       { name: "gett", label: "Gett", multiplier: 1.0 },
       { name: "uber", label: "Uber", multiplier: 1.08 },
@@ -453,6 +670,7 @@ export const CITY_CONFIGS: CityConfig[] = [
     lat: 35.6762,
     lng: 139.6503,
     aliases: ["tokyo", "tokyo japan"],
+    transitQuality: "good",
     taxiProviders: [{ name: "uber", label: "Uber", multiplier: 1.15 }],
     transport: {
       baseFare: 500,
@@ -545,6 +763,7 @@ export const DEFAULT_CITY: CityConfig = {
   lat: 40.7128,
   lng: -74.006,
   aliases: [],
+  transitQuality: "none",
   taxiProviders: [
     { name: "uber", label: "Uber", multiplier: 1.0 },
     { name: "lyft", label: "Lyft", multiplier: 0.95 },

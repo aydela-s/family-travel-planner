@@ -14,9 +14,13 @@ import { formatCoverDateRange } from "@/lib/itinerary-export";
 import { formatNapsSummary, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { updatesForPlanChip, type PlanChipUpdateKey } from "@/lib/plan-selection-updates";
+import { detectCity } from "@/lib/city-detect";
+import {
+  isPublicTransitSelectable,
+  transportationOptionsForCity,
+} from "@/lib/planning-engine/transit-mode";
 import {
   BudgetStyle,
-  TransportationType,
   TravelStyle,
   TripPlan,
 } from "@/types/trip-plan";
@@ -47,20 +51,13 @@ const READ_ONLY_KEYS = new Set<PlanChipKey>([
   "dietary",
 ]);
 
-/** Getting-around options shown on the itinerary (matches wizard — no walking). */
-const TRANSPORT_CHIP_OPTIONS: TransportationType[] = [
-  "car-rental",
-  "taxis",
-  "public-transportation",
-];
-
 type ChipDef = {
   key: PlanChipKey;
   label: string;
   value: string;
   editable: boolean;
   /** Inline pick list; omit to jump back to the wizard step when editable. */
-  options?: { value: string; label: string }[];
+  options?: { value: string; label: string; disabled?: boolean }[];
 };
 
 function travelersLabel(plan: TripPlan): string {
@@ -85,6 +82,9 @@ function interestsLabel(plan: TripPlan): string {
 }
 
 function buildChips(plan: TripPlan): ChipDef[] {
+  const city = detectCity(plan.destination);
+  const transitSelectable = isPublicTransitSelectable(city);
+  const transportOptions = transportationOptionsForCity(city);
   const chips: ChipDef[] = [
     {
       key: "destination",
@@ -119,9 +119,10 @@ function buildChips(plan: TripPlan): ChipDef[] {
       label: "Transit",
       value: getTransportationLabel(plan.transportationType),
       editable: true,
-      options: TRANSPORT_CHIP_OPTIONS.map((value) => ({
+      options: transportOptions.map((value) => ({
         value,
         label: TRANSPORTATION_LABELS[value],
+        disabled: value === "public-transportation" && !transitSelectable,
       })),
     },
     {
@@ -286,6 +287,7 @@ export default function PlanSelectionChips({
                         getTravelStyleLabel(plan.travelStyle) === option.label) ||
                       (chip.key === "transportation" &&
                         getTransportationLabel(plan.transportationType) === option.label);
+                    const optionDisabled = Boolean(disabled || option.disabled);
 
                     return (
                       <button
@@ -293,14 +295,25 @@ export default function PlanSelectionChips({
                         type="button"
                         role="option"
                         aria-selected={selected}
-                        disabled={disabled}
-                        onClick={() => handleOptionSelect(chip, option.value)}
-                        className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition hover:bg-primary-muted/60 ${
-                          selected ? "font-semibold text-primary" : "text-ink"
+                        aria-disabled={optionDisabled}
+                        disabled={optionDisabled}
+                        onClick={() => {
+                          if (optionDisabled) return;
+                          handleOptionSelect(chip, option.value);
+                        }}
+                        className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition ${
+                          optionDisabled
+                            ? "cursor-not-allowed text-muted opacity-60"
+                            : selected
+                              ? "font-semibold text-primary hover:bg-primary-muted/60"
+                              : "text-ink hover:bg-primary-muted/60"
                         }`}
                       >
-                        <span>{option.label}</span>
-                        {selected && <span aria-hidden>✓</span>}
+                        <span>
+                          {option.label}
+                          {option.disabled ? " (unavailable)" : ""}
+                        </span>
+                        {selected && !option.disabled && <span aria-hidden>✓</span>}
                       </button>
                     );
                   })}

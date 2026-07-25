@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
     const enrichedDay = body.existingItinerary?.days.find((d) => d.day === body.adjustDay);
 
-    const { raw, plan: effectivePlan } = planTrip(plan, {
+    const { raw, plan: effectivePlan, transportNote } = planTrip(plan, {
       relaxed: body.relaxed,
       adjustDay: body.adjustDay,
       adjustAction: body.adjustAction,
@@ -80,6 +80,7 @@ export async function POST(request: Request) {
       adjustDay: body.adjustDay,
       adjustAction: body.adjustAction,
       previousItinerary: body.existingItinerary,
+      transportNote,
     });
 
     // Optional AI tips via Vercel AI Gateway — never blocks the deterministic plan.
@@ -91,7 +92,11 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ ...enriched, demo: useDemo });
+    return NextResponse.json({
+      ...enriched,
+      demo: useDemo,
+      transportationType: effectivePlan.transportationType,
+    });
   } catch (error) {
     console.error("generate-itinerary error:", error);
 

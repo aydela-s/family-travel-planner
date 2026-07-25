@@ -1,30 +1,40 @@
+"use client";
+
+import { useEffect } from "react";
 import { StepProps, TransportationType } from "@/types/trip-plan";
+import { detectCity } from "@/lib/city-detect";
 import { TRANSPORTATION_LABELS } from "@/lib/format-labels";
+import {
+  isPublicTransitSelectable,
+  limitedTransitWarning,
+  transportationOptionsForCity,
+  unavailableTransitNote,
+} from "@/lib/planning-engine/transit-mode";
 import { OptionCard, StepIntro } from "../shared";
 
-const transportationOptions: {
-  value: TransportationType;
-  label: string;
-  emoji: string;
-}[] = [
-  {
-    value: "car-rental",
-    label: TRANSPORTATION_LABELS["car-rental"],
-    emoji: "🚗",
-  },
-  {
-    value: "taxis",
-    label: TRANSPORTATION_LABELS.taxis,
-    emoji: "🚕",
-  },
-  {
-    value: "public-transportation",
-    label: TRANSPORTATION_LABELS["public-transportation"],
-    emoji: "🚇",
-  },
-];
+const OPTION_EMOJI: Record<TransportationType, string> = {
+  walking: "🚶",
+  "car-rental": "🚗",
+  taxis: "🚕",
+  "public-transportation": "🚇",
+};
 
 export default function TransportationStep({ formData, updateFormData }: StepProps) {
+  const city = detectCity(formData.destination);
+  const options = transportationOptionsForCity(city);
+  const transitSelectable = isPublicTransitSelectable(city);
+  const limitedWarning = limitedTransitWarning(city);
+  const unavailableNote = unavailableTransitNote(city);
+
+  useEffect(() => {
+    if (
+      formData.transportationType === "public-transportation" &&
+      !transitSelectable
+    ) {
+      updateFormData({ transportationType: "" });
+    }
+  }, [transitSelectable, formData.transportationType, updateFormData]);
+
   return (
     <div className="space-y-6">
       <StepIntro
@@ -34,15 +44,35 @@ export default function TransportationStep({ formData, updateFormData }: StepPro
       />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        {transportationOptions.map((option) => (
-          <OptionCard
-            key={option.value}
-            selected={formData.transportationType === option.value}
-            label={`${option.emoji} ${option.label}`}
-            onClick={() => updateFormData({ transportationType: option.value })}
-          />
-        ))}
+        {options.map((value) => {
+          const isTransit = value === "public-transportation";
+          const disabled = isTransit && !transitSelectable;
+          return (
+            <OptionCard
+              key={value}
+              selected={formData.transportationType === value}
+              disabled={disabled}
+              label={`${OPTION_EMOJI[value]} ${TRANSPORTATION_LABELS[value]}`}
+              onClick={() => {
+                if (disabled) return;
+                updateFormData({ transportationType: value });
+              }}
+            />
+          );
+        })}
       </div>
+
+      {unavailableNote && (
+        <p className="rounded-2xl border border-border bg-background px-4 py-3 text-sm leading-relaxed text-muted">
+          {unavailableNote}
+        </p>
+      )}
+
+      {limitedWarning && (
+        <p className="rounded-2xl border border-warning/30 bg-warning-muted px-4 py-3 text-sm leading-relaxed text-ink">
+          {limitedWarning}
+        </p>
+      )}
     </div>
   );
 }

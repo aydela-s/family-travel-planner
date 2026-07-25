@@ -18,6 +18,8 @@ export default function DestinationAutocomplete({
   const [fetchError, setFetchError] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const requestSeq = useRef(0);
+  /** When set, query matches a picked suggestion — don't re-fetch or show empty state. */
+  const pickedLabelRef = useRef<string | null>(null);
 
   useEffect(() => {
     setQuery(value);
@@ -38,6 +40,15 @@ export default function DestinationAutocomplete({
       setSuggestions([]);
       setFetchError(false);
       setLoading(false);
+      return;
+    }
+
+    // Selecting from the list updates `query` to the full label — don't treat that as a failed search.
+    if (pickedLabelRef.current === query) {
+      setSuggestions([]);
+      setFetchError(false);
+      setLoading(false);
+      setOpen(false);
       return;
     }
 
@@ -81,12 +92,19 @@ export default function DestinationAutocomplete({
   }, [query]);
 
   function selectSuggestion(s: Suggestion) {
+    pickedLabelRef.current = s.label;
+    requestSeq.current += 1; // cancel in-flight search for the typed prefix
     setQuery(s.label);
     onChange(s.label);
+    setSuggestions([]);
+    setFetchError(false);
+    setLoading(false);
     setOpen(false);
   }
 
   const showPanel = open && query.length >= 2 && !loading;
+  const showEmptyState =
+    showPanel && suggestions.length === 0 && pickedLabelRef.current !== query;
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -94,16 +112,20 @@ export default function DestinationAutocomplete({
         type="text"
         value={query}
         onChange={(e) => {
+          pickedLabelRef.current = null;
           setQuery(e.target.value);
           onChange(e.target.value);
           setOpen(true);
         }}
-        onFocus={() => (suggestions.length > 0 || query.length >= 2) && setOpen(true)}
+        onFocus={() => {
+          if (pickedLabelRef.current === query) return;
+          if (suggestions.length > 0 || query.length >= 2) setOpen(true);
+        }}
         placeholder="Start typing a city..."
         className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3.5 text-ink shadow-sm outline-none transition placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary-muted"
         autoComplete="off"
         aria-autocomplete="list"
-        aria-expanded={showPanel}
+        aria-expanded={showPanel && (suggestions.length > 0 || showEmptyState)}
       />
       {loading && (
         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">
@@ -125,7 +147,7 @@ export default function DestinationAutocomplete({
           ))}
         </ul>
       )}
-      {showPanel && suggestions.length === 0 && (
+      {showEmptyState && (
         <div className="absolute z-20 mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm leading-relaxed text-muted shadow-[var(--shadow-card)]">
           {fetchError
             ? "Couldn’t load city suggestions — you can still type your destination and continue."
