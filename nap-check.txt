@@ -1,0 +1,7 @@
+beach intent=free total=0.8925 cov=1 age=0.75 budget=1 pace=0.7 var=1
+play_indoor intent=paid total=0.8175 cov=1 age=0.45000000000000007 budget=1 pace=0.7 var=1
+playgrounds intent=free total=0.8300 cov=1 age=0.5 budget=1 pace=0.7 var=1
+interactive intent=paid total=0.8925 cov=1 age=0.75 budget=1 pace=0.7 var=1
+entertainment intent=paid total=0.8925 cov=1 age=0.75 budget=1 pace=0.7 var=1
+scenic intent=free total=0.8425 cov=1 age=0.55 budget=1 pace=0.7 var=1
+FINAL arrival,playgrounds,play_indoor,entertainment,departure

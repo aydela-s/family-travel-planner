@@ -1,5 +1,6 @@
 import { CityConfig, Landmark, LandmarkIntensity } from "@/config/city-pricing";
 import { AdjustActionId } from "@/lib/planning-engine/adjust-types";
+import type { PlannerEngine, TripBlueprint } from "@/lib/planning-engine/staged/types";
 import { ActivityType, ItineraryDay, RawItinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -16,7 +17,14 @@ export type PlanOptions = {
   enrichedDay?: ItineraryDay;
   /** Prefer curated or Places-built city over detectCity (FAM-59). */
   cityOverride?: CityConfig;
+  /**
+   * Which planner engine to run. Defaults via PLANNER_ENGINE env, then "score".
+   * Staged path is built incrementally; until cutover, "staged" may still fall back to score.
+   */
+  plannerEngine?: PlannerEngine;
 };
+
+export type { PlannerEngine, TripBlueprint };
 
 /** Ordered slot in a deterministic day skeleton — filled after structure is built */
 export type SlotKind =

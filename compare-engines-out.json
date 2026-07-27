@@ -1,0 +1,859 @@
+{
+  "plan": {
+    "destination": "San Diego",
+    "dates": "2026-07-28 – 2026-08-01",
+    "interests": [
+      "Playgrounds & Indoor Play",
+      "Interactive Museums",
+      "Beaches & Waterfronts",
+      "Shows & Entertainment"
+    ],
+    "ages": [
+      4,
+      8
+    ],
+    "budget": "balanced",
+    "pace": "balanced",
+    "naps": "12:30–2:00 regular",
+    "dietary": "vegan"
+  },
+  "score": {
+    "plannerEngine": "score",
+    "experienceCoverage": {
+      "items": [
+        {
+          "key": "playgrounds",
+          "tag": "playgrounds",
+          "label": "Playgrounds & Indoor Play",
+          "target": 1,
+          "completed": 0,
+          "source": "interest"
+        },
+        {
+          "key": "indoor-play",
+          "tag": "indoor-play",
+          "label": "Playgrounds & Indoor Play",
+          "target": 1,
+          "completed": 0,
+          "source": "interest"
+        },
+        {
+          "key": "interactive",
+          "tag": "interactive",
+          "label": "Interactive Museums",
+          "target": 1,
+          "completed": 0,
+          "source": "interest"
+        },
+        {
+          "key": "beaches",
+          "tag": "beaches",
+          "label": "Beaches & Waterfronts",
+          "target": 1,
+          "completed": 0,
+          "source": "interest"
+        },
+        {
+          "key": "entertainment",
+          "tag": "entertainment",
+          "label": "Shows & Entertainment",
+          "target": 1,
+          "completed": 0,
+          "source": "interest"
+        }
+      ]
+    },
+    "days": [
+      {
+        "day": 1,
+        "date": "2026-07-28",
+        "role": "arrival",
+        "themeId": "arrival",
+        "themeLabel": "Arrival",
+        "dayBudgetIntent": "free",
+        "goals": [
+          "low_friction",
+          "keep_energy_low",
+          "prefer_near_stay_or_flexible_outdoor",
+          "honor_nap_windows"
+        ],
+        "constraints": [
+          "avoid_far_attractions",
+          "avoid_high_risk_time_sensitive_anchor",
+          "avoid_fixed_time_experiences",
+          "avoid_paid_tickets",
+          "prefer_free_anchor",
+          "prefer_low_walking",
+          "max_activities",
+          "discourage_anchor_tags"
+        ],
+        "anchor": null,
+        "support": [],
+        "timeline": [
+          {
+            "time": "08:30",
+            "endTime": "10:00",
+            "type": "activity",
+            "title": "Explore Kate Sessions Park"
+          },
+          {
+            "time": "11:15",
+            "endTime": "12:15",
+            "type": "meal",
+            "title": "Takeout or delivery lunch at your stay"
+          },
+          {
+            "time": "12:30",
+            "endTime": "14:00",
+            "type": "nap",
+            "title": "Nap & Quiet Time"
+          },
+          {
+            "time": "14:15",
+            "endTime": "17:45",
+            "type": "activity",
+            "title": "Explore Belmont Park"
+          },
+          {
+            "time": "18:00",
+            "endTime": "19:00",
+            "type": "meal",
+            "title": "Dinner at Mr. Charlie's"
+          }
+        ]
+      },
+      {
+        "day": 2,
+        "date": "2026-07-29",
+        "role": "full",
+        "themeId": "playgrounds",
+        "themeLabel": "Playgrounds",
+        "dayBudgetIntent": "free",
+        "goals": [
+          "honor_nap_windows",
+          "dedicated_experience"
+        ],
+        "constraints": [
+          "anchor_primary_tags",
+          "prefer_free_anchor",
+          "discourage_anchor_tags",
+          "prefer_free_anchor"
+        ],
+        "anchor": null,
+        "support": [],
+        "timeline": [
+          {
+            "time": "08:30",
+            "endTime": "10:00",
+            "type": "activity",
+            "title": "Explore Mission Beach Boardwalk"
+          },
+          {
+            "time": "11:15",
+            "endTime": "12:15",
+            "type": "meal",
+            "title": "Takeout or delivery lunch at your stay"
+          },
+          {
+            "time": "12:30",
+            "endTime": "14:00",
+            "type": "nap",
+            "title": "Nap & Quiet Time"
+          },
+          {
+            "time": "14:15",
+            "endTime": "15:45",
+            "type": "activity",
+            "title": "Explore Coronado Beach"
+          },
+          {
+            "time": "16:00",
+            "endTime": "16:30",
+            "type": "activity",
+            "title": "Afternoon stroll near Coronado Beach"
+          },
+          {
+            "time": "18:00",
+            "endTime": "19:00",
+            "type": "meal",
+            "title": "Dinner at Evolution Fast Food"
+          }
+        ]
+      },
+      {
+        "day": 3,
+        "date": "2026-07-30",
+        "role": "full",
+        "themeId": "play_indoor",
+        "themeLabel": "Play indoor",
+        "dayBudgetIntent": "paid",
+        "goals": [
+          "honor_nap_windows",
+          "dedicated_experience"
+        ],
+        "constraints": [
+          "anchor_primary_tags",
+          "discourage_anchor_tags",
+          "prefer_paid_anchor"
+        ],
+        "anchor": null,
+        "support": [],
+        "timeline": [
+          {
+            "time": "08:30",
+            "endTime": "10:00",
+            "type": "activity",
+            "title": "Explore Waterfront Park Playground"
+          },
+          {
+            "time": "11:15",
+            "endTime": "12:15",
+            "type": "meal",
+            "title": "Takeout or delivery lunch at your stay"
+          },
+          {
+            "time": "12:30",
+            "endTime": "14:00",
+            "type": "nap",
+            "title": "Nap & Quiet Time"
+          },
+          {
+            "time": "14:15",
+            "endTime": "15:45",
+            "type": "activity",
+            "title": "Family time at Play City Eastlake"
+          },
+          {
+            "time": "16:00",
+            "endTime": "16:30",
+            "type": "activity",
+            "title": "Afternoon stroll near Play City Eastlake"
+          },
+          {
+            "time": "18:00",
+            "endTime": "19:00",
+            "type": "meal",
+            "title": "Dinner at Plumeria Vegetarian Restaurant"
+          }
+        ]
+      },
+      {
+        "day": 4,
+        "date": "2026-07-31",
+        "role": "full",
+        "themeId": "entertainment",
+        "themeLabel": "Entertainment",
+        "dayBudgetIntent": "either",
+        "goals": [
+          "honor_nap_windows",
+          "dedicated_experience"
+        ],
+        "constraints": [
+          "anchor_primary_tags"
+        ],
+        "anchor": null,
+        "support": [],
+        "timeline": [
+          {
+            "time": "08:30",
+            "endTime": "10:00",
+            "type": "activity",
+            "title": "Explore Mission Bay Park"
+          },
+          {
+            "time": "11:15",
+            "endTime": "12:15",
+            "type": "meal",
+            "title": "Takeout or delivery lunch at your stay"
+          },
+          {
+            "time": "12:30",
+            "endTime": "14:00",
+            "type": "nap",
+            "title": "Nap & Quiet Time"
+          },
+          {
+            "time": "14:15",
+            "endTime": "15:45",
+            "type": "activity",
+            "title": "Explore La Jolla Cove"
+          },
+          {
+            "time": "16:00",
+            "endTime": "16:30",
+            "type": "activity",
+            "title": "Afternoon stroll near La Jolla Cove"
+          },
+          {
+            "time": "18:00",
+            "endTime": "19:00",
+            "type": "meal",
+            "title": "Dinner at Kindred"
+          }
+        ]
+      },
+      {
+        "day": 5,
+        "date": "2026-08-01",
+        "role": "departure",
+        "themeId": "departure",
+        "themeLabel": "Departure",
+        "dayBudgetIntent": "free",
+        "goals": [
+          "easy_exit",
+          "keep_energy_low",
+          "prefer_near_stay_or_flexible_outdoor"
+        ],
+        "constraints": [
+          "avoid_far_attractions",
+          "avoid_fixed_time_experiences",
+          "avoid_paid_tickets",
+          "prefer_free_anchor",
+          "prefer_low_walking",
+          "avoid_high_risk_time_sensitive_anchor",
+          "max_activities",
+          "discourage_anchor_tags"
+        ],
+        "anchor": null,
+        "support": [],
+        "timeline": [
+          {
+            "time": "08:30",
+            "endTime": "10:00",
+            "type": "activity",
+            "title": "Explore Torrey Pines State Natural Reserve"
+          },
+          {
+            "time": "11:15",
+            "endTime": "12:15",
+            "type": "meal",
+            "title": "Takeout or delivery lunch at your stay"
+          },
+          {
+            "time": "12:30",
+            "endTime": "14:00",
+            "type": "nap",
+            "title": "Nap & Quiet Time"
+          },
+          {
+            "time": "14:15",
+            "endTime": "15:45",
+            "type": "activity",
+            "title": "Explore La Jolla Cove"
+          },
+          {
+            "time": "16:00",
+            "endTime": "16:30",
+            "type": "activity",
+            "title": "Pack up & unwind"
+          },
+          {
+            "time": "18:00",
+            "endTime": "19:00",
+            "type": "meal",
+            "title": "Dinner at The Prado at Balboa Park"
+          }
+        ]
+      }
+    ]
+  },
+  "staged": {
+    "plannerEngine": "staged",
+    "experienceCoverage": {
+      "items": [
+        {
+          "key": "playgrounds",
+          "tag": "playgrounds",
+          "label": "Playgrounds & Indoor Play",
+          "target": 1,
+          "completed": 1,
+          "source": "interest"
+        },
+        {
+          "key": "indoor-play",
+          "tag": "indoor-play",
+          "label": "Playgrounds & Indoor Play",
+          "target": 1,
+          "completed": 1,
+          "source": "interest"
+        },
+        {
+          "key": "interactive",
+          "tag": "interactive",
+          "label": "Interactive Museums",
+          "target": 1,
+          "completed": 0,
+          "source": "interest"
+        },
+        {
+          "key": "beaches",
+          "tag": "beaches",
+          "label": "Beaches & Waterfronts",
+          "target": 1,
+          "completed": 0,
+          "source": "interest"
+        },
+        {
+          "key": "entertainment",
+          "tag": "entertainment",
+          "label": "Shows & Entertainment",
+          "target": 1,
+          "completed": 1,
+          "source": "interest"
+        }
+      ]
+    },
+    "days": [
+      {
+        "day": 1,
+        "date": "2026-07-28",
+        "role": "arrival",
+        "themeId": "arrival",
+        "themeLabel": "Arrival",
+        "dayBudgetIntent": "free",
+        "goals": [
+          "low_friction",
+          "keep_energy_low",
+          "prefer_near_stay_or_flexible_outdoor",
+          "honor_nap_windows"
+        ],
+        "constraints": [
+          "avoid_far_attractions",
+          "avoid_high_risk_time_sensitive_anchor",
+          "avoid_fixed_time_experiences",
+          "avoid_paid_tickets",
+          "prefer_free_anchor",
+          "prefer_low_walking",
+          "max_activities",
+          "discourage_anchor_tags"
+        ],
+        "anchor": {
+          "name": "Waterfront Park Playground",
+          "tags": [
+            "playgrounds",
+            "parks"
+          ],
+          "isPaid": false
+        },
+        "support": [
+          {
+            "name": "Balboa Park",
+            "tags": [
+              "parks",
+              "museums",
+              "playgrounds"
+            ],
+            "isPaid": false
+          }
+        ],
+        "timeline": [
+          {
+            "time": "08:30",
+            "endTime": "10:00",
+            "type": "activity",
+            "title": "Explore Balboa Park"
+          },
+          {
+            "time": "11:15",
+            "endTime": "12:15",
+            "type": "meal",
+            "title": "Takeout or delivery lunch at your stay"
+          },
+          {
+            "time": "12:30",
+            "endTime": "14:00",
+            "type": "nap",
+            "title": "Nap & Quiet Time"
+          },
+          {
+            "time": "14:15",
+            "endTime": "15:45",
+            "type": "activity",
+            "title": "Explore Waterfront Park Playground"
+          },
+          {
+            "time": "16:00",
+            "endTime": "16:30",
+            "type": "activity",
+            "title": "Afternoon stroll near Waterfront Park Playground"
+          },
+          {
+            "time": "18:00",
+            "endTime": "19:00",
+            "type": "meal",
+            "title": "Dinner at Mr. Charlie's"
+          }
+        ]
+      },
+      {
+        "day": 2,
+        "date": "2026-07-29",
+        "role": "full",
+        "themeId": "playgrounds",
+        "themeLabel": "Playgrounds",
+        "dayBudgetIntent": "free",
+        "goals": [
+          "honor_nap_windows",
+          "dedicated_experience"
+        ],
+        "constraints": [
+          "anchor_primary_tags",
+          "prefer_free_anchor",
+          "discourage_anchor_tags",
+          "prefer_free_anchor"
+        ],
+        "anchor": {
+          "name": "Kate Sessions Park",
+          "tags": [
+            "playgrounds",
+            "parks",
+            "nature"
+          ],
+          "isPaid": false
+        },
+        "support": [
+          {
+            "name": "Mission Bay Park",
+            "tags": [
+              "parks",
+              "sports",
+              "beaches",
+              "playgrounds"
+            ],
+            "isPaid": false
+          }
+        ],
+        "timeline": [
+          {
+            "time": "08:30",
+            "endTime": "10:00",
+            "type": "activity",
+            "title": "Explore Mission Bay Park"
+          },
+          {
+            "time": "11:15",
+            "endTime": "12:15",
+            "type": "meal",
+            "title": "Takeout or delivery lunch at your stay"
+          },
+          {
+            "time": "12:30",
+            "endTime": "14:00",
+            "type": "nap",
+            "title": "Nap & Quiet Time"
+          },
+          {
+            "time": "14:15",
+            "endTime": "15:45",
+            "type": "activity",
+            "title": "Explore Kate Sessions Park"
+          },
+          {
+            "time": "16:00",
+            "endTime": "16:30",
+            "type": "activity",
+            "title": "Afternoon stroll near Kate Sessions Park"
+          },
+          {
+            "time": "18:00",
+            "endTime": "19:00",
+            "type": "meal",
+            "title": "Dinner at Evolution Fast Food"
+          }
+        ]
+      },
+      {
+        "day": 3,
+        "date": "2026-07-30",
+        "role": "full",
+        "themeId": "play_indoor",
+        "themeLabel": "Play indoor",
+        "dayBudgetIntent": "paid",
+        "goals": [
+          "honor_nap_windows",
+          "dedicated_experience"
+        ],
+        "constraints": [
+          "anchor_primary_tags",
+          "discourage_anchor_tags",
+          "prefer_paid_anchor"
+        ],
+        "anchor": {
+          "name": "Funbox (Plaza Bonita, National City)",
+          "tags": [
+            "indoor-play",
+            "playgrounds",
+            "entertainment"
+          ],
+          "isPaid": true
+        },
+        "support": [
+          {
+            "name": "Coronado Beach",
+            "tags": [
+              "beaches",
+              "nature"
+            ],
+            "isPaid": false
+          }
+        ],
+        "timeline": [
+          {
+            "time": "08:30",
+            "endTime": "10:00",
+            "type": "activity",
+            "title": "Explore Coronado Beach"
+          },
+          {
+            "time": "11:15",
+            "endTime": "12:15",
+            "type": "meal",
+            "title": "Takeout or delivery lunch at your stay"
+          },
+          {
+            "time": "12:30",
+            "endTime": "14:00",
+            "type": "nap",
+            "title": "Nap & Quiet Time"
+          },
+          {
+            "time": "14:15",
+            "endTime": "15:45",
+            "type": "activity",
+            "title": "Family time at Funbox (Plaza Bonita, National City)"
+          },
+          {
+            "time": "16:00",
+            "endTime": "16:30",
+            "type": "activity",
+            "title": "Afternoon stroll near Funbox (Plaza Bonita, National City)"
+          },
+          {
+            "time": "18:00",
+            "endTime": "19:00",
+            "type": "meal",
+            "title": "Dinner at Plumeria Vegetarian Restaurant"
+          }
+        ]
+      },
+      {
+        "day": 4,
+        "date": "2026-07-31",
+        "role": "full",
+        "themeId": "entertainment",
+        "themeLabel": "Entertainment",
+        "dayBudgetIntent": "either",
+        "goals": [
+          "honor_nap_windows",
+          "dedicated_experience"
+        ],
+        "constraints": [
+          "anchor_primary_tags"
+        ],
+        "anchor": {
+          "name": "Belmont Park",
+          "tags": [
+            "theme-parks",
+            "beaches",
+            "entertainment"
+          ],
+          "isPaid": true
+        },
+        "support": [
+          {
+            "name": "Mission Beach Boardwalk",
+            "tags": [
+              "beaches",
+              "sports"
+            ],
+            "isPaid": false
+          }
+        ],
+        "timeline": [
+          {
+            "time": "08:30",
+            "endTime": "10:00",
+            "type": "activity",
+            "title": "Explore Mission Beach Boardwalk"
+          },
+          {
+            "time": "11:15",
+            "endTime": "12:15",
+            "type": "meal",
+            "title": "Takeout or delivery lunch at your stay"
+          },
+          {
+            "time": "12:30",
+            "endTime": "14:00",
+            "type": "nap",
+            "title": "Nap & Quiet Time"
+          },
+          {
+            "time": "14:15",
+            "endTime": "17:45",
+            "type": "activity",
+            "title": "Explore Belmont Park"
+          },
+          {
+            "time": "18:00",
+            "endTime": "19:00",
+            "type": "meal",
+            "title": "Dinner at Kindred"
+          }
+        ]
+      },
+      {
+        "day": 5,
+        "date": "2026-08-01",
+        "role": "departure",
+        "themeId": "departure",
+        "themeLabel": "Departure",
+        "dayBudgetIntent": "free",
+        "goals": [
+          "easy_exit",
+          "keep_energy_low",
+          "prefer_near_stay_or_flexible_outdoor"
+        ],
+        "constraints": [
+          "avoid_far_attractions",
+          "avoid_fixed_time_experiences",
+          "avoid_paid_tickets",
+          "prefer_free_anchor",
+          "prefer_low_walking",
+          "avoid_high_risk_time_sensitive_anchor",
+          "max_activities",
+          "discourage_anchor_tags"
+        ],
+        "anchor": {
+          "name": "Torrey Pines State Natural Reserve",
+          "tags": [
+            "nature",
+            "parks",
+            "beaches"
+          ],
+          "isPaid": false
+        },
+        "support": [],
+        "timeline": [
+          {
+            "time": "08:30",
+            "endTime": "10:00",
+            "type": "activity",
+            "title": "Explore Torrey Pines State Natural Reserve"
+          },
+          {
+            "time": "11:15",
+            "endTime": "12:15",
+            "type": "meal",
+            "title": "Takeout or delivery lunch at your stay"
+          },
+          {
+            "time": "12:30",
+            "endTime": "14:00",
+            "type": "nap",
+            "title": "Nap & Quiet Time"
+          },
+          {
+            "time": "14:15",
+            "endTime": "14:45",
+            "type": "activity",
+            "title": "Pack up & unwind"
+          },
+          {
+            "time": "18:00",
+            "endTime": "19:00",
+            "type": "meal",
+            "title": "Dinner at The Prado at Balboa Park"
+          }
+        ]
+      }
+    ]
+  },
+  "sideBySide": [
+    {
+      "day": 1,
+      "scoreActivities": [
+        "Explore Kate Sessions Park",
+        "Explore Belmont Park"
+      ],
+      "stagedTheme": "arrival",
+      "stagedAnchor": "Waterfront Park Playground",
+      "stagedSupport": [
+        "Balboa Park"
+      ],
+      "stagedActivities": [
+        "Explore Balboa Park",
+        "Explore Waterfront Park Playground",
+        "Afternoon stroll near Waterfront Park Playground"
+      ]
+    },
+    {
+      "day": 2,
+      "scoreActivities": [
+        "Explore Mission Beach Boardwalk",
+        "Explore Coronado Beach",
+        "Afternoon stroll near Coronado Beach"
+      ],
+      "stagedTheme": "playgrounds",
+      "stagedAnchor": "Kate Sessions Park",
+      "stagedSupport": [
+        "Mission Bay Park"
+      ],
+      "stagedActivities": [
+        "Explore Mission Bay Park",
+        "Explore Kate Sessions Park",
+        "Afternoon stroll near Kate Sessions Park"
+      ]
+    },
+    {
+      "day": 3,
+      "scoreActivities": [
+        "Explore Waterfront Park Playground",
+        "Family time at Play City Eastlake",
+        "Afternoon stroll near Play City Eastlake"
+      ],
+      "stagedTheme": "play_indoor",
+      "stagedAnchor": "Funbox (Plaza Bonita, National City)",
+      "stagedSupport": [
+        "Coronado Beach"
+      ],
+      "stagedActivities": [
+        "Explore Coronado Beach",
+        "Family time at Funbox (Plaza Bonita, National City)",
+        "Afternoon stroll near Funbox (Plaza Bonita, National City)"
+      ]
+    },
+    {
+      "day": 4,
+      "scoreActivities": [
+        "Explore Mission Bay Park",
+        "Explore La Jolla Cove",
+        "Afternoon stroll near La Jolla Cove"
+      ],
+      "stagedTheme": "entertainment",
+      "stagedAnchor": "Belmont Park",
+      "stagedSupport": [
+        "Mission Beach Boardwalk"
+      ],
+      "stagedActivities": [
+        "Explore Mission Beach Boardwalk",
+        "Explore Belmont Park"
+      ]
+    },
+    {
+      "day": 5,
+      "scoreActivities": [
+        "Explore Torrey Pines State Natural Reserve",
+        "Explore La Jolla Cove",
+        "Pack up & unwind"
+      ],
+      "stagedTheme": "departure",
+      "stagedAnchor": "Torrey Pines State Natural Reserve",
+      "stagedSupport": [],
+      "stagedActivities": [
+        "Explore Torrey Pines State Natural Reserve",
+        "Pack up & unwind"
+      ]
+    }
+  ]
+}

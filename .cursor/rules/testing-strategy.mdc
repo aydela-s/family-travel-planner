@@ -1,0 +1,58 @@
+---
+description: Vitest vs Playwright testing strategy for planning engine and UI
+alwaysApply: true
+---
+
+# Testing Strategy
+
+## Vitest — deterministic business logic
+
+When implementing or changing business logic in the planning engine, decide whether a Vitest regression test should be added.
+
+**Add a Vitest test when the change affects deterministic business rules**, including:
+- meal timing
+- travel style
+- activity counts
+- nap scheduling
+- age-based behavior
+- budget style logic
+- transportation calculations
+- cost calculations
+- date calculations
+- validation rules
+- scheduling logic
+- opening hours
+- overlap detection
+- routing logic
+- any bug where expected output can be determined by code
+
+**Test requirements:**
+- Focus only on the business rule
+- Avoid unnecessary mocking
+- Keep tests small and easy to understand
+- Cover expected behavior and important edge cases when appropriate
+- Prevent regressions if the planning engine changes later
+
+**Do NOT add Playwright tests for these situations.**
+
+## Playwright — user interaction only
+
+Use Playwright only when the change affects user interaction, for example:
+- wizard flow
+- clicking buttons
+- forms
+- navigation
+- rendering
+- loading states
+- UI interactions
+
+## Before finishing any implementation
+
+Report:
+1. Whether a Vitest test was added
+2. Why it was or wasn't needed
+3. Which business rule the test protects
+
+## Regression bugs
+
+If fixing a P0 or P1 bug caused by deterministic business logic, treat it as a regression bug and add a Vitest test unless there is a clear reason it cannot be tested outside the browser.

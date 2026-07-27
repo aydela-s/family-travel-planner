@@ -13,6 +13,14 @@ import {
   switchPlanToTaxis,
   transitScheduleIsDifficult,
 } from "@/lib/planning-engine/transit-mode";
+import {
+  applyDailyThemes,
+  buildTripStrategy,
+  commitStopsToBlueprint,
+  placementFromDayBlueprint,
+  resolvePlannerEngine,
+} from "@/lib/planning-engine/staged";
+import type { PlannerEngine, TripBlueprint } from "@/lib/planning-engine/staged/types";
 import { PlanOptions } from "@/lib/planning-engine/types";
 import { validatePlannedItinerary } from "@/lib/planning-engine/validators";
 import { RawItinerary } from "@/types/itinerary";
@@ -23,6 +31,10 @@ export type PlanTripResult = {
   plan: TripPlan;
   /** Shown when we fell back from public transit to taxis. */
   transportNote?: string;
+  /** Engine selected for this run (staged may still use score until cutover). */
+  plannerEngine: PlannerEngine;
+  /** Present when the staged pipeline builds a blueprint (Phase 1+). */
+  blueprint?: TripBlueprint;
 };
 
 function effectivePlan(plan: TripPlan, options?: PlanOptions): TripPlan {
@@ -117,13 +129,16 @@ function applySurgicalAdjust(
 
 /**
  * Deterministic planning engine — builds itinerary structure in code.
- * AI recommendation layer (Phase 7) will fill slot choices later.
+ * Staged vacation pipeline (Strategy → Themes → Anchors → …) lands behind
+ * PLANNER_ENGINE / options.plannerEngine; default remains the score path.
  */
 export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult {
   const dateIssues = validateTripDates(plan);
   if (dateIssues.length > 0) {
     throw new Error(dateIssues.map((i) => i.message).join(" "));
   }
+
+  const plannerEngine = resolvePlannerEngine(options?.plannerEngine);
 
   let workingPlan = effectivePlan(plan, options);
   const city = options?.cityOverride ?? detectCity(workingPlan.destination);
@@ -134,6 +149,14 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
   if (transitResolved.transportNote) transportNote = transitResolved.transportNote;
 
   const dayCount = getTripDayCount(workingPlan.startDate, workingPlan.endDate);
+  let blueprint = applyDailyThemes(
+    buildTripStrategy(workingPlan, {
+      city,
+      transitMode: workingPlan.transportationType || "public-transportation",
+    }),
+    workingPlan,
+    city,
+  );
 
   if (
     options?.adjustDay &&
@@ -157,6 +180,8 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
       },
       plan: workingPlan,
       transportNote,
+      plannerEngine,
+      blueprint,
     };
   }
 
@@ -190,10 +215,12 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
       },
       plan: workingPlan,
       transportNote,
+      plannerEngine,
+      blueprint,
     };
   }
 
-  function buildFullRaw(p: TripPlan): RawItinerary {
+  function buildFullRawScore(p: TripPlan): RawItinerary {
     const usedRestaurants = new Set<string>();
     const usedLandmarks = new Set<string>();
     return {
@@ -212,21 +239,95 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
     };
   }
 
-  let raw = buildFullRaw(workingPlan);
+  function buildFullRawStaged(p: TripPlan): { raw: RawItinerary; blueprint: TripBlueprint } {
+    const withStops = commitStopsToBlueprint(blueprint, p, city);
+    const usedRestaurants = new Set<string>();
+    const ledger = new Set(withStops.ledger.landmarkNames);
+    const days = withStops.days.map((dayBp) => {
+      const adjustment = getAdjustmentContext(undefined, dayBp.dayIndex);
+      const slots = buildDaySkeleton(p, dayBp.dayIndex, dayCount, adjustment);
+      const { ctx, dropSlotKinds } = placementFromDayBlueprint(city, p, dayBp, ledger);
+      const filtered = slots.filter((s) => !dropSlotKinds.includes(s.kind));
+      const activities = fillDaySkeleton(
+        filtered,
+        p,
+        city,
+        ctx,
+        dayBp.dayIndex,
+        dayCount,
+        undefined,
+        usedRestaurants,
+      );
+      return {
+        day: dayBp.dayIndex,
+        activities: fixRawDayActivities(activities, p, adjustment, ctx),
+      };
+    });
+    return { raw: { days }, blueprint: withStops };
+  }
+
+  let raw: RawItinerary;
+  if (plannerEngine === "staged") {
+    const staged = buildFullRawStaged(workingPlan);
+    raw = staged.raw;
+    blueprint = staged.blueprint;
+  } else {
+    raw = buildFullRawScore(workingPlan);
+  }
 
   if (transitScheduleIsDifficult(raw, workingPlan, city)) {
     const fallback = switchPlanToTaxis(workingPlan, city);
     workingPlan = fallback.plan;
     transportNote = fallback.transportNote;
-    raw = buildFullRaw(workingPlan);
+    if (plannerEngine === "staged") {
+      // Rebuild themes/strategy under taxi plan, then re-commit stops.
+      blueprint = applyDailyThemes(
+        buildTripStrategy(workingPlan, {
+          city,
+          transitMode: workingPlan.transportationType || "taxis",
+        }),
+        workingPlan,
+        city,
+      );
+      const staged = buildFullRawStaged(workingPlan);
+      raw = staged.raw;
+      blueprint = staged.blueprint;
+    } else {
+      raw = buildFullRawScore(workingPlan);
+    }
   }
 
   return {
     raw: normalizeRawItinerary(raw, workingPlan),
     plan: workingPlan,
     transportNote,
+    plannerEngine,
+    blueprint,
   };
 }
+
+export {
+  resolvePlannerEngine,
+  createEmptyBlueprint,
+  emptyPlanningRules,
+  fingerprintRawItinerary,
+  buildTripStrategy,
+  buildExperienceCoverageTargets,
+  applyDailyThemes,
+  commitStopsToBlueprint,
+  selectAnchorForDay,
+  selectSupportForDay,
+} from "@/lib/planning-engine/staged";
+export type {
+  PlannerEngine,
+  PlanningRules,
+  TripBlueprint,
+  ExperienceCoverage,
+  DayGoal,
+  DayConstraint,
+  ThemeId,
+  ValidationViolation,
+} from "@/lib/planning-engine/staged";
 
 export function replanDay(
   plan: TripPlan,

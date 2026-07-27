@@ -1,0 +1,425 @@
+import type { CityConfig, Landmark, LandmarkInterestTag } from "@/config/city-pricing";
+import { haversineKm } from "@/lib/maps/directions";
+import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
+import { isLandmarkOpenForVisit, type VisitWindow } from "@/lib/schedule/landmark-hours";
+import { clusterRadiusKm } from "@/config/cluster-distances";
+import {
+  hasFixedOpeningHours,
+  hasTicketRequirement,
+  isIndoorPlayExperience,
+  isOutdoorPlayground,
+  isShorelineBeachExperience,
+  LOW_FRICTION_PREFERRED_KM,
+  LOW_FRICTION_STAY_KM,
+} from "@/lib/planning-engine/staged/landmark-experience";
+import type {
+  CommittedStop,
+  DayBlueprint,
+  DayConstraint,
+} from "@/lib/planning-engine/staged/types";
+import type { TripPlan } from "@/types/trip-plan";
+
+function stayKm(landmark: Landmark, plan: TripPlan): number | null {
+  if (typeof plan.stayLat !== "number" || typeof plan.stayLng !== "number") return null;
+  return haversineKm(landmark.lat, landmark.lng, plan.stayLat, plan.stayLng);
+}
+
+function hasConstraint(day: DayBlueprint, type: DayConstraint["type"]): boolean {
+  return day.constraints.some((c) => c.type === type);
+}
+
+function discourageTags(day: DayBlueprint): LandmarkInterestTag[] {
+  const tags: LandmarkInterestTag[] = [];
+  for (const c of day.constraints) {
+    if (c.type === "discourage_anchor_tags") tags.push(...c.tags);
+  }
+  return tags;
+}
+
+function requiredAnchorTags(day: DayBlueprint): {
+  tags: LandmarkInterestTag[];
+  mode: "any" | "all";
+} | null {
+  const c = day.constraints.find((x) => x.type === "anchor_primary_tags");
+  if (!c || c.type !== "anchor_primary_tags") return null;
+  return { tags: c.tags, mode: c.mode };
+}
+
+function matchesRequiredTags(
+  landmark: Landmark,
+  req: { tags: LandmarkInterestTag[]; mode: "any" | "all" },
+): boolean {
+  if (req.mode === "all") return req.tags.every((t) => landmark.interestTags.includes(t));
+  return req.tags.some((t) => landmark.interestTags.includes(t));
+}
+
+function isHighRiskTimeSensitive(landmark: Landmark): boolean {
+  return (
+    landmark.interestTags.includes("theme-parks") ||
+    landmark.intensity === "high" ||
+    Boolean(landmark.hoursByWeekday && Object.keys(landmark.hoursByWeekday).length > 0)
+  );
+}
+
+function isIndoorPaid(landmark: Landmark): boolean {
+  return Boolean(landmark.indoor && landmark.adultPrice > 0);
+}
+
+function isFlexibleOutdoor(landmark: Landmark): boolean {
+  return (
+    !landmark.indoor &&
+    landmark.adultPrice <= 0 &&
+    landmark.interestTags.some((t) =>
+      ["beaches", "parks", "nature", "playgrounds"].includes(t),
+    )
+  );
+}
+
+/** Distance score for arrival/departure — proximity dominates age/scenic fit. */
+function scoreStayProximity(km: number | null, maxKm: number): number {
+  if (km == null) return 0;
+  if (km <= LOW_FRICTION_PREFERRED_KM) return 70 - km * 2;
+  if (km <= maxKm) return 28 - (km - LOW_FRICTION_PREFERRED_KM) * 3;
+  // Beyond ~20–30 min: steep penalty (Torrey Pines / far La Jolla from downtown)
+  return -70 - (km - maxKm) * 5;
+}
+
+function isLowWalkingFriendly(landmark: Landmark): boolean {
+  return landmark.intensity === "low" || landmark.intensity === "medium";
+}
+
+/** Soft filters — candidates must pass hard ledger exclusion + required tags when present. */
+export function filterAnchorCandidates(
+  city: CityConfig,
+  day: DayBlueprint,
+  plan: TripPlan,
+  ledgerNames: Set<string>,
+  visitWindow?: VisitWindow,
+): Landmark[] {
+  const unused = city.landmarks.filter((l) => !ledgerNames.has(l.name));
+  let pool = unused.length > 0 ? unused : [...city.landmarks];
+
+  const req = requiredAnchorTags(day);
+  if (req) {
+    const matching = pool.filter((l) => matchesRequiredTags(l, req));
+    if (matching.length > 0) pool = matching;
+  }
+
+  // Beach theme: shoreline / ocean experience must beat bay parks when available
+  if (hasConstraint(day, "prefer_shoreline_beach_anchor") || day.theme.id === "beach") {
+    const shoreline = pool.filter(isShorelineBeachExperience);
+    if (shoreline.length > 0) pool = shoreline;
+  }
+
+  // Indoor play vs outdoor playgrounds — do not mix coverage buckets
+  if (day.theme.id === "play_indoor") {
+    const indoor = pool.filter(isIndoorPlayExperience);
+    if (indoor.length > 0) pool = indoor;
+  }
+  if (day.theme.id === "playgrounds") {
+    const outdoor = pool.filter(isOutdoorPlayground);
+    if (outdoor.length > 0) pool = outdoor;
+  }
+
+  // Preferred experience types (soft pre-filter when enough options)
+  const preferred = day.theme.preferredExperienceTypes;
+  if (preferred.length > 0) {
+    const pref = pool.filter((l) => l.interestTags.some((t) => preferred.includes(t)));
+    if (pref.length >= 2) pool = pref;
+  }
+
+  if (visitWindow) {
+    const open = pool.filter((l) => isLandmarkOpenForVisit(l, visitWindow));
+    if (open.length > 0) pool = open;
+  }
+
+  // Arrival/departure: prefer free flexible outdoor near stay when options exist
+  if (day.role === "arrival" || day.role === "departure") {
+    const far = day.constraints.find((c) => c.type === "avoid_far_attractions");
+    const maxKm = far && far.type === "avoid_far_attractions" ? far.maxKm : LOW_FRICTION_STAY_KM;
+    const near = pool.filter((l) => {
+      const km = stayKm(l, plan);
+      return km == null || km <= maxKm;
+    });
+    if (near.length > 0) pool = near;
+
+    // Prefer the soft sweet-spot ring (~15–20 min) when anything qualifies
+    const nearPreferred = pool.filter((l) => {
+      const km = stayKm(l, plan);
+      return km == null || km <= LOW_FRICTION_PREFERRED_KM;
+    });
+    if (nearPreferred.length > 0) pool = nearPreferred;
+
+    const freeFlex = pool.filter(
+      (l) => !hasTicketRequirement(l) && (isFlexibleOutdoor(l) || l.adultPrice <= 0),
+    );
+    if (freeFlex.length > 0) pool = freeFlex;
+
+    // Parks/playgrounds beat scenic beaches when both are near stay
+    const easyLocal = pool.filter(
+      (l) => isOutdoorPlayground(l) || l.interestTags.includes("parks"),
+    );
+    if (easyLocal.length > 0) pool = easyLocal;
+  } else if (hasConstraint(day, "prefer_free_anchor") || day.dayBudgetIntent === "free") {
+    const free = pool.filter((l) => l.adultPrice <= 0);
+    if (free.length > 0) pool = free;
+  } else if (hasConstraint(day, "prefer_paid_anchor") || day.dayBudgetIntent === "paid") {
+    const paid = pool.filter((l) => l.adultPrice > 0);
+    if (paid.length > 0) pool = paid;
+  }
+
+  if (hasConstraint(day, "prefer_recovery_outdoor")) {
+    const outdoor = pool.filter(
+      (l) =>
+        !l.indoor &&
+        l.interestTags.some((t) =>
+          ["beaches", "nature", "parks", "playgrounds"].includes(t),
+        ),
+    );
+    if (outdoor.length > 0) pool = outdoor;
+  }
+
+  return pool;
+}
+
+export function scoreAnchorCandidate(
+  landmark: Landmark,
+  day: DayBlueprint,
+  plan: TripPlan,
+  ledgerNames: Set<string>,
+): number {
+  const profile = getFamilyAgeProfile(plan);
+  const km = stayKm(landmark, plan);
+  const lowFrictionDay = day.role === "arrival" || day.role === "departure";
+  // Arrival/departure: proximity beats perfect age coverage (Waterfront vs Coronado).
+  const ageWeight = lowFrictionDay ? 0.25 : 1;
+  let score = 40 + landmarkAgeScore(landmark, profile) * ageWeight;
+
+  const req = requiredAnchorTags(day);
+  if (req && matchesRequiredTags(landmark, req)) score += 50;
+  else if (req) score -= 40;
+
+  for (const tag of day.theme.preferredExperienceTypes) {
+    if (landmark.interestTags.includes(tag)) score += lowFrictionDay ? 8 : 12;
+  }
+
+  const discouraged = discourageTags(day);
+  if (landmark.interestTags.some((t) => discouraged.includes(t))) score -= 35;
+
+  if (hasConstraint(day, "discourage_indoor_paid_anchor") && isIndoorPaid(landmark)) {
+    score -= 45;
+  }
+
+  if (hasConstraint(day, "avoid_high_risk_time_sensitive_anchor") && isHighRiskTimeSensitive(landmark)) {
+    score -= 40;
+  }
+
+  // Beach-first: shoreline anchors win; bay/park beaches lose hard
+  if (hasConstraint(day, "prefer_shoreline_beach_anchor") || day.theme.id === "beach") {
+    if (isShorelineBeachExperience(landmark)) score += 55;
+    else if (landmark.interestTags.includes("beaches") && /\bpark\b/i.test(landmark.name)) {
+      score -= 50;
+    } else if (!landmark.interestTags.includes("beaches")) {
+      score -= 30;
+    }
+  }
+
+  if (day.theme.id === "play_indoor") {
+    if (isIndoorPlayExperience(landmark)) score += 45;
+    else if (isOutdoorPlayground(landmark)) score -= 50;
+  }
+  if (day.theme.id === "playgrounds") {
+    if (isOutdoorPlayground(landmark)) score += 45;
+    else if (isIndoorPlayExperience(landmark)) score -= 50;
+  }
+
+  const far = day.constraints.find((c) => c.type === "avoid_far_attractions");
+  const maxKm =
+    far && far.type === "avoid_far_attractions" ? far.maxKm : LOW_FRICTION_STAY_KM;
+
+  if (lowFrictionDay) {
+    // Priority: 1 near stay → 2 free/flexible → 3 low walking → 4 scenic only if close
+    score += scoreStayProximity(km, maxKm);
+
+    if (hasTicketRequirement(landmark) || landmark.adultPrice > 0) {
+      // Departure: paid only when very close; arrival: always steep
+      if (day.role === "departure" && km != null && km <= LOW_FRICTION_PREFERRED_KM) {
+        score -= 45;
+      } else {
+        score -= 70;
+      }
+    } else {
+      score += 28;
+    }
+
+    if (hasConstraint(day, "avoid_paid_tickets") && hasTicketRequirement(landmark)) {
+      score -= 40;
+    }
+
+    if (
+      hasConstraint(day, "avoid_fixed_time_experiences") &&
+      (hasFixedOpeningHours(landmark) || isHighRiskTimeSensitive(landmark))
+    ) {
+      // Flexible outdoor parks/playgrounds often list hours but are low-risk
+      if (isFlexibleOutdoor(landmark) && !hasTicketRequirement(landmark)) {
+        score -= 5;
+      } else {
+        score -= 50;
+      }
+    }
+
+    if (hasConstraint(day, "prefer_low_walking") || day.goals.some((g) => g.type === "low_friction")) {
+      if (landmark.intensity === "low") score += 22;
+      if (landmark.intensity === "medium") score += 6;
+      if (landmark.intensity === "high") score -= 35;
+      if (!isLowWalkingFriendly(landmark)) score -= 15;
+    }
+
+    // Near-stay parks/playgrounds beat scenic beaches that require a longer drive
+    if (
+      km != null &&
+      km <= LOW_FRICTION_PREFERRED_KM &&
+      (isOutdoorPlayground(landmark) || landmark.interestTags.includes("parks"))
+    ) {
+      score += 45;
+    }
+
+    // Scenic / nature / beach bonus only when geographically close — never overrides near-stay
+    if (landmark.interestTags.some((t) => ["nature", "beaches"].includes(t))) {
+      if (km != null && km <= LOW_FRICTION_PREFERRED_KM) score += 10;
+      else if (km != null && km <= maxKm) score += 2;
+      else if (km != null && km > maxKm) score -= 30;
+    }
+
+    if (isFlexibleOutdoor(landmark)) score += 20;
+
+    // Indoor paid / aquariums / zoos are high-friction on travel days
+    if (landmark.interestTags.some((t) => ["zoos", "museums", "interactive"].includes(t))) {
+      score -= 40;
+    }
+    if (landmark.indoor && hasTicketRequirement(landmark)) score -= 35;
+  } else if (far && far.type === "avoid_far_attractions" && km != null) {
+    if (km > far.maxKm) score -= 40;
+    else score += Math.max(0, 15 - km);
+  }
+
+  for (const g of day.goals) {
+    if (g.type === "prefer_near_stay_or_flexible_outdoor" && km != null && !lowFrictionDay) {
+      if (km <= g.maxKm) score += 18;
+      else if (isFlexibleOutdoor(landmark)) score += 8;
+      else score -= 12;
+    }
+    if (g.type === "dedicated_experience" && landmark.interestTags.includes(g.tag)) {
+      score += 28;
+    }
+    if (g.type === "keep_energy_low" || g.type === "low_friction" || g.type === "easy_exit") {
+      if (landmark.intensity === "low") score += 14;
+      if (landmark.intensity === "high") score -= 20;
+    }
+    if (g.type === "include_older_appeal") {
+      if (
+        landmark.interestTags.some((t) =>
+          ["history", "interactive", "food-markets", "nature", "beaches", "entertainment"].includes(
+            t,
+          ),
+        )
+      ) {
+        score += 16;
+      }
+    }
+  }
+
+  if (day.dayBudgetIntent === "paid" && landmark.adultPrice > 0) score += 10;
+  if (day.dayBudgetIntent === "free" && landmark.adultPrice <= 0) score += 10;
+
+  if (ledgerNames.has(landmark.name)) score -= 500;
+
+  // Tiny deterministic jitter from name for stable ties
+  score += (landmark.name.length % 7) * 0.01;
+
+  return score;
+}
+
+export function toCommittedStop(landmark: Landmark, role: "anchor" | "support"): CommittedStop {
+  return {
+    landmarkName: landmark.name,
+    placeId: landmark.placeId,
+    role,
+    interestTags: landmark.interestTags,
+    isPaid: landmark.adultPrice > 0,
+  };
+}
+
+export type SelectAnchorOptions = {
+  visitWindow?: VisitWindow;
+  ledgerNames: Set<string>;
+  /** Soft-exclude landmarks (e.g. toddler-only when rebalancing mixed families). */
+  softExcludeNames?: Set<string>;
+};
+
+/** Pick the day's hero stop from a small filtered candidate set. */
+export function selectAnchorForDay(
+  city: CityConfig,
+  plan: TripPlan,
+  day: DayBlueprint,
+  opts: SelectAnchorOptions,
+): Landmark {
+  let candidates = filterAnchorCandidates(
+    city,
+    day,
+    plan,
+    opts.ledgerNames,
+    opts.visitWindow,
+  );
+  if (opts.softExcludeNames && opts.softExcludeNames.size > 0) {
+    const filtered = candidates.filter((l) => !opts.softExcludeNames!.has(l.name));
+    if (filtered.length > 0) candidates = filtered;
+  }
+  if (candidates.length === 0) {
+    return city.landmarks.find((l) => !opts.ledgerNames.has(l.name)) ?? city.landmarks[0]!;
+  }
+
+  const ranked = [...candidates]
+    .map((lm) => ({
+      lm,
+      score: scoreAnchorCandidate(lm, day, plan, opts.ledgerNames),
+    }))
+    .sort((a, b) => b.score - a.score || a.lm.name.localeCompare(b.lm.name));
+
+  return ranked[0]!.lm;
+}
+
+/** Soft near-stay / outdoor filler when no support stop is available. */
+export function selectSoftFiller(
+  city: CityConfig,
+  plan: TripPlan,
+  day: DayBlueprint,
+  anchor: Landmark,
+  ledgerNames: Set<string>,
+  visitWindow?: VisitWindow,
+): Landmark | null {
+  const radius = clusterRadiusKm(plan);
+  const exclude = new Set([...ledgerNames, anchor.name]);
+  let pool = city.landmarks.filter(
+    (l) =>
+      !exclude.has(l.name) &&
+      l.intensity !== "high" &&
+      !l.interestTags.includes("theme-parks") &&
+      haversineKm(l.lat, l.lng, anchor.lat, anchor.lng) <= radius,
+  );
+  if (visitWindow) {
+    const open = pool.filter((l) => isLandmarkOpenForVisit(l, visitWindow));
+    if (open.length > 0) pool = open;
+  }
+  const outdoor = pool.filter((l) =>
+    l.interestTags.some((t) => ["parks", "beaches", "nature", "playgrounds"].includes(t)),
+  );
+  const list = outdoor.length > 0 ? outdoor : pool;
+  if (list.length === 0) return null;
+  const profile = getFamilyAgeProfile(plan);
+  return [...list].sort(
+    (a, b) =>
+      landmarkAgeScore(b, profile) - landmarkAgeScore(a, profile) ||
+      a.adultPrice - b.adultPrice,
+  )[0]!;
+}

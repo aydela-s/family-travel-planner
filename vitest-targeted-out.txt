@@ -1,0 +1,68 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will error in a future major version of npm. See `npm help 
+npmrc` for supported config options.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\aydel\AppData\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice run family-travel-planner@0.1.0 npx
+npm notice run vitest run src/lib/planning-engine/staged --reporter=verbose
+
+ RUN  v4.1.10 C:/Users/aydel/Projects/family-travel-planner
+
+ Γ£ô src/lib/planning-engine/staged/blueprint.test.ts > emptyPlanningRules ΓÇö Budget/Pace as strategy seeds > save prefers fewer paid days and picnic lunches 4ms
+ Γ£ô src/lib/planning-engine/staged/blueprint.test.ts > emptyPlanningRules ΓÇö Budget/Pace as strategy seeds > splurge raises paid ratio and skips cook nights 1ms
+ Γ£ô src/lib/planning-engine/staged/blueprint.test.ts > emptyPlanningRules ΓÇö Budget/Pace as strategy seeds > packed pace allows more support stops than relaxed 0ms
+ Γ£ô src/lib/planning-engine/staged/blueprint.test.ts > createEmptyBlueprint > creates a versioned shell with one day slot per date 1ms
+ Γ£ô src/lib/planning-engine/staged/engine-flag.test.ts > resolvePlannerEngine > defaults to score when unset 6ms
+ Γ£ô src/lib/planning-engine/staged/engine-flag.test.ts > resolvePlannerEngine > honors explicit option over env 0ms
+ Γ£ô src/lib/planning-engine/staged/engine-flag.test.ts > resolvePlannerEngine > reads PLANNER_ENGINE=staged from env 1ms
+ Γ£ô src/lib/planning-engine/staged/strategy-builder.test.ts > assignDayRoles > marks first/last as arrival/departure on 5-day trips 5ms
+ Γ£ô src/lib/planning-engine/staged/strategy-builder.test.ts > assignDayRoles > uses arrival+departure for 2-day trips 0ms
+ Γ£ô src/lib/planning-engine/staged/strategy-builder.test.ts > goalsAndConstraintsForRole > arrival is low-friction with soft outdoor/near-stay preference 1ms
+ Γ£ô src/lib/planning-engine/staged/strategy-builder.test.ts > buildTripStrategy > seeds ExperienceCoverage from selected interests 3ms
+ Γ£ô src/lib/planning-engine/staged/strategy-builder.test.ts > buildTripStrategy > assigns arrival goals on day 1 and departure on last day 2ms
+ Γ£ô src/lib/planning-engine/staged/strategy-builder.test.ts > buildTripStrategy > compiles budget/pace into rules consumed by later stages 1ms
+ Γ£ô src/lib/planning-engine/staged/theme-generator.test.ts > eligibleInterestThemes > maps zoos interest to animals and includes beach/play/interactive/entertainment 4ms
+ Γ£ô src/lib/planning-engine/staged/theme-generator.test.ts > scoreTheme weights > penalizes repeating the same primary theme on adjacent days 2ms
+ ├ù src/lib/planning-engine/staged/theme-generator.test.ts > applyDailyThemes ΓÇö San Diego 5-day shadow > assigns arrival / experience days / departure with internal theme ids 14ms
+   ΓåÆ expected [ 'playgrounds', 'play_indoor', ΓÇª(1) ] to include 'beach'
+ Γ£ô src/lib/planning-engine/staged/theme-generator.test.ts > applyDailyThemes ΓÇö San Diego 5-day shadow > keeps theme ids internal (not narrative display titles) 2ms
+ Γ£ô src/lib/planning-engine/staged/theme-generator.test.ts > applyDailyThemes ΓÇö San Diego 5-day shadow > mixed-age mixed_family days require older-appeal goal 2ms
+ Γ£ô src/lib/planning-engine/staged/golden-fixture.test.ts > golden fixture harness (Phase 0) > defaults to the score engine 6ms
+ Γ£ô src/lib/planning-engine/staged/golden-fixture.test.ts > golden fixture harness (Phase 0) > produces a stable fingerprint shape for the canonical SD trip 84ms
+ Γ£ô src/lib/planning-engine/staged/compare-engines.artifact.test.ts > compare planner engines (artifact) > writes score vs staged JSON for review 112ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > selectAnchorForDay > picks a beach-primary landmark on beach theme days 26ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > selectAnchorForDay > picks a shoreline beach anchor, not a bay park 1ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > selectAnchorForDay > keeps arrival near stay and free/flexible (not Torrey Pines) 7ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > selectAnchorForDay > avoids paid aquariums as departure anchors when free near-stay options exist 4ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > selectAnchorForDay > picks indoor play for play_indoor theme, not outdoor playgrounds 3ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > commitStopsToBlueprint > hard-excludes anchors across days (no duplicate landmark names) 10ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > commitStopsToBlueprint > does not let outdoor playgrounds satisfy indoor-play coverage 14ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > commitStopsToBlueprint > limits mixed families to at most one toddler-only full day 8ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > planTrip staged engine > uses blueprint anchors in activity titles when plannerEngine=staged 47ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > planTrip staged engine > does not clone the same activity pair across 3+ days 8ms
+ Γ£ô src/lib/planning-engine/staged/anchor-support.test.ts > planTrip staged engine > defaults to score engine without changing staged flag behavior for callers 12ms
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  src/lib/planning-engine/staged/theme-generator.test.ts > applyDailyThemes ΓÇö San Diego 5-day shadow > assigns 
+arrival / experience days / departure with internal theme ids
+AssertionError: expected [ 'playgrounds', 'play_indoor', ΓÇª(1) ] to include 'beach'
+ Γ¥» src/lib/planning-engine/staged/theme-generator.test.ts:104:20
+    102|       ]).toContain(id);
+    103|     }
+    104|     expect(middle).toContain("beach");
+       |                    ^
+    105|     expect(middle.some((id) => id === "interactive" || id === "animalsΓÇª
+    106|     expect(
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+
+ Test Files  1 failed | 6 passed (7)
+      Tests  1 failed | 31 passed (32)
+   Start at  22:56:06
+   Duration  10.99s (transform 3.81s, setup 0ms, import 6.01s, tests 423ms, environment 1ms)
+
