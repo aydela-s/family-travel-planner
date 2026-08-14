@@ -71,7 +71,9 @@ export function buildItineraryPdf(ctx: ItineraryExportContext): {
 
   for (const day of itinerary.days) {
     const c = day.costBreakdown;
-    const dayTitle = `Day ${day.day} · ${day.formattedDate}`;
+    const dayTitle = day.displayTitle
+      ? `Day ${day.day} · ${day.displayTitle}`
+      : `Day ${day.day} · ${day.formattedDate}`;
     const dayTotal = moneyWhole(c.total, symbol);
 
     y = ensureSpace(doc, y, 56);
@@ -81,6 +83,14 @@ export function buildItineraryPdf(ctx: ItineraryExportContext): {
     doc.text(dayTitle, MARGIN, y);
     doc.text(dayTotal, pageWidth - MARGIN, y, { align: "right" });
     y += 18;
+
+    if (day.displayTitle) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(90, 90, 90);
+      doc.text(day.formattedDate, MARGIN, y);
+      y += 14;
+    }
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);

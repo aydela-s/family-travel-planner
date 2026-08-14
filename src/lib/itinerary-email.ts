@@ -127,7 +127,9 @@ export function buildItineraryEmailModel(input: {
     dietary: plan?.dietaryRestrictions?.trim() || "Nothing specific",
     interests:
       plan?.interests && plan.interests.length > 0 ? plan.interests.join(", ") : "—",
-    day1Title: "Day 1",
+    day1Title: itinerary.days[0]?.displayTitle
+      ? `Day 1 · ${itinerary.days[0].displayTitle}`
+      : "Day 1",
     day1Stops: buildDay1PreviewStops(itinerary.days[0]),
     moreDaysCount,
     moreDaysNote:

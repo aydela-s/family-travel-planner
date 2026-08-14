@@ -291,9 +291,14 @@ function DayCard({ day, symbol }: { day: ItineraryDay; symbol: string }) {
   return (
     <section className="animate-fade-in overflow-hidden rounded-3xl border border-border bg-surface shadow-[var(--shadow-card)]">
       <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-5 sm:px-6">
-        <h3 className="min-w-0 text-xl font-bold text-ink sm:text-2xl">
-          Day {day.day} · {day.formattedDate}
-        </h3>
+        <div className="min-w-0">
+          <h3 className="text-xl font-bold text-ink sm:text-2xl">
+            Day {day.day} · {day.displayTitle || day.formattedDate}
+          </h3>
+          {day.displayTitle ? (
+            <p className="mt-0.5 text-sm font-medium text-muted">{day.formattedDate}</p>
+          ) : null}
+        </div>
         <p className="shrink-0 text-2xl font-bold tabular-nums text-ink sm:text-3xl">{total}</p>
       </header>
 

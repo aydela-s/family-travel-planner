@@ -159,7 +159,9 @@ export function formatItineraryPlainText(ctx: ItineraryExportContext): string {
   for (const day of itinerary.days) {
     const c = day.costBreakdown;
     lines.push(
-      `Day ${day.day} · ${day.formattedDate || formatTripDate(day.date)}  ${moneyWhole(c.total, symbol)}`,
+      day.displayTitle
+        ? `Day ${day.day} · ${day.displayTitle} · ${day.formattedDate || formatTripDate(day.date)}  ${moneyWhole(c.total, symbol)}`
+        : `Day ${day.day} · ${day.formattedDate || formatTripDate(day.date)}  ${moneyWhole(c.total, symbol)}`,
     );
     lines.push(
       `Food ${moneyWhole(c.food, symbol)}  ·  Transport ${moneyWhole(c.transport, symbol)}  ·  Activities ${moneyWhole(c.activities, symbol)}`,

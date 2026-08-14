@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { enrichItineraryTipsWithAi } from "@/lib/ai/enrich-tips";
+import { applyFallbackDisplayTitles } from "@/lib/ai/display-titles";
+import { polishItineraryWithAi } from "@/lib/ai/polish-itinerary";
 import { shouldEnrichItineraryWithAi } from "@/lib/ai/config";
 import { enrichItinerary, isDemoMode } from "@/lib/enrich-itinerary";
 import { isValidTripPlan, normalizeRawItinerary } from "@/lib/itinerary";
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
 
     const enrichedDay = body.existingItinerary?.days.find((d) => d.day === body.adjustDay);
 
-    const { raw, plan: effectivePlan, transportNote } = planTrip(plan, {
+    const { raw, plan: effectivePlan, transportNote, blueprint } = planTrip(plan, {
       relaxed: body.relaxed,
       adjustDay: body.adjustDay,
       adjustAction: body.adjustAction,
@@ -87,12 +88,13 @@ export async function POST(request: Request) {
       cityOverride: city,
     });
 
-    // Optional AI tips via Vercel AI Gateway — never blocks the deterministic plan.
+    // Theme display titles always; optional AI polish never blocks the deterministic plan.
+    enriched = applyFallbackDisplayTitles(enriched, blueprint);
     if (shouldEnrichItineraryWithAi(useDemo)) {
       try {
-        enriched = await enrichItineraryTipsWithAi(enriched, effectivePlan);
+        enriched = await polishItineraryWithAi(enriched, effectivePlan, blueprint);
       } catch (aiError) {
-        console.warn("AI Gateway tip enrichment skipped:", aiError);
+        console.warn("AI Gateway polish skipped:", aiError);
       }
     }
 

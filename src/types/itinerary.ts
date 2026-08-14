@@ -58,6 +58,8 @@ export type ItineraryDay = {
   date: string;
   weekday: string;
   formattedDate: string;
+  /** User-facing vacation title (theme polish). Internal theme ids stay off this field. */
+  displayTitle?: string;
   activities: ItineraryActivity[];
   /** Informational family daily costs — food/transport/activities, no cap or target. */
   costBreakdown: DayCostBreakdown;

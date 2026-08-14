@@ -174,9 +174,21 @@ describe("itinerary email model — FAM-50", () => {
     expect(model.feedbackUrl).toBe("http://localhost:3000/feedback");
     expect(model.pdfUrl).toBeUndefined();
     expect(model.subject).toContain("Paris");
+    expect(model.day1Title).toBe("Day 1");
     // Email clients can't fetch localhost — logo uses a public asset host.
     expect(model.logoUrl).toMatch(/^https:\/\/.+\/tripnestly-logo\.png$/);
     expect(model.logoUrl).not.toMatch(/localhost/);
+  });
+
+  it("uses the polished display title in the Day 1 preview heading", () => {
+    const itinerary = sampleItinerary();
+    itinerary.days[0]!.displayTitle = "Easy Arrival Day";
+    const model = buildItineraryEmailModel({
+      itinerary,
+      plan: samplePlan(),
+      appOrigin: "http://localhost:3000",
+    });
+    expect(model.day1Title).toBe("Day 1 · Easy Arrival Day");
   });
 
   it("deep-links View Full Itinerary to the editable shared trip", () => {
