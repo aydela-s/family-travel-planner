@@ -81,10 +81,10 @@ describe("nap + lunch coordination", () => {
     expect(end).toBeLessThanOrEqual(13 * 60);
     expect(end - start).toBeLessThanOrEqual(60);
     expect(end - start).toBeGreaterThanOrEqual(20);
-    expect(nap.notes).toBe("Protected downtime 12:00 PM–1:00 PM.");
+    expect(nap.notes).toBeUndefined();
   });
 
-  it("echoes the typed 12:00–1:30 nap window in the note (not travel-slip times)", () => {
+  it("schedules nap at the typed window without protected-downtime notes", () => {
     const trip = plan({
       children: [4],
       naps: [{ startTime: "12:00 PM", endTime: "1:30 PM", type: "regular" }],
@@ -121,7 +121,7 @@ describe("nap + lunch coordination", () => {
     );
 
     const nap = scheduled.find((a) => a.type === "nap")!;
-    expect(nap.notes).toBe("Protected downtime 12:00 PM–1:30 PM.");
+    expect(nap.notes).toBeUndefined();
     expect(parseTimeToMinutes(nap.time)).toBe(12 * 60);
   });
 });

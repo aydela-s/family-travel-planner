@@ -11,6 +11,7 @@ import {
   LOW_FRICTION_STAY_KM,
   selectAnchorForDay,
 } from "@/lib/planning-engine/staged";
+import { sharesDayActivityCategory } from "@/lib/planning-engine/staged/landmark-experience";
 import { activityTitlesByDay } from "@/lib/planning-engine/staged/fingerprint";
 import { haversineKm } from "@/lib/maps/directions";
 import { TripPlan } from "@/types/trip-plan";
@@ -175,12 +176,15 @@ describe("commitStopsToBlueprint", () => {
     const committed = commitStopsToBlueprint(themed, plan, city);
     const arrival = committed.days.find((d) => d.role === "arrival")!;
     expect(arrival.support.length).toBeGreaterThan(0);
+    const anchor = city.landmarks.find((l) => l.name === arrival.anchor!.landmarkName)!;
     const support = city.landmarks.find((l) => l.name === arrival.support[0]!.landmarkName)!;
     const km = haversineKm(support.lat, support.lng, plan.stayLat!, plan.stayLng!);
     expect(km).toBeLessThanOrEqual(LOW_FRICTION_STAY_KM);
     expect(support.adultPrice).toBe(0);
     expect(support.interestTags.includes("museums")).toBe(false);
     expect(support.name).not.toMatch(/Balboa Park/i);
+    expect(sharesDayActivityCategory(anchor, support)).toBe(false);
+    expect(support.name).not.toMatch(/Coronado Beach/i);
   });
 
   it("assigns a shoreline beach anchor on beach theme days end-to-end", () => {

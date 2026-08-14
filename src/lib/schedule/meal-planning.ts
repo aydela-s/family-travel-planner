@@ -785,16 +785,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
     const scheduled = {
       ...item,
       ...span,
-      ...(item.type === "nap" && thisNapWindow
-        ? {
-            // Always echo the family's chosen window in the note (not travel-slip clock times).
-            notes: `Protected downtime ${formatMeridiemTime(thisNapWindow.startMin)}–${formatMeridiemTime(thisNapWindow.endMin)}.`,
-          }
-        : item.type === "nap"
-          ? {
-              notes: `Protected downtime ${formatMeridiemTime(start)}–${formatMeridiemTime(start + duration)}.`,
-            }
-          : {}),
+      ...(item.type === "nap" ? { notes: undefined } : {}),
     };
     result.push(scheduled);
     cursor = parseTimeToMinutes(scheduled.endTime);

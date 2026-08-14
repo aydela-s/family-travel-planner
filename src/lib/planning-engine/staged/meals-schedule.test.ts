@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CITY_CONFIGS } from "@/config/city-pricing";
 import { restaurantsForCityId } from "@/config/city-restaurants";
 import { planTrip } from "@/lib/planning-engine";
+import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import {
   applyDailyThemes,
   buildTripStrategy,
@@ -75,12 +76,14 @@ describe("planMealsOnBlueprint", () => {
 describe("planTrip staged meals + schedule", () => {
   const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
 
-  it("keeps typed nap window in nap notes", () => {
+  it("keeps typed nap window in schedule without protected-downtime notes", () => {
     const { raw } = planTrip(sdPlan(), { cityOverride: city, plannerEngine: "staged" });
     const nap = raw.days.flatMap((d) => d.activities).find((a) => a.type === "nap");
     expect(nap).toBeDefined();
-    expect(nap!.notes).toMatch(/Protected downtime/i);
-    expect(nap!.notes).toMatch(/12:30|2:00|14:00/i);
+    expect(nap!.title).toMatch(/Nap & Quiet Time/i);
+    expect(nap!.notes).toBeUndefined();
+    expect(parseTimeToMinutes(nap!.time)).toBeGreaterThanOrEqual(12 * 60 + 25);
+    expect(parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(14 * 60 + 5);
   });
 
   it("includes committed anchor names in activity titles", () => {

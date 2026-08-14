@@ -11,6 +11,7 @@ import {
   isShorelineBeachExperience,
   LOW_FRICTION_PREFERRED_KM,
   LOW_FRICTION_STAY_KM,
+  sharesAnyDayActivityCategory,
 } from "@/lib/planning-engine/staged/landmark-experience";
 import type {
   CommittedStop,
@@ -448,6 +449,7 @@ export function selectSoftFiller(
       !exclude.has(l.name) &&
       l.intensity !== "high" &&
       !l.interestTags.includes("theme-parks") &&
+      !sharesAnyDayActivityCategory(l, [anchor]) &&
       haversineKm(l.lat, l.lng, anchor.lat, anchor.lng) <= radius,
   );
   if (visitWindow) {

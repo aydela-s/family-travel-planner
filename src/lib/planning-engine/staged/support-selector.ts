@@ -7,6 +7,8 @@ import {
   isOutdoorPlayground,
   LOW_FRICTION_PREFERRED_KM,
   LOW_FRICTION_STAY_KM,
+  sharesAnyDayActivityCategory,
+  sharesDayActivityCategory,
 } from "@/lib/planning-engine/staged/landmark-experience";
 import type { DayBlueprint } from "@/lib/planning-engine/staged/types";
 import type { TripPlan } from "@/types/trip-plan";
@@ -128,6 +130,9 @@ export function selectSupportForDay(
 
   let pool = city.landmarks.filter((l) => !exclude.has(l.name));
 
+  // Never stack the same experience category twice on one day (e.g. beach + waterfront playground).
+  pool = pool.filter((l) => !sharesDayActivityCategory(l, anchor));
+
   if (day.role === "arrival") {
     const nearStay = pool.filter((l) => {
       const km = stayKm(l, plan);
@@ -177,6 +182,7 @@ export function selectSupportForDay(
   const picked: Landmark[] = [];
   for (const row of ranked) {
     if (picked.length >= n) break;
+    if (sharesAnyDayActivityCategory(row.lm, [anchor, ...picked])) continue;
     picked.push(row.lm);
     exclude.add(row.lm.name);
   }

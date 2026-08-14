@@ -39,6 +39,12 @@ function mealTierFromActivity(activity: ItineraryActivity): keyof typeof MEAL_TI
   if (t.includes("picnic") || t.includes("sandwich")) return "picnic";
   if (t.includes("supermarket") || t.includes("ready-meal")) return "supermarket";
   if (
+    (t.includes("takeout") || t.includes("delivery")) &&
+    t.includes("lunch")
+  ) {
+    return "picnic";
+  }
+  if (
     t.includes("pastries") ||
     t.includes("bakery") ||
     t.includes("casual") ||

@@ -34,9 +34,47 @@ export function isIndoorPlayExperience(landmark: Landmark): boolean {
   return Boolean(landmark.indoor && landmark.interestTags.includes("playgrounds"));
 }
 
+/** Waterfront / shoreline experiences — at most one per day alongside other water tags. */
+export function isWaterfrontExperience(landmark: Landmark): boolean {
+  if (landmark.interestTags.includes("beaches")) return true;
+  return /\b(waterfront|beach|cove|boardwalk|bay|harbor|pier|shore|seawall)\b/i.test(
+    landmark.name,
+  );
+}
+
+/** Interest tags that should not repeat across anchor + support on the same day. */
+export const DAY_EXCLUSIVE_ACTIVITY_TAGS = [
+  "beaches",
+  "zoos",
+  "theme-parks",
+  "interactive",
+  "indoor-play",
+  "playgrounds",
+] as const;
+
+export function dayActivityCategories(landmark: Landmark): Set<string> {
+  const cats = new Set<string>();
+  for (const tag of DAY_EXCLUSIVE_ACTIVITY_TAGS) {
+    if (landmark.interestTags.includes(tag)) cats.add(tag);
+  }
+  if (isWaterfrontExperience(landmark)) cats.add("waterfront");
+  return cats;
+}
+
+export function sharesDayActivityCategory(a: Landmark, b: Landmark): boolean {
+  const left = dayActivityCategories(a);
+  for (const cat of dayActivityCategories(b)) {
+    if (left.has(cat)) return true;
+  }
+  return false;
+}
+
+export function sharesAnyDayActivityCategory(landmark: Landmark, others: Landmark[]): boolean {
+  return others.some((other) => sharesDayActivityCategory(landmark, other));
+}
+
 /** Toddler/young-child only — weak for mixed families with tweens/teens. */
 export function isYoungChildOnlyLandmark(landmark: Landmark): boolean {
-  if (landmark.ageTags.length === 0) return false;
   const hasOlder = landmark.ageTags.some((t) => t === "tween" || t === "teen");
   if (hasOlder) return false;
   return landmark.ageTags.every((t) => t === "toddler" || t === "child");

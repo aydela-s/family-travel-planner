@@ -271,11 +271,7 @@ function fillSlot(
           ),
           type,
           notes:
-            ctx.afternoon.adultPrice > 0
-              ? "Paid stop within your family budget."
-              : plan.walkingLimit === "low"
-                ? "Short walks, stroller-friendly."
-                : "Light exploring between stops.",
+            ctx.afternoon.adultPrice > 0 ? "Paid stop within your family budget." : undefined,
         },
         ctx.afternoon,
       );

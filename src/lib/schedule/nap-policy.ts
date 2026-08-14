@@ -187,7 +187,6 @@ export function createNapActivity(window: NapWindow): RawActivity {
     time: minutesToTime(window.startMin),
     title: "Nap & Quiet Time",
     type: "nap",
-    notes: `Protected downtime ${formatMeridiemTime(window.startMin)}–${formatMeridiemTime(window.endMin)}.`,
   };
 }
 
