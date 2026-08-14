@@ -64,6 +64,13 @@ function summarize(engine: "score" | "staged") {
           tags: s.interestTags,
           isPaid: s.isPaid,
         })) ?? [],
+      meals:
+        bp?.meals.map((m) => ({
+          slot: m.slot,
+          mode: m.mode,
+          restaurantName: m.restaurantName ?? null,
+          nearLandmarkName: m.nearLandmarkName ?? null,
+        })) ?? [],
       timeline: d.activities.map((a) => ({
         time: a.time,
         endTime: a.endTime,

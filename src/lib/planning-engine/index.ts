@@ -17,7 +17,8 @@ import {
   applyDailyThemes,
   buildTripStrategy,
   commitStopsToBlueprint,
-  placementFromDayBlueprint,
+  buildScheduleFromBlueprint,
+  planMealsOnBlueprint,
   resolvePlannerEngine,
 } from "@/lib/planning-engine/staged";
 import type { PlannerEngine, TripBlueprint } from "@/lib/planning-engine/staged/types";
@@ -241,29 +242,16 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
 
   function buildFullRawStaged(p: TripPlan): { raw: RawItinerary; blueprint: TripBlueprint } {
     const withStops = commitStopsToBlueprint(blueprint, p, city);
-    const usedRestaurants = new Set<string>();
-    const ledger = new Set(withStops.ledger.landmarkNames);
-    const days = withStops.days.map((dayBp) => {
+    const withMeals = planMealsOnBlueprint(withStops, p, city);
+    const days = withMeals.days.map((dayBp) => {
       const adjustment = getAdjustmentContext(undefined, dayBp.dayIndex);
-      const slots = buildDaySkeleton(p, dayBp.dayIndex, dayCount, adjustment);
-      const { ctx, dropSlotKinds } = placementFromDayBlueprint(city, p, dayBp, ledger);
-      const filtered = slots.filter((s) => !dropSlotKinds.includes(s.kind));
-      const activities = fillDaySkeleton(
-        filtered,
-        p,
-        city,
-        ctx,
-        dayBp.dayIndex,
-        dayCount,
-        undefined,
-        usedRestaurants,
-      );
+      const { activities, ctx } = buildScheduleFromBlueprint(dayBp, p, city);
       return {
         day: dayBp.dayIndex,
         activities: fixRawDayActivities(activities, p, adjustment, ctx),
       };
     });
-    return { raw: { days }, blueprint: withStops };
+    return { raw: { days }, blueprint: withMeals };
   }
 
   let raw: RawItinerary;
@@ -317,6 +305,8 @@ export {
   commitStopsToBlueprint,
   selectAnchorForDay,
   selectSupportForDay,
+  planMealsOnBlueprint,
+  buildScheduleFromBlueprint,
 } from "@/lib/planning-engine/staged";
 export type {
   PlannerEngine,
@@ -326,6 +316,7 @@ export type {
   DayGoal,
   DayConstraint,
   ThemeId,
+  MealIntent,
   ValidationViolation,
 } from "@/lib/planning-engine/staged";
 

@@ -89,6 +89,7 @@
         ],
         "anchor": null,
         "support": [],
+        "meals": [],
         "timeline": [
           {
             "time": "08:30",
@@ -142,6 +143,7 @@
         ],
         "anchor": null,
         "support": [],
+        "meals": [],
         "timeline": [
           {
             "time": "08:30",
@@ -199,6 +201,7 @@
         ],
         "anchor": null,
         "support": [],
+        "meals": [],
         "timeline": [
           {
             "time": "08:30",
@@ -256,6 +259,7 @@
         ],
         "anchor": null,
         "support": [],
+        "meals": [],
         "timeline": [
           {
             "time": "08:30",
@@ -319,6 +323,7 @@
         ],
         "anchor": null,
         "support": [],
+        "meals": [],
         "timeline": [
           {
             "time": "08:30",
@@ -448,6 +453,20 @@
             "isPaid": false
           }
         ],
+        "meals": [
+          {
+            "slot": "lunch",
+            "mode": "takeout_at_stay",
+            "restaurantName": null,
+            "nearLandmarkName": "Waterfront Park Playground"
+          },
+          {
+            "slot": "dinner",
+            "mode": "named_restaurant",
+            "restaurantName": "Mr. Charlie's",
+            "nearLandmarkName": "Waterfront Park Playground"
+          }
+        ],
         "timeline": [
           {
             "time": "08:30",
@@ -524,6 +543,20 @@
             "isPaid": false
           }
         ],
+        "meals": [
+          {
+            "slot": "lunch",
+            "mode": "takeout_at_stay",
+            "restaurantName": null,
+            "nearLandmarkName": "La Jolla Cove"
+          },
+          {
+            "slot": "dinner",
+            "mode": "named_restaurant",
+            "restaurantName": "Evolution Fast Food",
+            "nearLandmarkName": "La Jolla Cove"
+          }
+        ],
         "timeline": [
           {
             "time": "08:30",
@@ -596,6 +629,20 @@
               "playgrounds"
             ],
             "isPaid": false
+          }
+        ],
+        "meals": [
+          {
+            "slot": "lunch",
+            "mode": "takeout_at_stay",
+            "restaurantName": null,
+            "nearLandmarkName": "Fleet Science Center"
+          },
+          {
+            "slot": "dinner",
+            "mode": "named_restaurant",
+            "restaurantName": "Plumeria Vegetarian Restaurant",
+            "nearLandmarkName": "Fleet Science Center"
           }
         ],
         "timeline": [
@@ -673,6 +720,20 @@
             "isPaid": false
           }
         ],
+        "meals": [
+          {
+            "slot": "lunch",
+            "mode": "takeout_at_stay",
+            "restaurantName": null,
+            "nearLandmarkName": "Mission Bay Park"
+          },
+          {
+            "slot": "dinner",
+            "mode": "named_restaurant",
+            "restaurantName": "Kindred",
+            "nearLandmarkName": "Mission Bay Park"
+          }
+        ],
         "timeline": [
           {
             "time": "08:30",
@@ -743,6 +804,20 @@
           "isPaid": false
         },
         "support": [],
+        "meals": [
+          {
+            "slot": "lunch",
+            "mode": "takeout_at_stay",
+            "restaurantName": null,
+            "nearLandmarkName": "Liberty Public Market"
+          },
+          {
+            "slot": "dinner",
+            "mode": "named_restaurant",
+            "restaurantName": "The Prado at Balboa Park",
+            "nearLandmarkName": "Liberty Public Market"
+          }
+        ],
         "timeline": [
           {
             "time": "08:30",

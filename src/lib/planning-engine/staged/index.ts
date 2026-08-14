@@ -45,6 +45,15 @@ export {
   type StagedDayPlacement,
 } from "@/lib/planning-engine/staged/fill-stops";
 export {
+  planMealsOnBlueprint,
+  planMealsForDay,
+  labelForMealIntent,
+} from "@/lib/planning-engine/staged/meal-planner";
+export {
+  buildScheduleFromBlueprint,
+  type StagedDaySchedule,
+} from "@/lib/planning-engine/staged/schedule-builder";
+export {
   TRIP_BLUEPRINT_VERSION,
   type CommittedStop,
   type DayBlueprint,
