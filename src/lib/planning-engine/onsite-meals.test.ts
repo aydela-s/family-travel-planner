@@ -8,8 +8,8 @@ import { TripPlan } from "@/types/trip-plan";
 function basePlan(overrides: Partial<TripPlan> = {}): TripPlan {
   return {
     destination: "San Diego, CA",
-    startDate: "2026-08-12",
-    endDate: "2026-08-12",
+    startDate: "2026-09-16",
+    endDate: "2026-09-16",
     adults: 2,
     children: [5],
     travelStyle: "balanced",
@@ -34,7 +34,12 @@ describe("on-site café meals", () => {
   it("schedules lunch at a venue café when morning stop supports on-site lunch", () => {
     const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
     const fleet = city.landmarks.find((l) => l.name === "Fleet Science Center")!;
-    const plan = basePlan({ startDate: "2026-08-12", endDate: "2026-08-12" });
+    // Save lunch is not a named-restaurant meal, so on-site café preference can win.
+    const plan = basePlan({
+      startDate: "2026-09-16",
+      endDate: "2026-09-16",
+      budgetStyle: "save",
+    });
     const ctx = buildLandmarkContext(city, plan, 1, 1);
     // Force morning to Fleet (open Wednesday) to assert café preference.
     const forced = { ...ctx, morning: fleet };
@@ -48,8 +53,8 @@ describe("on-site café meals", () => {
     const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
     const fleet = city.landmarks.find((l) => l.name === "Fleet Science Center")!;
     const plan = basePlan({
-      startDate: "2026-08-12",
-      endDate: "2026-08-12",
+      startDate: "2026-09-16",
+      endDate: "2026-09-16",
       dietaryRestrictions: "Gluten-free",
       budgetStyle: "splurge",
     });

@@ -16,8 +16,8 @@ import { RawItinerary } from "@/types/itinerary";
 function basePlan(overrides: Partial<TripPlan> = {}): TripPlan {
   return {
     destination: "San Diego, CA",
-    startDate: "2026-08-10",
-    endDate: "2026-08-12",
+    startDate: "2026-09-15",
+    endDate: "2026-09-15",
     adults: 2,
     children: [5],
     travelStyle: "balanced",
@@ -113,28 +113,32 @@ describe("transit quality gates", () => {
   });
 
   it("planTrip San Diego + public transit falls back to taxis with a note when hard", () => {
-    const { plan, transportNote } = planTrip(basePlan());
-    // Spread interests across beaches + parks typically force long legs in SD
+    const { plan, transportNote } = planTrip(
+      basePlan({
+        // Multi-day + far-flung interests force long consecutive legs in SD.
+        startDate: "2026-09-15",
+        endDate: "2026-09-19",
+        travelStyle: "packed",
+        interests: ["Zoos & Aquariums", "Beaches & Waterfronts", "Parks & Gardens", "Theme Parks"],
+      }),
+      { plannerEngine: "score" },
+    );
     expect(plan.transportationType).toBe("taxis");
     expect(transportNote).toMatch(/San Diego/i);
     expect(transportNote).toMatch(/taxis/i);
   });
 
   it("planTrip London + public transit keeps transit without a note", () => {
-    const { plan, transportNote } = planTrip(
-      basePlan({
+    const { plan, transportNote } = planTrip(basePlan({
         destination: "London, UK",
         interests: ["Museums & Art", "Parks & Gardens", "Playgrounds"],
-      }),
-    );
+      }), { plannerEngine: "score" });
     expect(plan.transportationType).toBe("public-transportation");
     expect(transportNote).toBeUndefined();
   });
 
   it("planTrip unknown city with public transit forces taxis", () => {
-    const { plan, transportNote } = planTrip(
-      basePlan({ destination: "Boise, Idaho" }),
-    );
+    const { plan, transportNote } = planTrip(basePlan({ destination: "Boise, Idaho" }), { plannerEngine: "score" });
     expect(plan.transportationType).toBe("taxis");
     expect(transportNote).toBeTruthy();
   });

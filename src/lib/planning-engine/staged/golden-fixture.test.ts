@@ -36,8 +36,8 @@ export function goldenSanDiegoPlan(): TripPlan {
 }
 
 describe("golden fixture harness (Phase 0)", () => {
-  it("defaults to the score engine", () => {
-    expect(resolvePlannerEngine()).toBe("score");
+  it("defaults to the staged engine", () => {
+    expect(resolvePlannerEngine()).toBe("staged");
   });
 
   it("produces a stable fingerprint shape for the canonical SD trip", () => {
@@ -46,12 +46,13 @@ describe("golden fixture harness (Phase 0)", () => {
       cityOverride: sanDiego,
     });
 
-    expect(plannerEngine).toBe("score");
+    expect(plannerEngine).toBe("staged");
     expect(raw.days).toHaveLength(5);
     expect(blueprint).toBeDefined();
     expect(blueprint!.days[0]!.role).toBe("arrival");
     expect(blueprint!.days[0]!.theme.id).toBe("arrival");
     expect(blueprint!.days[4]!.theme.id).toBe("departure");
+    expect(blueprint!.days.every((d) => d.anchor)).toBe(true);
     expect(blueprint!.experienceCoverage.items.length).toBeGreaterThan(0);
 
     const fingerprint = fingerprintRawItinerary(raw);

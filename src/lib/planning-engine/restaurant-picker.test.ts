@@ -14,8 +14,8 @@ import { TripPlan } from "@/types/trip-plan";
 function plan(overrides: Partial<TripPlan> = {}): TripPlan {
   return {
     destination: "San Diego",
-    startDate: "2026-08-10",
-    endDate: "2026-08-12",
+    startDate: "2026-09-15",
+    endDate: "2026-09-15",
     adults: 2,
     children: [2],
     travelStyle: "balanced",
@@ -184,7 +184,7 @@ describe("restaurant picker — FAM-46", () => {
   });
 
   it("names restaurants for balanced lunch and dinner when there are no diet filters", () => {
-    const { raw } = planTrip(plan({ budgetStyle: "balanced", naps: [] }));
+    const { raw } = planTrip(plan({ budgetStyle: "balanced", naps: [] }), { plannerEngine: "score" });
     const meals = raw.days[0].activities.filter((a) => a.type === "meal");
     expect(meals.length).toBeGreaterThanOrEqual(2);
 
@@ -204,7 +204,7 @@ describe("restaurant picker — FAM-46", () => {
   });
 
   it("names real restaurants throughout the day on splurge", () => {
-    const { raw } = planTrip(plan({ budgetStyle: "splurge" }));
+    const { raw } = planTrip(plan({ budgetStyle: "splurge" }), { plannerEngine: "score" });
     const meals = raw.days[0].activities.filter((a) => a.type === "meal");
     expect(meals.length).toBeGreaterThanOrEqual(2);
 
@@ -216,14 +216,12 @@ describe("restaurant picker — FAM-46", () => {
   });
 
   it("mentions dietary fit on named restaurant meals without asking to double-check the menu", () => {
-    const { raw } = planTrip(
-      plan({
+    const { raw } = planTrip(plan({
         dietaryRestrictions: "Gluten-free",
         children: [6],
         budgetStyle: "splurge",
         naps: [],
-      }),
-    );
+      }), { plannerEngine: "score" });
     const meals = raw.days.flatMap((d) => d.activities.filter((a) => a.type === "meal"));
     expect(meals.length).toBeGreaterThan(0);
     for (const meal of meals) {
@@ -267,15 +265,13 @@ describe("restaurant picker — FAM-46", () => {
   });
 
   it("varies named restaurants on a vegan multi-day trip without early repeats", () => {
-    const { raw } = planTrip(
-      plan({
-        startDate: "2026-08-10",
-        endDate: "2026-08-13",
+    const { raw } = planTrip(plan({
+        startDate: "2026-09-15",
+        endDate: "2026-09-18",
         children: [6, 10],
         naps: [],
         dietaryRestrictions: "Vegan",
-      }),
-    );
+      }), { plannerEngine: "score" });
 
     const names = raw.days.flatMap((d) =>
       d.activities

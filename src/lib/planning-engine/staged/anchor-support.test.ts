@@ -260,11 +260,9 @@ describe("planTrip staged engine", () => {
     expect(Math.max(...counts.values())).toBeLessThan(3);
   });
 
-  it("defaults to score engine without changing staged flag behavior for callers", () => {
+  it("defaults to staged engine with committed anchors for callers", () => {
     const { plannerEngine, blueprint } = planTrip(sdPlan(), { cityOverride: city });
-    expect(plannerEngine).toBe("score");
-    // Shadow blueprint still has themes, but stops are not committed on score path
-    expect(blueprint?.days[0]?.theme.id).toBe("arrival");
-    expect(blueprint?.days[0]?.anchor).toBeUndefined();
+    expect(plannerEngine).toBe("staged");
+    expect(blueprint?.days.every((d) => d.anchor)).toBe(true);
   });
 });

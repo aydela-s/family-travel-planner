@@ -9,9 +9,9 @@ describe("resolvePlannerEngine", () => {
     else process.env.PLANNER_ENGINE = prev;
   });
 
-  it("defaults to score when unset", () => {
+  it("defaults to staged when unset", () => {
     delete process.env.PLANNER_ENGINE;
-    expect(resolvePlannerEngine()).toBe("score");
+    expect(resolvePlannerEngine()).toBe("staged");
   });
 
   it("honors explicit option over env", () => {
@@ -19,8 +19,8 @@ describe("resolvePlannerEngine", () => {
     expect(resolvePlannerEngine("score")).toBe("score");
   });
 
-  it("reads PLANNER_ENGINE=staged from env", () => {
-    process.env.PLANNER_ENGINE = "staged";
-    expect(resolvePlannerEngine()).toBe("staged");
+  it("reads PLANNER_ENGINE=score from env for legacy rollback", () => {
+    process.env.PLANNER_ENGINE = "score";
+    expect(resolvePlannerEngine()).toBe("score");
   });
 });

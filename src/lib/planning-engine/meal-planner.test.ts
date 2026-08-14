@@ -7,8 +7,8 @@ import { CityRestaurant } from "@/config/city-restaurants";
 function plan(overrides: Partial<TripPlan> = {}): TripPlan {
   return {
     destination: "Paris",
-    startDate: "2026-07-14",
-    endDate: "2026-07-17",
+    startDate: "2026-09-15",
+    endDate: "2026-09-17",
     adults: 2,
     children: [16],
     travelStyle: "balanced",
@@ -90,10 +90,10 @@ describe("shouldCookDinnerAtHome — splurge vs kitchen", () => {
     const trip = plan({
       accommodationType: "airbnb_with_kitchen",
       budgetStyle: "splurge",
-      startDate: "2026-08-10",
-      endDate: "2026-08-13",
+      startDate: "2026-09-15",
+      endDate: "2026-09-18",
     });
-    const { raw } = planTrip(trip);
+    const { raw } = planTrip(trip, { plannerEngine: "score" });
     const titles = raw.days.flatMap((d) => d.activities.map((a) => a.title));
     expect(titles.some((t) => /cook dinner/i.test(t))).toBe(false);
     expect(titles.some((t) => /grocery/i.test(t))).toBe(false);

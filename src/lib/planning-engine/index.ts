@@ -131,8 +131,9 @@ function applySurgicalAdjust(
 
 /**
  * Deterministic planning engine — builds itinerary structure in code.
- * Staged vacation pipeline (Strategy → Themes → Anchors → …) lands behind
- * PLANNER_ENGINE / options.plannerEngine; default remains the score path.
+ * Default is the staged vacation pipeline (Strategy → Themes → Anchors → Meals →
+ * Schedule → Validation). Pass plannerEngine: "score" / PLANNER_ENGINE=score for
+ * the quarantined legacy score path.
  */
 export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult {
   const dateIssues = validateTripDates(plan);
@@ -222,6 +223,7 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
     };
   }
 
+  /** @deprecated Quarantined legacy path — only when plannerEngine === "score". */
   function buildFullRawScore(p: TripPlan): RawItinerary {
     const usedRestaurants = new Set<string>();
     const usedLandmarks = new Set<string>();
@@ -257,19 +259,22 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
   }
 
   let raw: RawItinerary;
-  if (plannerEngine === "staged") {
+  if (plannerEngine === "score") {
+    // Quarantined legacy score engine (rollback / score-only regressions).
+    raw = buildFullRawScore(workingPlan);
+  } else {
     const staged = buildFullRawStaged(workingPlan);
     raw = staged.raw;
     blueprint = staged.blueprint;
-  } else {
-    raw = buildFullRawScore(workingPlan);
   }
 
   if (transitScheduleIsDifficult(raw, workingPlan, city)) {
     const fallback = switchPlanToTaxis(workingPlan, city);
     workingPlan = fallback.plan;
     transportNote = fallback.transportNote;
-    if (plannerEngine === "staged") {
+    if (plannerEngine === "score") {
+      raw = buildFullRawScore(workingPlan);
+    } else {
       // Rebuild themes/strategy under taxi plan, then re-commit stops.
       blueprint = applyDailyThemes(
         buildTripStrategy(workingPlan, {
@@ -282,8 +287,6 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
       const staged = buildFullRawStaged(workingPlan);
       raw = staged.raw;
       blueprint = staged.blueprint;
-    } else {
-      raw = buildFullRawScore(workingPlan);
     }
   }
 

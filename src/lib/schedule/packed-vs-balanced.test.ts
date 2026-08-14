@@ -10,8 +10,8 @@ import { TripPlan } from "@/types/trip-plan";
 function plan(style: "balanced" | "packed", overrides: Partial<TripPlan> = {}): TripPlan {
   return {
     destination: "San Diego",
-    startDate: "2026-07-25",
-    endDate: "2026-07-28",
+    startDate: "2026-09-15",
+    endDate: "2026-09-18",
     adults: 1,
     children: [3, 5],
     travelStyle: style,
@@ -40,8 +40,8 @@ function realActivitySlots<
 
 describe("packed vs balanced schedules (FAM-5)", () => {
   it("keeps a third activity on packed days with young kids + nap", () => {
-    const balancedRaw = planTrip(plan("balanced")).raw.days[0]!.activities;
-    const packedResult = planTrip(plan("packed"));
+    const balancedRaw = planTrip(plan("balanced"), { plannerEngine: "score" }).raw.days[0]!.activities;
+    const packedResult = planTrip(plan("packed"), { plannerEngine: "score" });
     const packedRaw = packedResult.raw.days[0]!.activities;
 
     expect(buildDaySkeleton(plan("packed"), 1, 4).some((s) => s.kind === "extra_activity")).toBe(
@@ -56,7 +56,7 @@ describe("packed vs balanced schedules (FAM-5)", () => {
   });
 
   it("keeps three stops on packed days without naps", () => {
-    const packedResult = planTrip(plan("packed", { naps: [], children: [10, 12] }));
+    const packedResult = planTrip(plan("packed", { naps: [], children: [10, 12] }), { plannerEngine: "score" });
     const packedRaw = packedResult.raw.days[0]!.activities;
     expect(packedRaw.filter((a) => a.slotKind === "extra_activity")).toHaveLength(1);
     expect(realActivitySlots(packedRaw).length).toBeGreaterThanOrEqual(3);
@@ -65,12 +65,10 @@ describe("packed vs balanced schedules (FAM-5)", () => {
   });
 
   it("lengthens remaining stops to packed adventure length when extra cannot fit", () => {
-    const packedResult = planTrip(
-      plan("packed", {
+    const packedResult = planTrip(plan("packed", {
         naps: [{ startTime: "11:30 AM", endTime: "3:30 PM", type: "regular" }],
         children: [2],
-      }),
-    );
+      }), { plannerEngine: "score" });
     const scheduled = rescheduleActivitiesWithMealAnchors(
       packedResult.raw.days[0]!.activities,
       packedResult.plan,

@@ -44,7 +44,7 @@ describe("packed San Diego schedule quality (FAM-70)", () => {
   });
 
   it("fills the morning until lunch when hotel breakfast starts the day early", () => {
-    const { raw, plan } = planTrip(sdPacked());
+    const { raw, plan } = planTrip(sdPacked(), { plannerEngine: "score" });
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0]!.activities, plan);
     const morning = scheduled.find((a) => a.slotKind === "morning_activity")!;
     const lunch = scheduled.find((a) => a.slotKind === "lunch")!;
@@ -56,7 +56,7 @@ describe("packed San Diego schedule quality (FAM-70)", () => {
   });
 
   it("schedules theme parks as half-day afternoon adventures, not short extras", () => {
-    const { raw, plan } = planTrip(sdPacked());
+    const { raw, plan } = planTrip(sdPacked(), { plannerEngine: "score" });
     const themeActs = raw.days
       .flatMap((d) => d.activities)
       .filter((a) => a.interestTags?.includes("theme-parks"));
@@ -92,7 +92,7 @@ describe("packed San Diego schedule quality (FAM-70)", () => {
   });
 
   it("prefers unique primary stops across a 5-day packed trip", () => {
-    const { raw } = planTrip(sdPacked());
+    const { raw } = planTrip(sdPacked(), { plannerEngine: "score" });
     const primaryNames = raw.days.flatMap((d) =>
       d.activities
         .filter(

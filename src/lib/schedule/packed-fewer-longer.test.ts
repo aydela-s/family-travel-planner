@@ -125,7 +125,7 @@ describe("packed fewer/longer activities — P1", () => {
 
   it("keeps short afternoon/extra stops when the packed extra fits (morning may fill to lunch)", () => {
     const plan = packedPlan({ children: [12, 15] });
-    const { raw } = planTrip(plan);
+    const { raw } = planTrip(plan, { plannerEngine: "score" });
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
 
     expect(scheduled.some((a) => a.slotKind === "extra_activity")).toBe(true);
@@ -148,7 +148,7 @@ describe("packed fewer/longer activities — P1", () => {
     const intents = buildDayIntents(plan, 1, 2);
     expect(intents.some((i) => i.kind === "extra_activity")).toBe(true);
 
-    const { raw } = planTrip(plan);
+    const { raw } = planTrip(plan, { plannerEngine: "score" });
     expect(raw.days[0].activities.some((a) => a.type === "nap")).toBe(true);
 
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
@@ -188,11 +188,11 @@ describe("packed fewer/longer activities — P1", () => {
     const balanced = packedPlan({ ...shared, travelStyle: "balanced" });
     const packed = packedPlan({ ...shared, travelStyle: "packed" });
     const balancedSched = rescheduleActivitiesWithMealAnchors(
-      planTrip(balanced).raw.days[0].activities,
+      planTrip(balanced, { plannerEngine: "score" }).raw.days[0].activities,
       balanced,
     );
     const packedSched = rescheduleActivitiesWithMealAnchors(
-      planTrip(packed).raw.days[0].activities,
+      planTrip(packed, { plannerEngine: "score" }).raw.days[0].activities,
       packed,
     );
     expect(packedSched.some((a) => a.slotKind === "extra_activity")).toBe(true);
@@ -240,7 +240,7 @@ describe("packed fewer/longer activities — P1", () => {
       transportationType: "taxis",
       accommodationType: "hotel_no_breakfast",
     });
-    const { raw, plan: working } = planTrip(plan);
+    const { raw, plan: working } = planTrip(plan, { plannerEngine: "score" });
     const itinerary = await enrichItinerary(raw, working);
 
     for (const day of itinerary.days) {

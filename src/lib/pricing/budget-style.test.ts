@@ -37,7 +37,7 @@ function planFor(style: BudgetStyle): TripPlan {
 
 async function tripTotalCost(style: BudgetStyle): Promise<number> {
   const plan = planFor(style);
-  const { raw, plan: workingPlan } = planTrip(plan);
+  const { raw, plan: workingPlan } = planTrip(plan, { plannerEngine: "score" });
   const itinerary = await enrichItinerary(raw, workingPlan);
   return itinerary.days.reduce((sum, d) => sum + d.costs.total, 0);
 }
@@ -61,7 +61,7 @@ describe("Budget Style drives real cost differences, not a numeric cap", () => {
 
   it("cost breakdown is informational only — no dollar cap, no usage percentage", async () => {
     const plan = planFor("balanced");
-    const { raw, plan: workingPlan } = planTrip(plan);
+    const { raw, plan: workingPlan } = planTrip(plan, { plannerEngine: "score" });
     const itinerary = await enrichItinerary(raw, workingPlan);
     const day = itinerary.days[0];
 
@@ -76,8 +76,8 @@ describe("Budget Style drives real cost differences, not a numeric cap", () => {
   it("meal copy never includes a dollar figure; splurge names restaurants, save stays casual", async () => {
     const savePlan = planFor("save");
     const splurgePlan = planFor("splurge");
-    const saveRaw = planTrip(savePlan);
-    const splurgeRaw = planTrip(splurgePlan);
+    const saveRaw = planTrip(savePlan, { plannerEngine: "score" });
+    const splurgeRaw = planTrip(splurgePlan, { plannerEngine: "score" });
 
     const saveResult = await enrichItinerary(saveRaw.raw, saveRaw.plan);
     const splurgeResult = await enrichItinerary(splurgeRaw.raw, splurgeRaw.plan);
@@ -87,7 +87,11 @@ describe("Budget Style drives real cost differences, not a numeric cap", () => {
     const saveDinner = saveMeals[saveMeals.length - 1];
     const splurgeDinner = splurgeMeals[splurgeMeals.length - 1];
 
-    expect(saveDinner.title).toMatch(/Casual dinner/i);
+    // Save still names a dinner spot, but keeps casual/affordable framing in title or notes.
+    expect(saveDinner.title).toMatch(/Casual dinner|Dinner at /i);
+    expect(`${saveDinner.title} ${saveDinner.notes ?? ""}`).toMatch(
+      /casual|affordable|simple|low-key|takeaway/i,
+    );
     expect(splurgeDinner.title).toMatch(/Dinner at /);
     expect(saveDinner.title).not.toBe(splurgeDinner.title);
     expect(saveDinner.notes ?? "").not.toMatch(/\$\d/);

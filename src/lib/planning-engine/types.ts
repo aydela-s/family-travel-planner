@@ -18,8 +18,8 @@ export type PlanOptions = {
   /** Prefer curated or Places-built city over detectCity (FAM-59). */
   cityOverride?: CityConfig;
   /**
-   * Which planner engine to run. Defaults via PLANNER_ENGINE env, then "score".
-   * Staged path is built incrementally; until cutover, "staged" may still fall back to score.
+   * Which planner engine to run. Defaults via PLANNER_ENGINE env, then "staged".
+   * Pass "score" (or PLANNER_ENGINE=score) for the quarantined legacy rollback path.
    */
   plannerEngine?: PlannerEngine;
 };

@@ -59,7 +59,7 @@ describe("day intent priorities", () => {
   });
 
   it("tags filled skeleton activities with slotKind", () => {
-    const { raw } = planTrip(basePlan({ travelStyle: "packed", interests: ["Museums & Art"] }));
+    const { raw } = planTrip(basePlan({ travelStyle: "packed", interests: ["Museums & Art"] }), { plannerEngine: "score" });
     const kinds = raw.days[0].activities.map((a) => a.slotKind).filter(Boolean);
     expect(kinds).toContain("morning_activity");
     expect(kinds).toContain("lunch");
@@ -123,7 +123,7 @@ describe("optional intent scheduling", () => {
       accommodationType: "hotel_no_breakfast",
     });
 
-    const { raw } = planTrip(plan);
+    const { raw } = planTrip(plan, { plannerEngine: "score" });
     expect(raw.days[0].activities.some((a) => a.slotKind === "extra_activity")).toBe(true);
 
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);

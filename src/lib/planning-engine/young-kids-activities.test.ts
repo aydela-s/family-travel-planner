@@ -9,8 +9,8 @@ import { TripPlan } from "@/types/trip-plan";
 function youngKidsPlan(overrides: Partial<TripPlan> = {}): TripPlan {
   return {
     destination: "San Diego, CA",
-    startDate: "2026-07-25",
-    endDate: "2026-07-28",
+    startDate: "2026-09-15",
+    endDate: "2026-09-18",
     adults: 1,
     children: [3, 5],
     travelStyle: "balanced",
@@ -40,7 +40,7 @@ describe("young kids — real activities over stroll fillers", () => {
 
   it("does not repeat Explore/Visit landmarks across days while alternatives remain", () => {
     const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
-    const { raw } = planTrip(youngKidsPlan());
+    const { raw } = planTrip(youngKidsPlan(), { plannerEngine: "score" });
     const activityNames = raw.days.flatMap((d) =>
       d.activities
         .filter((a) => a.type === "activity")
@@ -99,7 +99,7 @@ describe("young kids — real activities over stroll fillers", () => {
     );
     expect(indoorPlayNames.size).toBeGreaterThanOrEqual(2);
 
-    const { raw } = planTrip(youngKidsPlan());
+    const { raw } = planTrip(youngKidsPlan(), { plannerEngine: "score" });
     const activityNames = raw.days.flatMap((d) =>
       activityPlaceNames(d.activities.filter((a) => a.type === "activity").map((a) => a.title)),
     );
