@@ -1,7 +1,7 @@
 {
   "plan": {
     "destination": "San Diego",
-    "dates": "2026-07-28 – 2026-08-01",
+    "dates": "2026-09-15 – 2026-09-19",
     "interests": [
       "Playgrounds & Indoor Play",
       "Interactive Museums",
@@ -66,7 +66,7 @@
     "days": [
       {
         "day": 1,
-        "date": "2026-07-28",
+        "date": "2026-09-15",
         "role": "arrival",
         "themeId": "arrival",
         "themeLabel": "Arrival",
@@ -124,10 +124,10 @@
       },
       {
         "day": 2,
-        "date": "2026-07-29",
+        "date": "2026-09-16",
         "role": "full",
-        "themeId": "playgrounds",
-        "themeLabel": "Playgrounds",
+        "themeId": "beach",
+        "themeLabel": "Beach",
         "dayBudgetIntent": "free",
         "goals": [
           "honor_nap_windows",
@@ -135,7 +135,8 @@
         ],
         "constraints": [
           "anchor_primary_tags",
-          "prefer_free_anchor",
+          "discourage_indoor_paid_anchor",
+          "prefer_shoreline_beach_anchor",
           "discourage_anchor_tags",
           "prefer_free_anchor"
         ],
@@ -182,10 +183,10 @@
       },
       {
         "day": 3,
-        "date": "2026-07-30",
+        "date": "2026-09-17",
         "role": "full",
-        "themeId": "play_indoor",
-        "themeLabel": "Play indoor",
+        "themeId": "interactive",
+        "themeLabel": "Interactive",
         "dayBudgetIntent": "paid",
         "goals": [
           "honor_nap_windows",
@@ -239,17 +240,19 @@
       },
       {
         "day": 4,
-        "date": "2026-07-31",
+        "date": "2026-09-18",
         "role": "full",
-        "themeId": "entertainment",
-        "themeLabel": "Entertainment",
+        "themeId": "playgrounds",
+        "themeLabel": "Playgrounds",
         "dayBudgetIntent": "either",
         "goals": [
           "honor_nap_windows",
           "dedicated_experience"
         ],
         "constraints": [
-          "anchor_primary_tags"
+          "anchor_primary_tags",
+          "prefer_free_anchor",
+          "discourage_anchor_tags"
         ],
         "anchor": null,
         "support": [],
@@ -294,7 +297,7 @@
       },
       {
         "day": 5,
-        "date": "2026-08-01",
+        "date": "2026-09-19",
         "role": "departure",
         "themeId": "departure",
         "themeLabel": "Departure",
@@ -374,7 +377,7 @@
           "tag": "indoor-play",
           "label": "Playgrounds & Indoor Play",
           "target": 1,
-          "completed": 1,
+          "completed": 0,
           "source": "interest"
         },
         {
@@ -382,7 +385,7 @@
           "tag": "interactive",
           "label": "Interactive Museums",
           "target": 1,
-          "completed": 0,
+          "completed": 1,
           "source": "interest"
         },
         {
@@ -390,7 +393,7 @@
           "tag": "beaches",
           "label": "Beaches & Waterfronts",
           "target": 1,
-          "completed": 0,
+          "completed": 1,
           "source": "interest"
         },
         {
@@ -398,7 +401,7 @@
           "tag": "entertainment",
           "label": "Shows & Entertainment",
           "target": 1,
-          "completed": 1,
+          "completed": 0,
           "source": "interest"
         }
       ]
@@ -406,7 +409,7 @@
     "days": [
       {
         "day": 1,
-        "date": "2026-07-28",
+        "date": "2026-09-15",
         "role": "arrival",
         "themeId": "arrival",
         "themeLabel": "Arrival",
@@ -437,11 +440,10 @@
         },
         "support": [
           {
-            "name": "Balboa Park",
+            "name": "Coronado Beach",
             "tags": [
-              "parks",
-              "museums",
-              "playgrounds"
+              "beaches",
+              "nature"
             ],
             "isPaid": false
           }
@@ -451,7 +453,7 @@
             "time": "08:30",
             "endTime": "10:00",
             "type": "activity",
-            "title": "Explore Balboa Park"
+            "title": "Explore Coronado Beach"
           },
           {
             "time": "11:15",
@@ -487,10 +489,10 @@
       },
       {
         "day": 2,
-        "date": "2026-07-29",
+        "date": "2026-09-16",
         "role": "full",
-        "themeId": "playgrounds",
-        "themeLabel": "Playgrounds",
+        "themeId": "beach",
+        "themeLabel": "Beach",
         "dayBudgetIntent": "free",
         "goals": [
           "honor_nap_windows",
@@ -498,27 +500,26 @@
         ],
         "constraints": [
           "anchor_primary_tags",
-          "prefer_free_anchor",
+          "discourage_indoor_paid_anchor",
+          "prefer_shoreline_beach_anchor",
           "discourage_anchor_tags",
           "prefer_free_anchor"
         ],
         "anchor": {
-          "name": "Kate Sessions Park",
+          "name": "La Jolla Cove",
           "tags": [
-            "playgrounds",
-            "parks",
+            "beaches",
             "nature"
           ],
           "isPaid": false
         },
         "support": [
           {
-            "name": "Mission Bay Park",
+            "name": "Kate Sessions Park",
             "tags": [
+              "playgrounds",
               "parks",
-              "sports",
-              "beaches",
-              "playgrounds"
+              "nature"
             ],
             "isPaid": false
           }
@@ -528,7 +529,7 @@
             "time": "08:30",
             "endTime": "10:00",
             "type": "activity",
-            "title": "Explore Mission Bay Park"
+            "title": "Explore Kate Sessions Park"
           },
           {
             "time": "11:15",
@@ -546,13 +547,13 @@
             "time": "14:15",
             "endTime": "15:45",
             "type": "activity",
-            "title": "Explore Kate Sessions Park"
+            "title": "Explore La Jolla Cove"
           },
           {
             "time": "16:00",
             "endTime": "16:30",
             "type": "activity",
-            "title": "Afternoon stroll near Kate Sessions Park"
+            "title": "Afternoon stroll near La Jolla Cove"
           },
           {
             "time": "18:00",
@@ -564,10 +565,10 @@
       },
       {
         "day": 3,
-        "date": "2026-07-30",
+        "date": "2026-09-17",
         "role": "full",
-        "themeId": "play_indoor",
-        "themeLabel": "Play indoor",
+        "themeId": "interactive",
+        "themeLabel": "Interactive",
         "dayBudgetIntent": "paid",
         "goals": [
           "honor_nap_windows",
@@ -579,20 +580,20 @@
           "prefer_paid_anchor"
         ],
         "anchor": {
-          "name": "Funbox (Plaza Bonita, National City)",
+          "name": "Fleet Science Center",
           "tags": [
-            "indoor-play",
-            "playgrounds",
-            "entertainment"
+            "interactive",
+            "museums"
           ],
           "isPaid": true
         },
         "support": [
           {
-            "name": "Coronado Beach",
+            "name": "Balboa Park",
             "tags": [
-              "beaches",
-              "nature"
+              "parks",
+              "museums",
+              "playgrounds"
             ],
             "isPaid": false
           }
@@ -602,7 +603,7 @@
             "time": "08:30",
             "endTime": "10:00",
             "type": "activity",
-            "title": "Explore Coronado Beach"
+            "title": "Explore Balboa Park"
           },
           {
             "time": "11:15",
@@ -620,13 +621,13 @@
             "time": "14:15",
             "endTime": "15:45",
             "type": "activity",
-            "title": "Family time at Funbox (Plaza Bonita, National City)"
+            "title": "Explore Fleet Science Center"
           },
           {
             "time": "16:00",
             "endTime": "16:30",
             "type": "activity",
-            "title": "Afternoon stroll near Funbox (Plaza Bonita, National City)"
+            "title": "Afternoon stroll near Fleet Science Center"
           },
           {
             "time": "18:00",
@@ -638,26 +639,29 @@
       },
       {
         "day": 4,
-        "date": "2026-07-31",
+        "date": "2026-09-18",
         "role": "full",
-        "themeId": "entertainment",
-        "themeLabel": "Entertainment",
+        "themeId": "playgrounds",
+        "themeLabel": "Playgrounds",
         "dayBudgetIntent": "either",
         "goals": [
           "honor_nap_windows",
           "dedicated_experience"
         ],
         "constraints": [
-          "anchor_primary_tags"
+          "anchor_primary_tags",
+          "prefer_free_anchor",
+          "discourage_anchor_tags"
         ],
         "anchor": {
-          "name": "Belmont Park",
+          "name": "Mission Bay Park",
           "tags": [
-            "theme-parks",
+            "parks",
+            "sports",
             "beaches",
-            "entertainment"
+            "playgrounds"
           ],
-          "isPaid": true
+          "isPaid": false
         },
         "support": [
           {
@@ -690,9 +694,15 @@
           },
           {
             "time": "14:15",
-            "endTime": "17:45",
+            "endTime": "15:45",
             "type": "activity",
-            "title": "Explore Belmont Park"
+            "title": "Explore Mission Bay Park"
+          },
+          {
+            "time": "16:00",
+            "endTime": "16:30",
+            "type": "activity",
+            "title": "Afternoon stroll near Mission Bay Park"
           },
           {
             "time": "18:00",
@@ -704,7 +714,7 @@
       },
       {
         "day": 5,
-        "date": "2026-08-01",
+        "date": "2026-09-19",
         "role": "departure",
         "themeId": "departure",
         "themeLabel": "Departure",
@@ -725,11 +735,10 @@
           "discourage_anchor_tags"
         ],
         "anchor": {
-          "name": "Torrey Pines State Natural Reserve",
+          "name": "Liberty Public Market",
           "tags": [
-            "nature",
-            "parks",
-            "beaches"
+            "food-markets",
+            "shopping"
           ],
           "isPaid": false
         },
@@ -739,7 +748,7 @@
             "time": "08:30",
             "endTime": "10:00",
             "type": "activity",
-            "title": "Explore Torrey Pines State Natural Reserve"
+            "title": "Family time at Liberty Public Market"
           },
           {
             "time": "11:15",
@@ -779,10 +788,10 @@
       "stagedTheme": "arrival",
       "stagedAnchor": "Waterfront Park Playground",
       "stagedSupport": [
-        "Balboa Park"
+        "Coronado Beach"
       ],
       "stagedActivities": [
-        "Explore Balboa Park",
+        "Explore Coronado Beach",
         "Explore Waterfront Park Playground",
         "Afternoon stroll near Waterfront Park Playground"
       ]
@@ -794,15 +803,15 @@
         "Explore Coronado Beach",
         "Afternoon stroll near Coronado Beach"
       ],
-      "stagedTheme": "playgrounds",
-      "stagedAnchor": "Kate Sessions Park",
+      "stagedTheme": "beach",
+      "stagedAnchor": "La Jolla Cove",
       "stagedSupport": [
-        "Mission Bay Park"
+        "Kate Sessions Park"
       ],
       "stagedActivities": [
-        "Explore Mission Bay Park",
         "Explore Kate Sessions Park",
-        "Afternoon stroll near Kate Sessions Park"
+        "Explore La Jolla Cove",
+        "Afternoon stroll near La Jolla Cove"
       ]
     },
     {
@@ -812,15 +821,15 @@
         "Family time at Play City Eastlake",
         "Afternoon stroll near Play City Eastlake"
       ],
-      "stagedTheme": "play_indoor",
-      "stagedAnchor": "Funbox (Plaza Bonita, National City)",
+      "stagedTheme": "interactive",
+      "stagedAnchor": "Fleet Science Center",
       "stagedSupport": [
-        "Coronado Beach"
+        "Balboa Park"
       ],
       "stagedActivities": [
-        "Explore Coronado Beach",
-        "Family time at Funbox (Plaza Bonita, National City)",
-        "Afternoon stroll near Funbox (Plaza Bonita, National City)"
+        "Explore Balboa Park",
+        "Explore Fleet Science Center",
+        "Afternoon stroll near Fleet Science Center"
       ]
     },
     {
@@ -830,14 +839,15 @@
         "Explore La Jolla Cove",
         "Afternoon stroll near La Jolla Cove"
       ],
-      "stagedTheme": "entertainment",
-      "stagedAnchor": "Belmont Park",
+      "stagedTheme": "playgrounds",
+      "stagedAnchor": "Mission Bay Park",
       "stagedSupport": [
         "Mission Beach Boardwalk"
       ],
       "stagedActivities": [
         "Explore Mission Beach Boardwalk",
-        "Explore Belmont Park"
+        "Explore Mission Bay Park",
+        "Afternoon stroll near Mission Bay Park"
       ]
     },
     {
@@ -848,10 +858,10 @@
         "Pack up & unwind"
       ],
       "stagedTheme": "departure",
-      "stagedAnchor": "Torrey Pines State Natural Reserve",
+      "stagedAnchor": "Liberty Public Market",
       "stagedSupport": [],
       "stagedActivities": [
-        "Explore Torrey Pines State Natural Reserve",
+        "Family time at Liberty Public Market",
         "Pack up & unwind"
       ]
     }

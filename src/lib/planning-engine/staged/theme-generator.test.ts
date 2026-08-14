@@ -12,8 +12,8 @@ import { TripPlan } from "@/types/trip-plan";
 function sdPlan(overrides: Partial<TripPlan> = {}): TripPlan {
   return {
     destination: "San Diego",
-    startDate: "2026-07-28",
-    endDate: "2026-08-01",
+    startDate: "2026-09-15",
+    endDate: "2026-09-19",
     adults: 1,
     children: [4, 8],
     travelStyle: "balanced",
@@ -147,8 +147,8 @@ describe("applyDailyThemes — San Diego 5-day shadow", () => {
     const plan = sdPlan({
       children: [3, 14],
       interests: ["Playgrounds & Indoor Play", "Beaches & Waterfronts"],
-      startDate: "2026-07-28",
-      endDate: "2026-07-30",
+      startDate: "2026-09-15",
+      endDate: "2026-09-17",
     });
     const bp = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
     const mixed = bp.days.find((d) => d.theme.id === "mixed_family");

@@ -18,8 +18,8 @@ import { TripPlan } from "@/types/trip-plan";
 function sdPlan(overrides: Partial<TripPlan> = {}): TripPlan {
   return {
     destination: "San Diego",
-    startDate: "2026-07-28",
-    endDate: "2026-08-01",
+    startDate: "2026-09-15",
+    endDate: "2026-09-19",
     adults: 1,
     children: [4, 8],
     travelStyle: "balanced",
@@ -146,13 +146,52 @@ describe("selectAnchorForDay", () => {
 describe("commitStopsToBlueprint", () => {
   const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
 
-  it("hard-excludes anchors across days (no duplicate landmark names)", () => {
+  it("hard-excludes full-day anchors across days (travel days may soft-reuse near stay)", () => {
     const plan = sdPlan();
     const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
     const committed = commitStopsToBlueprint(themed, plan, city);
-    const names = committed.days.map((d) => d.anchor!.landmarkName);
-    expect(new Set(names).size).toBe(names.length);
-    expect(committed.ledger.landmarkNames.length).toBeGreaterThanOrEqual(names.length);
+    const fullNames = committed.days
+      .filter((d) => d.role === "full")
+      .map((d) => d.anchor!.landmarkName);
+    expect(new Set(fullNames).size).toBe(fullNames.length);
+    expect(committed.ledger.landmarkNames.length).toBeGreaterThanOrEqual(fullNames.length);
+  });
+
+  it("keeps departure within low-friction stay distance even when near POIs are ledger-used", () => {
+    const plan = sdPlan();
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
+    const committed = commitStopsToBlueprint(themed, plan, city);
+    const departure = committed.days.find((d) => d.role === "departure")!;
+    const anchor = city.landmarks.find((l) => l.name === departure.anchor!.landmarkName)!;
+    const km = haversineKm(anchor.lat, anchor.lng, plan.stayLat!, plan.stayLng!);
+    expect(km).toBeLessThanOrEqual(LOW_FRICTION_STAY_KM);
+    expect(anchor.adultPrice).toBe(0);
+    expect(anchor.name).not.toMatch(/Torrey Pines|Birch Aquarium/i);
+  });
+
+  it("picks light near-stay arrival support, not a museum campus", () => {
+    const plan = sdPlan();
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
+    const committed = commitStopsToBlueprint(themed, plan, city);
+    const arrival = committed.days.find((d) => d.role === "arrival")!;
+    expect(arrival.support.length).toBeGreaterThan(0);
+    const support = city.landmarks.find((l) => l.name === arrival.support[0]!.landmarkName)!;
+    const km = haversineKm(support.lat, support.lng, plan.stayLat!, plan.stayLng!);
+    expect(km).toBeLessThanOrEqual(LOW_FRICTION_STAY_KM);
+    expect(support.adultPrice).toBe(0);
+    expect(support.interestTags.includes("museums")).toBe(false);
+    expect(support.name).not.toMatch(/Balboa Park/i);
+  });
+
+  it("assigns a shoreline beach anchor on beach theme days end-to-end", () => {
+    const plan = sdPlan();
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
+    const committed = commitStopsToBlueprint(themed, plan, city);
+    const beachDay = committed.days.find((d) => d.theme.id === "beach");
+    expect(beachDay).toBeDefined();
+    const anchor = city.landmarks.find((l) => l.name === beachDay!.anchor!.landmarkName)!;
+    expect(isShorelineBeachExperience(anchor)).toBe(true);
+    expect(anchor.name).not.toMatch(/Mission Bay Park/i);
   });
 
   it("does not let outdoor playgrounds satisfy indoor-play coverage", () => {

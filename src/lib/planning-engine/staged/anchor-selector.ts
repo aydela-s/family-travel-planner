@@ -137,11 +137,18 @@ export function filterAnchorCandidates(
   if (day.role === "arrival" || day.role === "departure") {
     const far = day.constraints.find((c) => c.type === "avoid_far_attractions");
     const maxKm = far && far.type === "avoid_far_attractions" ? far.maxKm : LOW_FRICTION_STAY_KM;
-    const near = pool.filter((l) => {
+    const isNear = (l: Landmark) => {
       const km = stayKm(l, plan);
       return km == null || km <= maxKm;
-    });
-    if (near.length > 0) pool = near;
+    };
+
+    // Prefer unused near-stay; if ledger exhausted locally, reuse near landmarks
+    // rather than falling through to far unused POIs (e.g. Torrey Pines).
+    let nearPool = unused.filter(isNear);
+    if (nearPool.length === 0) {
+      nearPool = city.landmarks.filter(isNear);
+    }
+    if (nearPool.length > 0) pool = nearPool;
 
     // Prefer the soft sweet-spot ring (~15–20 min) when anything qualifies
     const nearPreferred = pool.filter((l) => {
@@ -332,7 +339,8 @@ export function scoreAnchorCandidate(
   if (day.dayBudgetIntent === "paid" && landmark.adultPrice > 0) score += 10;
   if (day.dayBudgetIntent === "free" && landmark.adultPrice <= 0) score += 10;
 
-  if (ledgerNames.has(landmark.name)) score -= 500;
+  // Arrival/departure may soft-reuse near-stay POIs when the local unused pool is empty.
+  if (ledgerNames.has(landmark.name) && !lowFrictionDay) score -= 500;
 
   // Tiny deterministic jitter from name for stable ties
   score += (landmark.name.length % 7) * 0.01;
@@ -357,6 +365,37 @@ export type SelectAnchorOptions = {
   softExcludeNames?: Set<string>;
 };
 
+/** Last-resort near-stay pick for arrival/departure — never leave the low-friction ring. */
+function lowFrictionFallback(
+  city: CityConfig,
+  plan: TripPlan,
+  day: DayBlueprint,
+): Landmark | null {
+  const far = day.constraints.find((c) => c.type === "avoid_far_attractions");
+  const maxKm =
+    far && far.type === "avoid_far_attractions" ? far.maxKm : LOW_FRICTION_STAY_KM;
+
+  const near = city.landmarks
+    .filter((l) => {
+      const km = stayKm(l, plan);
+      if (km != null && km > maxKm) return false;
+      if (l.adultPrice > 0) return false;
+      if (l.interestTags.includes("theme-parks")) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const ka = stayKm(a, plan) ?? 99;
+      const kb = stayKm(b, plan) ?? 99;
+      return (
+        ka - kb ||
+        Number(isOutdoorPlayground(b)) - Number(isOutdoorPlayground(a)) ||
+        a.name.localeCompare(b.name)
+      );
+    });
+
+  return near[0] ?? null;
+}
+
 /** Pick the day's hero stop from a small filtered candidate set. */
 export function selectAnchorForDay(
   city: CityConfig,
@@ -376,6 +415,10 @@ export function selectAnchorForDay(
     if (filtered.length > 0) candidates = filtered;
   }
   if (candidates.length === 0) {
+    if (day.role === "arrival" || day.role === "departure") {
+      const near = lowFrictionFallback(city, plan, day);
+      if (near) return near;
+    }
     return city.landmarks.find((l) => !opts.ledgerNames.has(l.name)) ?? city.landmarks[0]!;
   }
 

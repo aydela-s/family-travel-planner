@@ -33,6 +33,24 @@ function stayKm(landmark: Landmark, plan: TripPlan): number | null {
   return haversineKm(landmark.lat, landmark.lng, plan.stayLat, plan.stayLng);
 }
 
+/** Museum campuses / large attractions — too heavy as arrival morning support. */
+function isMuseumCampus(landmark: Landmark): boolean {
+  return landmark.interestTags.includes("museums") || landmark.interestTags.includes("interactive");
+}
+
+/** Light arrival support: playground, simple park, beach/boardwalk — not museum campuses. */
+function isLightArrivalSupport(landmark: Landmark): boolean {
+  if (landmark.adultPrice > 0) return false;
+  if (isMuseumCampus(landmark)) return false;
+  if (landmark.interestTags.includes("theme-parks") || landmark.interestTags.includes("zoos")) {
+    return false;
+  }
+  return (
+    isOutdoorPlayground(landmark) ||
+    landmark.interestTags.some((t) => ["parks", "beaches", "nature", "playgrounds"].includes(t))
+  );
+}
+
 /** Score a support candidate — complementary, nearby, not stealing the theme. */
 export function scoreSupportCandidate(
   landmark: Landmark,
@@ -47,17 +65,20 @@ export function scoreSupportCandidate(
   if (km <= radius) score += (radius - km) * 6;
   else score -= (km - radius) * 8;
 
-  // Arrival: support must stay near the hotel, not chase a far scenic anchor
+  // Arrival: prefer light near-stay playground / outdoor; avoid museum-scale campuses
   if (day.role === "arrival") {
     const fromStay = stayKm(landmark, plan);
     if (fromStay != null) {
-      if (fromStay <= LOW_FRICTION_PREFERRED_KM) score += 35;
-      else if (fromStay <= LOW_FRICTION_STAY_KM) score += 10;
-      else score -= 40;
+      if (fromStay <= LOW_FRICTION_PREFERRED_KM) score += 40;
+      else if (fromStay <= LOW_FRICTION_STAY_KM) score += 8;
+      else score -= 45;
     }
-    if (landmark.adultPrice > 0) score -= 25;
-    if (landmark.interestTags.includes("theme-parks")) score -= 40;
-    if (isOutdoorPlayground(landmark) || landmark.interestTags.includes("parks")) score += 12;
+    if (landmark.adultPrice > 0) score -= 30;
+    if (landmark.interestTags.includes("theme-parks")) score -= 45;
+    if (isMuseumCampus(landmark)) score -= 55;
+    if (isOutdoorPlayground(landmark) && !isMuseumCampus(landmark)) score += 45;
+    else if (isLightArrivalSupport(landmark)) score += 22;
+    if (landmark.intensity === "high") score -= 20;
   }
 
   // Complementary: share preferred types but don't duplicate anchor's primary coverage tags entirely
@@ -113,6 +134,30 @@ export function selectSupportForDay(
       return km == null || km <= LOW_FRICTION_STAY_KM;
     });
     if (nearStay.length > 0) pool = nearStay;
+
+    // Prefer playground-only within the soft sweet-spot ring
+    const preferredPlay = pool.filter((l) => {
+      const km = stayKm(l, plan);
+      return (
+        isOutdoorPlayground(l) &&
+        !isMuseumCampus(l) &&
+        (km == null || km <= LOW_FRICTION_PREFERRED_KM)
+      );
+    });
+    if (preferredPlay.length > 0) {
+      pool = preferredPlay;
+    } else {
+      // Else light outdoor near stay (beach / simple park) — not museum campuses
+      const light = pool.filter((l) => {
+        const km = stayKm(l, plan);
+        return isLightArrivalSupport(l) && (km == null || km <= LOW_FRICTION_PREFERRED_KM);
+      });
+      if (light.length > 0) pool = light;
+      else {
+        const lightWider = pool.filter(isLightArrivalSupport);
+        if (lightWider.length > 0) pool = lightWider;
+      }
+    }
   } else {
     const nearby = pool.filter(
       (l) => haversineKm(l.lat, l.lng, anchor.lat, anchor.lng) <= radius * 1.25,

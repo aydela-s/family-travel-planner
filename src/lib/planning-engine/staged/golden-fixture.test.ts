@@ -12,8 +12,8 @@ import { TripPlan } from "@/types/trip-plan";
 export function goldenSanDiegoPlan(): TripPlan {
   return {
     destination: "San Diego",
-    startDate: "2026-07-28",
-    endDate: "2026-08-01",
+    startDate: "2026-09-15",
+    endDate: "2026-09-19",
     adults: 1,
     children: [4, 8],
     travelStyle: "balanced",

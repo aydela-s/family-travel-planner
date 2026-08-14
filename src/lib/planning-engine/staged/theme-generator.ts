@@ -32,6 +32,33 @@ export type ThemeScoreBreakdown = {
   varietyBonus: number;
 };
 
+const PLAY_THEME_IDS = new Set<ThemeId>(["play_indoor", "playgrounds"]);
+
+function isPlayTheme(theme: ThemeDefinition): boolean {
+  return PLAY_THEME_IDS.has(theme.id);
+}
+
+/**
+ * Short trips with many interests: at most one dedicated play theme day so beach /
+ * interactive / entertainment still get slots. Longer trips may use both indoor + outdoor play.
+ */
+function maxPlayThemesForTrip(
+  blueprint: TripBlueprint,
+  eligible: ThemeDefinition[],
+): number {
+  const nonPlayCoverage = eligible.filter(
+    (t) =>
+      !isPlayTheme(t) &&
+      t.coverageTags.length > 0 &&
+      t.id !== "scenic" &&
+      t.id !== "mixed_family" &&
+      t.id !== "recovery",
+  );
+  if (nonPlayCoverage.length === 0) return 2;
+  if (fullDayCount(blueprint) >= 6) return 2;
+  return 1;
+}
+
 function cityHasTag(city: CityConfig, tags: LandmarkInterestTag[]): boolean {
   if (tags.length === 0) return true;
   return city.landmarks.some((l) => l.interestTags.some((t) => tags.includes(t)));
@@ -300,6 +327,8 @@ export function applyDailyThemes(
   const eligible = eligibleInterestThemes(plan, city);
   const reserved = new Map<LandmarkInterestTag, number>();
   const consumeRareOnArrivalDeparture = fullDayCount(blueprint) <= 2;
+  const maxPlayThemes = maxPlayThemesForTrip(blueprint, eligible);
+  let playThemesAssigned = 0;
   let previousThemeId: ThemeId | null = null;
   let previousPaid = false;
   let fullDayIndex = 0;
@@ -344,6 +373,35 @@ export function applyDailyThemes(
     let candidates = eligible.filter((t) => t.id !== previousThemeId);
     if (candidates.length === 0) candidates = [...eligible];
 
+    // Cap play themes on short multi-interest trips
+    if (playThemesAssigned >= maxPlayThemes) {
+      const withoutPlay = candidates.filter((t) => !isPlayTheme(t));
+      if (withoutPlay.length > 0) candidates = withoutPlay;
+    }
+
+    // When remaining full days are scarce, prefer themes that close uncovered gaps
+    // (especially non-play: beach / interactive) so play can't crowd them out.
+    const remainingSlots =
+      1 + blueprint.days.filter((d) => d.dayIndex > day.dayIndex && d.role === "full").length;
+    const uncoveredGaps = blueprint.experienceCoverage.items.filter((i) => {
+      const done = i.completed + (reserved.get(i.tag) ?? 0);
+      return i.target - done > 0;
+    });
+    if (uncoveredGaps.length > 0 && uncoveredGaps.length >= remainingSlots) {
+      const urgent = candidates.filter((t) =>
+        t.coverageTags.some((tag) => uncoveredGaps.some((g) => g.tag === tag)),
+      );
+      const nonPlayGaps = uncoveredGaps.filter(
+        (g) => g.tag !== "indoor-play" && g.tag !== "playgrounds",
+      );
+      const nonPlayUrgent = urgent.filter((t) => !isPlayTheme(t));
+      if (nonPlayGaps.length > 0 && nonPlayUrgent.length > 0) {
+        candidates = nonPlayUrgent;
+      } else if (urgent.length > 0) {
+        candidates = urgent;
+      }
+    }
+
     const ranked = candidates
       .map((theme) => ({
         theme,
@@ -373,6 +431,12 @@ export function applyDailyThemes(
       chosen = ranked.find((r) => r.breakdown.coverageNeed > 0)?.theme ?? chosen;
     }
 
+    // Final play-cap guard after coverage preference
+    if (isPlayTheme(chosen) && playThemesAssigned >= maxPlayThemes) {
+      const alt = ranked.find((r) => !isPlayTheme(r.theme));
+      if (alt) chosen = alt.theme;
+    }
+
     const intent = budgetIntentForFullDay(
       plan,
       fullDayIndex,
@@ -385,6 +449,7 @@ export function applyDailyThemes(
     previousThemeId = chosen.id;
     previousPaid = intent === "paid" || (intent === "either" && chosen.typicallyPaid);
     fullDayIndex += 1;
+    if (isPlayTheme(chosen)) playThemesAssigned += 1;
 
     if (
       chosen.highIntensity &&
@@ -442,6 +507,12 @@ export function applyDailyThemes(
       ) ??
       themeById("mixed_family");
 
+    // Respect play theme cap during gap-fill
+    const playAssigned = adjusted.filter(
+      (d) => d.theme.id === "play_indoor" || d.theme.id === "playgrounds",
+    ).length;
+    if (isPlayTheme(cover) && playAssigned >= maxPlayThemes) continue;
+
     const canPlaceAt = (i: number): boolean => {
       const prevId = adjusted[i - 1]?.theme.id;
       const nextId = adjusted[i + 1]?.theme.id;
@@ -470,17 +541,7 @@ export function applyDailyThemes(
         );
       });
     }
-    if (idx < 0) {
-      idx = adjusted.findIndex((d, i) => {
-        if (d.role !== "full" || !canPlaceAt(i)) return false;
-        const def = THEME_CATALOG.find((t) => t.id === d.theme.id);
-        if (!def || def.highIntensity) return false;
-        if (isSoleCoverForOtherGap(i, gap.tag)) return false;
-        // Prefer replacing themes that are not dedicated play/beach when filling play gaps
-        return true;
-      });
-    }
-    // Play buckets are easy to starve on short trips — allow replacing entertainment/scenic.
+    // Play buckets: may replace entertainment / scenic / shopping
     if (
       idx < 0 &&
       (gap.tag === "indoor-play" || gap.tag === "playgrounds")
@@ -491,6 +552,35 @@ export function applyDailyThemes(
           canPlaceAt(i) &&
           (d.theme.id === "entertainment" || d.theme.id === "scenic" || d.theme.id === "shopping"),
       );
+    }
+    // Beach / interactive: may replace entertainment or a surplus play day
+    if (
+      idx < 0 &&
+      (gap.tag === "beaches" || gap.tag === "interactive" || gap.tag === "entertainment")
+    ) {
+      idx = adjusted.findIndex((d, i) => {
+        if (d.role !== "full" || !canPlaceAt(i)) return false;
+        if (d.theme.id === "entertainment" || d.theme.id === "scenic" || d.theme.id === "shopping") {
+          return true;
+        }
+        if (d.theme.id === "play_indoor" || d.theme.id === "playgrounds") {
+          return (
+            adjusted.filter(
+              (x) => x.theme.id === "play_indoor" || x.theme.id === "playgrounds",
+            ).length > 1
+          );
+        }
+        return false;
+      });
+    }
+    if (idx < 0) {
+      idx = adjusted.findIndex((d, i) => {
+        if (d.role !== "full" || !canPlaceAt(i)) return false;
+        const def = THEME_CATALOG.find((t) => t.id === d.theme.id);
+        if (!def || def.highIntensity) return false;
+        if (isSoleCoverForOtherGap(i, gap.tag)) return false;
+        return true;
+      });
     }
     if (idx < 0) continue;
 

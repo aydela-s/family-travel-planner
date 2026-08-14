@@ -10,8 +10,8 @@ import type { TripPlan } from "@/types/trip-plan";
 function sdPlan(): TripPlan {
   return {
     destination: "San Diego",
-    startDate: "2026-07-28",
-    endDate: "2026-08-01",
+    startDate: "2026-09-15",
+    endDate: "2026-09-19",
     adults: 1,
     children: [4, 8],
     travelStyle: "balanced",
@@ -87,7 +87,7 @@ describe("compare planner engines (artifact)", () => {
     const out = {
       plan: {
         destination: "San Diego",
-        dates: "2026-07-28 – 2026-08-01",
+        dates: "2026-09-15 – 2026-09-19",
         interests: [
           "Playgrounds & Indoor Play",
           "Interactive Museums",
