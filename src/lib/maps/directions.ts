@@ -1,4 +1,5 @@
 import { CityConfig } from "@/config/city-pricing";
+import { WALKABLE_TAXI_KM } from "@/config/travel-times";
 import {
   choosePublicTransitFare,
   estimateFuelCostForDriving,
@@ -6,6 +7,7 @@ import {
   estimateTaxiDailyCost,
 } from "@/lib/pricing/transport-planner";
 import { calculateRideCost } from "@/lib/pricing/transport-cost";
+import { estimateRoutedMetrics, haversineKm } from "@/lib/maps/travel-estimate";
 import { TripPlan } from "@/types/trip-plan";
 
 export type DirectionsResult = {
@@ -16,22 +18,7 @@ export type DirectionsResult = {
   source: "google" | "estimated";
 };
 
-export function haversineKm(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number,
-): number {
-  const r = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+export { haversineKm } from "@/lib/maps/travel-estimate";
 
 export async function getDirections(
   city: CityConfig,
@@ -40,6 +27,20 @@ export async function getDirections(
   transportType: string,
   providerIndex: number,
 ): Promise<DirectionsResult> {
+  const straight = haversineKm(from.lat, from.lng, to.lat, to.lng);
+
+  // Families walk between same-place / campus hops — do not bill an Uber.
+  if (transportType === "taxis" && straight <= WALKABLE_TAXI_KM) {
+    const walk = estimateRoutedMetrics(straight, true);
+    return {
+      distanceKm: walk.distanceKm,
+      durationMin: walk.durationMin,
+      cost: 0,
+      provider: "Walk",
+      source: "estimated",
+    };
+  }
+
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 
   if (apiKey) {
@@ -63,13 +64,8 @@ export async function getDirections(
     }
   }
 
-  const straight = haversineKm(from.lat, from.lng, to.lat, to.lng);
-  const roadFactor = transportType === "walking" ? 1.3 : 1.45;
-  const distanceKm = Math.max(0.5, Math.round(straight * roadFactor * 10) / 10);
-  const durationMin =
-    transportType === "walking"
-      ? Math.round(distanceKm * 12)
-      : Math.round(distanceKm * 3.2 + 5);
+  const walking = transportType === "walking";
+  const { distanceKm, durationMin } = estimateRoutedMetrics(straight, walking);
 
   const { cost, provider } =
     transportType === "taxis"
@@ -129,7 +125,11 @@ export function estimateDailyTransport(
     return { cost: choice.cost, label: choice.label };
   }
   const cost = estimateTaxiDailyCost(segmentCosts);
-  return { cost, label: "Taxi" };
+  const rideCount = segmentCosts.filter((c) => c > 0).length;
+  return {
+    cost,
+    label: rideCount > 0 ? `Uber · ${rideCount} ride${rideCount === 1 ? "" : "s"}` : "Uber",
+  };
 }
 
 /**

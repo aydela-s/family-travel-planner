@@ -1,16 +1,28 @@
 import type { CityConfig, Landmark, LandmarkInterestTag } from "@/config/city-pricing";
+import { clusterRadiusKm } from "@/config/cluster-distances";
+import { travelTimeBudget } from "@/config/travel-times";
 import { haversineKm } from "@/lib/maps/directions";
+import {
+  estimateDurationMin,
+  isHighValueAttraction,
+  travelFrictionScore,
+} from "@/lib/maps/travel-estimate";
 import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
 import { isLandmarkOpenForVisit, type VisitWindow } from "@/lib/schedule/landmark-hours";
-import { clusterRadiusKm } from "@/config/cluster-distances";
 import {
+  exceedsBudgetStyleTicket,
+  fitsBudgetStyle,
   hasFixedOpeningHours,
   hasTicketRequirement,
+  isHeavyDayLandmark,
   isIndoorPlayExperience,
   isOutdoorPlayground,
   isShorelineBeachExperience,
+  isChillDayCompanion,
+  isThemeParkExperience,
   LOW_FRICTION_PREFERRED_KM,
   LOW_FRICTION_STAY_KM,
+  pairingAllowedForDay,
   sharesAnyDayActivityCategory,
 } from "@/lib/planning-engine/staged/landmark-experience";
 import type {
@@ -187,6 +199,11 @@ export function filterAnchorCandidates(
     if (outdoor.length > 0) pool = outdoor;
   }
 
+  if ((plan.budgetStyle || "balanced") !== "splurge") {
+    const affordable = pool.filter((l) => fitsBudgetStyle(l, plan.budgetStyle));
+    if (affordable.length > 0) pool = affordable;
+  }
+
   return pool;
 }
 
@@ -202,6 +219,17 @@ export function scoreAnchorCandidate(
   // Arrival/departure: proximity beats perfect age coverage (Waterfront vs Coronado).
   const ageWeight = lowFrictionDay ? 0.25 : 1;
   let score = 40 + landmarkAgeScore(landmark, profile) * ageWeight;
+
+  if (km != null && typeof plan.stayLat === "number" && typeof plan.stayLng === "number") {
+    const fromStay = estimateDurationMin(
+      { lat: plan.stayLat, lng: plan.stayLng },
+      landmark,
+      plan,
+    );
+    score += travelFrictionScore(fromStay, travelTimeBudget(plan), {
+      highValue: isHighValueAttraction(landmark),
+    });
+  }
 
   const req = requiredAnchorTags(day);
   if (req && matchesRequiredTags(landmark, req)) score += 50;
@@ -340,6 +368,16 @@ export function scoreAnchorCandidate(
   if (day.dayBudgetIntent === "paid" && landmark.adultPrice > 0) score += 10;
   if (day.dayBudgetIntent === "free" && landmark.adultPrice <= 0) score += 10;
 
+  if (exceedsBudgetStyleTicket(landmark, plan.budgetStyle)) score -= 120;
+
+  if (isHeavyDayLandmark(landmark) && day.goals.some((g) => g.type === "keep_energy_low")) {
+    score -= 35;
+  }
+
+  if (isThemeParkExperience(landmark) && day.role === "full") {
+    score += 18;
+  }
+
   // Arrival/departure may soft-reuse near-stay POIs when the local unused pool is empty.
   if (ledgerNames.has(landmark.name) && !lowFrictionDay) score -= 500;
 
@@ -443,6 +481,7 @@ export function selectSoftFiller(
   visitWindow?: VisitWindow,
 ): Landmark | null {
   const radius = clusterRadiusKm(plan);
+  const budget = travelTimeBudget(plan);
   const exclude = new Set([...ledgerNames, anchor.name]);
   let pool = city.landmarks.filter(
     (l) =>
@@ -450,11 +489,29 @@ export function selectSoftFiller(
       l.intensity !== "high" &&
       !l.interestTags.includes("theme-parks") &&
       !sharesAnyDayActivityCategory(l, [anchor]) &&
-      haversineKm(l.lat, l.lng, anchor.lat, anchor.lng) <= radius,
+      pairingAllowedForDay(anchor, l) &&
+      fitsBudgetStyle(l, plan.budgetStyle) &&
+      estimateDurationMin(anchor, l, plan) <= Math.round(budget.softMaxMin * 1.25),
   );
+  if (pool.length === 0) {
+    pool = city.landmarks.filter(
+      (l) =>
+        !exclude.has(l.name) &&
+        l.intensity !== "high" &&
+        !l.interestTags.includes("theme-parks") &&
+        !sharesAnyDayActivityCategory(l, [anchor]) &&
+        pairingAllowedForDay(anchor, l) &&
+        fitsBudgetStyle(l, plan.budgetStyle) &&
+        haversineKm(l.lat, l.lng, anchor.lat, anchor.lng) <= radius,
+    );
+  }
   if (visitWindow) {
     const open = pool.filter((l) => isLandmarkOpenForVisit(l, visitWindow));
     if (open.length > 0) pool = open;
+  }
+  if (isThemeParkExperience(anchor)) {
+    const chill = pool.filter((l) => isChillDayCompanion(l));
+    if (chill.length > 0) pool = chill;
   }
   const outdoor = pool.filter((l) =>
     l.interestTags.some((t) => ["parks", "beaches", "nature", "playgrounds"].includes(t)),

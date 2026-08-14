@@ -1,6 +1,12 @@
 import { CityConfig, Landmark, LandmarkAgeTag, LandmarkIntensity, LandmarkInterestTag } from "@/config/city-pricing";
 import { CLUSTER_PREFER_SCORE_MARGIN, clusterRadiusKm } from "@/config/cluster-distances";
+import { travelTimeBudget } from "@/config/travel-times";
 import { haversineKm } from "@/lib/maps/directions";
+import {
+  estimateDurationMin,
+  isHighValueAttraction,
+  travelFrictionScore,
+} from "@/lib/maps/travel-estimate";
 import { landmarksForStyle } from "@/lib/pricing/budget-style";
 import {
   interestTagsFromPlan,
@@ -201,18 +207,14 @@ export function landmarkInterestScore(landmark: Landmark, plan: TripPlan): numbe
 
 export function stayProximityScore(landmark: Landmark, plan: TripPlan): number {
   if (typeof plan.stayLat !== "number" || typeof plan.stayLng !== "number") return 0;
-  const km = haversineKm(landmark.lat, landmark.lng, plan.stayLat, plan.stayLng);
-  // Driving: farther stays are fine — only soft-penalize very long hops.
-  if (plan.transportationType === "car-rental") {
-    if (km <= 3) return 12;
-    if (km <= 8) return 8;
-    if (km <= 15) return 2;
-    return -(km - 15) * 1.5;
-  }
-  if (km <= 1.5) return 24;
-  if (km <= 3) return 14;
-  if (km <= 6) return 4;
-  return -(km - 6) * 3;
+  const durationMin = estimateDurationMin(
+    { lat: plan.stayLat, lng: plan.stayLng },
+    landmark,
+    plan,
+  );
+  return travelFrictionScore(durationMin, travelTimeBudget(plan), {
+    highValue: isHighValueAttraction(landmark),
+  });
 }
 
 export function walkingFitScore(landmark: Landmark, plan: TripPlan): number {
@@ -257,15 +259,22 @@ export function maxPairwiseDistanceKm(landmarks: Landmark[]): number {
   return max;
 }
 
-function proximityBonus(candidate: Landmark, alreadyPicked: Landmark[], radiusKm: number): number {
+function proximityBonus(candidate: Landmark, alreadyPicked: Landmark[], plan: TripPlan): number {
   if (alreadyPicked.length === 0) return 0;
-  const dist = minDistanceKmToPicked(candidate, alreadyPicked);
-  if (dist <= radiusKm) {
-    // Prefer closer stops inside the preferred cluster.
-    return (radiusKm - dist) * 8 + 16;
-  }
-  // Soft penalty beyond the radius — slight overshoot is allowed when needed.
-  return -(dist - radiusKm) * 5;
+  const nearest = alreadyPicked.reduce((best, p) => {
+    const d = haversineKm(candidate.lat, candidate.lng, p.lat, p.lng);
+    const bd = haversineKm(candidate.lat, candidate.lng, best.lat, best.lng);
+    return d < bd ? p : best;
+  });
+  const durationMin = estimateDurationMin(nearest, candidate, plan);
+  const km = minDistanceKmToPicked(candidate, alreadyPicked);
+  return (
+    travelFrictionScore(durationMin, travelTimeBudget(plan), {
+      highValue: isHighValueAttraction(candidate),
+    }) *
+      2 +
+    Math.max(0, 6 - km)
+  );
 }
 
 /**
@@ -457,7 +466,7 @@ export function pickLandmarkForFamily(
         landmarkInterestScore(lm, plan) +
         stayProximityScore(lm, plan) +
         walkingFitScore(lm, plan) +
-        proximityBonus(lm, alreadyPicked, radiusKm) +
+        proximityBonus(lm, alreadyPicked, plan) +
         landmarkBandTargetScore(lm, opts.preferBand ?? null);
 
       if (opts.strollerQuiet) {
@@ -474,10 +483,24 @@ export function pickLandmarkForFamily(
         score += stayProximityScore(lm, plan);
       }
 
+      const durationMin =
+        alreadyPicked.length > 0
+          ? estimateDurationMin(
+              alreadyPicked.reduce((best, p) => {
+                const d = haversineKm(lm.lat, lm.lng, p.lat, p.lng);
+                const bd = haversineKm(lm.lat, lm.lng, best.lat, best.lng);
+                return d < bd ? p : best;
+              }),
+              lm,
+              plan,
+            )
+          : 0;
+
       return {
         landmark: lm,
         score,
         dist: minDistanceKmToPicked(lm, alreadyPicked),
+        durationMin,
       };
     })
     .sort(
@@ -494,8 +517,16 @@ export function pickLandmarkForFamily(
 
   if (alreadyPicked.length > 0) {
     const topScore = ranked[0]?.score ?? 0;
+    const timeBudget = travelTimeBudget(plan);
+    const inTime = ranked.filter((r) => r.durationMin <= timeBudget.preferredMin);
+    const competitiveTime = inTime.filter(
+      (r) => r.score >= topScore - CLUSTER_PREFER_SCORE_MARGIN,
+    );
+    if (competitiveTime.length > 0) {
+      return pickFromRanked(competitiveTime);
+    }
     const inCluster = ranked.filter((r) => r.dist <= radiusKm);
-    // Prefer in-cluster picks when they are competitively scored.
+    // Prefer in-cluster picks when they are competitively scored (km fallback).
     const competitive = inCluster.filter(
       (r) => r.score >= topScore - CLUSTER_PREFER_SCORE_MARGIN,
     );

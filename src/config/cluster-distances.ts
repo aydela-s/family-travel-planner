@@ -2,8 +2,8 @@ import { TripPlan } from "@/types/trip-plan";
 
 /**
  * Preferred same-day attraction cluster radii by getting-around mode (km).
- * Soft preference in the planner — not a hard cutoff.
- * Adjust values here only; callers should import from this file.
+ * FAM-78: travel-time budgets in travel-times.ts are the primary friction measure.
+ * These km values stay as a comparison fallback — not a hard cutoff.
  */
 export const WALKING_CLUSTER_KM = 3;
 export const PUBLIC_TRANSIT_CLUSTER_KM = 5;

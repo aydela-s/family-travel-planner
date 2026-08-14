@@ -2,10 +2,14 @@ import type { CityConfig, Landmark } from "@/config/city-pricing";
 import { restaurantsForCityId } from "@/config/city-restaurants";
 import { haversineKm } from "@/lib/maps/directions";
 import {
+  exceedsBudgetStyleTicket,
+  isHeavyDayLandmark,
   isIndoorPlayExperience,
   isOutdoorPlayground,
   isShorelineBeachExperience,
+  isThemeParkExperience,
   LOW_FRICTION_STAY_KM,
+  pairingAllowedForDay,
 } from "@/lib/planning-engine/staged/landmark-experience";
 import type {
   DayBlueprint,
@@ -90,6 +94,46 @@ function validateDay(
       day: day.dayIndex,
       repairHint: "regenerate_anchor",
     });
+  }
+
+  const supportLandmarks = day.support
+    .map((s) => findLandmark(city, s.landmarkName))
+    .filter((l): l is Landmark => Boolean(l));
+  const dayStops = [anchor, ...supportLandmarks];
+  const heavyStops = dayStops.filter(isHeavyDayLandmark);
+  if (heavyStops.length > 1) {
+    out.push({
+      code: "double_heavy_day",
+      message: `Day ${day.dayIndex} stacks heavy stops "${heavyStops.map((l) => l.name).join('" and "')}".`,
+      day: day.dayIndex,
+      repairHint: "regenerate_support",
+    });
+  }
+
+  for (const stop of dayStops) {
+    if (exceedsBudgetStyleTicket(stop, plan.budgetStyle)) {
+      out.push({
+        code: "budget_premium_stop",
+        message: `"${stop.name}" exceeds the ${plan.budgetStyle || "balanced"} ticket budget.`,
+        day: day.dayIndex,
+        repairHint: stop === anchor ? "regenerate_anchor" : "regenerate_support",
+      });
+    }
+  }
+
+  for (const support of supportLandmarks) {
+    if (!pairingAllowedForDay(anchor, support)) {
+      const themeParkDay =
+        isThemeParkExperience(anchor) || isThemeParkExperience(support);
+      out.push({
+        code: themeParkDay ? "theme_park_needs_chill_companion" : "incompatible_day_pairing",
+        message: themeParkDay
+          ? `Theme park day cannot pair "${anchor.name}" with "${support.name}" — use a chill outdoor stop instead.`
+          : `Day ${day.dayIndex} pairs incompatible stops "${anchor.name}" and "${support.name}".`,
+        day: day.dayIndex,
+        repairHint: "regenerate_support",
+      });
+    }
   }
 
   for (const meal of day.meals) {

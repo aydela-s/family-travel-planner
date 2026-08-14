@@ -11,7 +11,13 @@ import {
   LOW_FRICTION_STAY_KM,
   selectAnchorForDay,
 } from "@/lib/planning-engine/staged";
-import { sharesDayActivityCategory } from "@/lib/planning-engine/staged/landmark-experience";
+import { selectSupportForDay } from "@/lib/planning-engine/staged/support-selector";
+import {
+  exceedsBudgetStyleTicket,
+  isHeavyDayLandmark,
+  pairingAllowedForDay,
+  sharesDayActivityCategory,
+} from "@/lib/planning-engine/staged/landmark-experience";
 import { activityTitlesByDay } from "@/lib/planning-engine/staged/fingerprint";
 import { haversineKm } from "@/lib/maps/directions";
 import { TripPlan } from "@/types/trip-plan";
@@ -268,5 +274,77 @@ describe("planTrip staged engine", () => {
     const { plannerEngine, blueprint } = planTrip(sdPlan(), { cityOverride: city });
     expect(plannerEngine).toBe("staged");
     expect(blueprint?.days.every((d) => d.anchor)).toBe(true);
+  });
+
+  it("balanced budget avoids San Diego Zoo and never stacks two heavy stops on one day", () => {
+    const plan = sdPlan({
+      interests: [
+        "Zoos & Animals",
+        "Shows & Entertainment",
+        "Playgrounds & Indoor Play",
+        "Interactive Museums",
+        "Beaches & Waterfronts",
+      ],
+    });
+    const { raw, blueprint } = planTrip(plan, { cityOverride: city, plannerEngine: "staged" });
+    const titles = raw.days.flatMap((d) => d.activities.map((a) => a.title)).join(" | ");
+    expect(titles).not.toMatch(/San Diego Zoo/i);
+
+    for (const day of blueprint!.days) {
+      const stops = [day.anchor!, ...day.support]
+        .map((s) => city.landmarks.find((l) => l.name === s.landmarkName))
+        .filter(Boolean);
+      const heavy = stops.filter((l) => isHeavyDayLandmark(l!));
+      expect(heavy.length).toBeLessThanOrEqual(1);
+      for (const lm of stops) {
+        expect(exceedsBudgetStyleTicket(lm!, plan.budgetStyle)).toBe(false);
+      }
+    }
+  });
+
+  it("selects chill support for Belmont Park, not Children's Museum", () => {
+    const plan = sdPlan({
+      interests: [
+        "Shows & Entertainment",
+        "Interactive Museums",
+        "Playgrounds & Indoor Play",
+        "Beaches & Waterfronts",
+      ],
+    });
+    const belmont = city.landmarks.find((l) => l.name === "Belmont Park")!;
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
+    const entertainmentDay = {
+      ...themed.days[1]!,
+      role: "full" as const,
+      theme: {
+        id: "entertainment" as const,
+        label: "Entertainment",
+        primaryTags: ["entertainment" as const],
+        secondaryTags: ["theme-parks" as const],
+        preferredExperienceTypes: ["entertainment" as const, "theme-parks" as const],
+      },
+      constraints: [
+        {
+          type: "anchor_primary_tags" as const,
+          tags: ["entertainment" as const],
+          mode: "any" as const,
+        },
+      ],
+      dayBudgetIntent: "paid" as const,
+      support: [],
+      meals: [],
+    };
+    const ledgerNames = new Set(
+      city.landmarks.map((l) => l.name).filter((n) => n !== belmont.name),
+    );
+    const support = selectSupportForDay(city, plan, entertainmentDay, belmont, {
+      ledgerNames,
+      alreadyToday: [belmont],
+    });
+
+    for (const stop of support) {
+      expect(pairingAllowedForDay(belmont, stop)).toBe(true);
+      expect(stop.name).not.toMatch(/Children's Museum/i);
+    }
   });
 });

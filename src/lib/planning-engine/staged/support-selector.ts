@@ -1,14 +1,28 @@
 import type { CityConfig, Landmark } from "@/config/city-pricing";
 import { clusterRadiusKm } from "@/config/cluster-distances";
+import { travelTimeBudget } from "@/config/travel-times";
 import { haversineKm } from "@/lib/maps/directions";
+import {
+  estimateDurationMin,
+  isHighValueAttraction,
+  travelFrictionScore,
+} from "@/lib/maps/travel-estimate";
 import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
 import { isLandmarkOpenForVisit, type VisitWindow } from "@/lib/schedule/landmark-hours";
 import {
+  dayAlreadyHasHeavyLandmark,
+  exceedsBudgetStyleTicket,
+  fitsBudgetStyle,
+  isChillDayCompanion,
+  isHeavyDayLandmark,
   isOutdoorPlayground,
+  isThemeParkExperience,
   LOW_FRICTION_PREFERRED_KM,
   LOW_FRICTION_STAY_KM,
+  pairingAllowedForDay,
   sharesAnyDayActivityCategory,
   sharesDayActivityCategory,
+  sharesHeavyDayLoad,
 } from "@/lib/planning-engine/staged/landmark-experience";
 import type { DayBlueprint } from "@/lib/planning-engine/staged/types";
 import type { TripPlan } from "@/types/trip-plan";
@@ -64,8 +78,13 @@ export function scoreSupportCandidate(
   let score = 20 + landmarkAgeScore(landmark, profile) * 0.5;
   const km = haversineKm(landmark.lat, landmark.lng, anchor.lat, anchor.lng);
   const radius = clusterRadiusKm(plan);
-  if (km <= radius) score += (radius - km) * 6;
-  else score -= (km - radius) * 8;
+  // FAM-78: travel time is primary; km radius stays as a light comparison fallback.
+  if (km <= radius) score += (radius - km) * 2;
+  else score -= (km - radius) * 3;
+  const hopMin = estimateDurationMin(anchor, landmark, plan);
+  score += travelFrictionScore(hopMin, travelTimeBudget(plan), {
+    highValue: isHighValueAttraction(landmark),
+  }) * 2;
 
   // Arrival: prefer light near-stay playground / outdoor; avoid museum-scale campuses
   if (day.role === "arrival") {
@@ -98,6 +117,16 @@ export function scoreSupportCandidate(
   }
   if (landmark.interestTags.includes("theme-parks")) score -= 40;
   if (landmark.adultPrice > 0 && day.dayBudgetIntent === "free") score -= 10;
+
+  if (sharesHeavyDayLoad(landmark, anchor)) score -= 120;
+  if (exceedsBudgetStyleTicket(landmark, plan.budgetStyle)) score -= 80;
+
+  if (isThemeParkExperience(anchor)) {
+    if (isChillDayCompanion(landmark)) score += 40;
+    else score -= 120;
+  } else if (isThemeParkExperience(landmark)) {
+    score -= 120;
+  }
 
   // Beach day support: playground / boardwalk / nearby park complement the shoreline anchor
   if (day.theme.id === "beach") {
@@ -132,6 +161,8 @@ export function selectSupportForDay(
 
   // Never stack the same experience category twice on one day (e.g. beach + waterfront playground).
   pool = pool.filter((l) => !sharesDayActivityCategory(l, anchor));
+  pool = pool.filter((l) => pairingAllowedForDay(anchor, l));
+  pool = pool.filter((l) => fitsBudgetStyle(l, plan.budgetStyle));
 
   if (day.role === "arrival") {
     const nearStay = pool.filter((l) => {
@@ -164,10 +195,23 @@ export function selectSupportForDay(
       }
     }
   } else {
+    const budget = travelTimeBudget(plan);
     const nearby = pool.filter(
-      (l) => haversineKm(l.lat, l.lng, anchor.lat, anchor.lng) <= radius * 1.25,
+      (l) => estimateDurationMin(anchor, l, plan) <= budget.softMaxMin,
     );
     if (nearby.length > 0) pool = nearby;
+    else {
+      const wider = pool.filter(
+        (l) => estimateDurationMin(anchor, l, plan) <= Math.round(budget.softMaxMin * 1.25),
+      );
+      if (wider.length > 0) pool = wider;
+      else {
+        const kmNearby = pool.filter(
+          (l) => haversineKm(l.lat, l.lng, anchor.lat, anchor.lng) <= radius * 1.25,
+        );
+        if (kmNearby.length > 0) pool = kmNearby;
+      }
+    }
   }
 
   if (opts.visitWindow) {
@@ -183,6 +227,10 @@ export function selectSupportForDay(
   for (const row of ranked) {
     if (picked.length >= n) break;
     if (sharesAnyDayActivityCategory(row.lm, [anchor, ...picked])) continue;
+    if (!pairingAllowedForDay(anchor, row.lm)) continue;
+    if (picked.some((p) => !pairingAllowedForDay(p, row.lm))) continue;
+    if (dayAlreadyHasHeavyLandmark([anchor, ...picked]) && isHeavyDayLandmark(row.lm)) continue;
+    if (!fitsBudgetStyle(row.lm, plan.budgetStyle)) continue;
     picked.push(row.lm);
     exclude.add(row.lm.name);
   }

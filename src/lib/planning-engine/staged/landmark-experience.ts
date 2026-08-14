@@ -1,4 +1,5 @@
 import type { Landmark } from "@/config/city-pricing";
+import type { BudgetStyle } from "@/types/trip-plan";
 
 /** ~20–30 min urban drive — prefer stays inside this for arrival/departure. */
 export const LOW_FRICTION_STAY_KM = 12;
@@ -86,4 +87,78 @@ export function hasTicketRequirement(landmark: Landmark): boolean {
 
 export function hasFixedOpeningHours(landmark: Landmark): boolean {
   return Boolean(landmark.openingHours || landmark.hoursByWeekday);
+}
+
+/** Adult ticket above this is premium for balanced family trips (Zoo ~$72 is out). */
+export const BALANCED_MAX_ADULT_TICKET = 45;
+/** Save style keeps to lower-cost paid stops (e.g. science centers). */
+export const SAVE_MAX_ADULT_TICKET = 28;
+
+/** Full-day hero or support that should not be doubled on one day (zoo + boardwalk, etc.). */
+export function isHeavyDayLandmark(landmark: Landmark): boolean {
+  if (landmark.intensity === "high") return true;
+  return landmark.interestTags.some((t) => t === "theme-parks" || t === "zoos");
+}
+
+export function sharesHeavyDayLoad(a: Landmark, b: Landmark): boolean {
+  return isHeavyDayLandmark(a) && isHeavyDayLandmark(b);
+}
+
+export function dayAlreadyHasHeavyLandmark(others: Landmark[]): boolean {
+  return others.some(isHeavyDayLandmark);
+}
+
+export function exceedsBudgetStyleTicket(
+  landmark: Landmark,
+  budgetStyle: BudgetStyle | undefined,
+): boolean {
+  if (landmark.adultPrice <= 0) return false;
+  const style = budgetStyle || "balanced";
+  if (style === "splurge") return false;
+  const max = style === "save" ? SAVE_MAX_ADULT_TICKET : BALANCED_MAX_ADULT_TICKET;
+  return landmark.adultPrice > max;
+}
+
+export function fitsBudgetStyle(
+  landmark: Landmark,
+  budgetStyle: BudgetStyle | undefined,
+): boolean {
+  return !exceedsBudgetStyleTicket(landmark, budgetStyle);
+}
+
+/** Boardwalk / amusement-park style stops (Belmont Park, etc.). */
+export function isThemeParkExperience(landmark: Landmark): boolean {
+  return landmark.interestTags.includes("theme-parks");
+}
+
+/**
+ * Low-key complement for a theme-park or heavy day — outdoor, flexible, not another ticketed venue.
+ */
+export function isChillDayCompanion(landmark: Landmark): boolean {
+  if (isThemeParkExperience(landmark) || isHeavyDayLandmark(landmark)) return false;
+  if (landmark.intensity === "high") return false;
+  if (
+    landmark.interestTags.some((t) =>
+      ["museums", "interactive", "indoor-play", "zoos"].includes(t),
+    )
+  ) {
+    return false;
+  }
+  if (landmark.indoor && landmark.adultPrice > 0) return false;
+  if (landmark.intensity === "low") return true;
+  return (
+    landmark.adultPrice <= 0 &&
+    !landmark.indoor &&
+    landmark.interestTags.some((t) =>
+      ["parks", "beaches", "nature", "playgrounds", "history"].includes(t),
+    )
+  );
+}
+
+/** Whether two stops belong on the same day (theme parks need a chill partner). */
+export function pairingAllowedForDay(a: Landmark, b: Landmark): boolean {
+  if (sharesHeavyDayLoad(a, b)) return false;
+  if (isThemeParkExperience(a) && !isChillDayCompanion(b)) return false;
+  if (isThemeParkExperience(b) && !isChillDayCompanion(a)) return false;
+  return true;
 }
