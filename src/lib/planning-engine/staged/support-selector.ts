@@ -1,10 +1,11 @@
 import type { CityConfig, Landmark } from "@/config/city-pricing";
 import { clusterRadiusKm } from "@/config/cluster-distances";
-import { travelTimeBudget } from "@/config/travel-times";
+import { travelDayBudget, travelTimeBudget } from "@/config/travel-times";
 import { haversineKm } from "@/lib/maps/directions";
 import {
   estimateDurationMin,
   isHighValueAttraction,
+  stayTravelMin,
   travelFrictionScore,
 } from "@/lib/maps/travel-estimate";
 import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
@@ -88,10 +89,16 @@ export function scoreSupportCandidate(
 
   // Arrival: prefer light near-stay playground / outdoor; avoid museum-scale campuses
   if (day.role === "arrival") {
-    const fromStay = stayKm(landmark, plan);
+    const fromStay = stayTravelMin(landmark, plan);
+    const fromStayKm = stayKm(landmark, plan);
+    const dayBudget = travelDayBudget(plan);
     if (fromStay != null) {
-      if (fromStay <= LOW_FRICTION_PREFERRED_KM) score += 40;
-      else if (fromStay <= LOW_FRICTION_STAY_KM) score += 8;
+      if (fromStay <= dayBudget.preferredMin) score += 40;
+      else if (fromStay <= dayBudget.softMaxMin) score += 8;
+      else score -= 45;
+    } else if (fromStayKm != null) {
+      if (fromStayKm <= LOW_FRICTION_PREFERRED_KM) score += 40;
+      else if (fromStayKm <= LOW_FRICTION_STAY_KM) score += 8;
       else score -= 45;
     }
     if (landmark.adultPrice > 0) score -= 30;
@@ -165,28 +172,33 @@ export function selectSupportForDay(
   pool = pool.filter((l) => fitsBudgetStyle(l, plan.budgetStyle));
 
   if (day.role === "arrival") {
+    const dayBudget = travelDayBudget(plan);
     const nearStay = pool.filter((l) => {
+      const mins = stayTravelMin(l, plan);
+      if (mins != null) return mins <= dayBudget.softMaxMin;
       const km = stayKm(l, plan);
       return km == null || km <= LOW_FRICTION_STAY_KM;
     });
     if (nearStay.length > 0) pool = nearStay;
 
-    // Prefer playground-only within the soft sweet-spot ring
     const preferredPlay = pool.filter((l) => {
-      const km = stayKm(l, plan);
-      return (
-        isOutdoorPlayground(l) &&
-        !isMuseumCampus(l) &&
-        (km == null || km <= LOW_FRICTION_PREFERRED_KM)
-      );
+      const mins = stayTravelMin(l, plan);
+      const close =
+        mins != null
+          ? mins <= dayBudget.preferredMin
+          : stayKm(l, plan) == null || (stayKm(l, plan) ?? 99) <= LOW_FRICTION_PREFERRED_KM;
+      return isOutdoorPlayground(l) && !isMuseumCampus(l) && close;
     });
     if (preferredPlay.length > 0) {
       pool = preferredPlay;
     } else {
-      // Else light outdoor near stay (beach / simple park) — not museum campuses
       const light = pool.filter((l) => {
-        const km = stayKm(l, plan);
-        return isLightArrivalSupport(l) && (km == null || km <= LOW_FRICTION_PREFERRED_KM);
+        const mins = stayTravelMin(l, plan);
+        const close =
+          mins != null
+            ? mins <= dayBudget.preferredMin
+            : stayKm(l, plan) == null || (stayKm(l, plan) ?? 99) <= LOW_FRICTION_PREFERRED_KM;
+        return isLightArrivalSupport(l) && close;
       });
       if (light.length > 0) pool = light;
       else {

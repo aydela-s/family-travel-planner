@@ -101,7 +101,7 @@ export type DayGoal =
   | { type: "low_friction" }
   | { type: "easy_exit" }
   | { type: "keep_energy_low" }
-  | { type: "prefer_near_stay_or_flexible_outdoor"; maxKm: number }
+  | { type: "prefer_near_stay_or_flexible_outdoor"; maxKm: number; maxMin: number }
   | { type: "cover_experience"; tag: LandmarkInterestTag }
   | { type: "dedicated_experience"; tag: LandmarkInterestTag }
   | { type: "half_day_anchor" }
@@ -122,7 +122,7 @@ export type DayConstraint =
   | { type: "discourage_anchor_tags"; tags: LandmarkInterestTag[] }
   | { type: "discourage_indoor_paid_anchor" }
   | { type: "avoid_high_risk_time_sensitive_anchor" }
-  | { type: "avoid_far_attractions"; maxKm: number }
+  | { type: "avoid_far_attractions"; maxKm: number; maxMin: number }
   | { type: "avoid_fixed_time_experiences" }
   | { type: "avoid_paid_tickets" }
   | { type: "max_activities"; n: number }

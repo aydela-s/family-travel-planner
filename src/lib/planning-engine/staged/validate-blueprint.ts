@@ -1,6 +1,8 @@
 import type { CityConfig, Landmark } from "@/config/city-pricing";
 import { restaurantsForCityId } from "@/config/city-restaurants";
 import { haversineKm } from "@/lib/maps/directions";
+import { stayTravelMin } from "@/lib/maps/travel-estimate";
+import { travelDayBudget } from "@/config/travel-times";
 import {
   exceedsBudgetStyleTicket,
   isHeavyDayLandmark,
@@ -59,11 +61,20 @@ function validateDay(
   }
 
   if (day.role === "arrival" || day.role === "departure") {
+    const dayBudget = travelDayBudget(plan);
+    const stayMin = stayTravelMin(anchor, plan);
     const km = stayKm(anchor, plan);
-    if (km != null && km > LOW_FRICTION_STAY_KM) {
+    const tooFar =
+      stayMin != null
+        ? stayMin > dayBudget.softMaxMin
+        : km != null && km > LOW_FRICTION_STAY_KM;
+    if (tooFar) {
       out.push({
         code: "travel_day_far",
-        message: `${day.role} anchor "${anchor.name}" is ${km.toFixed(1)} km from stay (max ${LOW_FRICTION_STAY_KM}).`,
+        message:
+          stayMin != null
+            ? `${day.role} anchor "${anchor.name}" is ~${stayMin} min from stay (max ${dayBudget.softMaxMin} min).`
+            : `${day.role} anchor "${anchor.name}" is ${km!.toFixed(1)} km from stay (max ${LOW_FRICTION_STAY_KM}).`,
         day: day.dayIndex,
         repairHint: "regenerate_anchor",
       });

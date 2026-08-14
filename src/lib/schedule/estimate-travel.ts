@@ -1,6 +1,6 @@
 import { Landmark } from "@/config/city-pricing";
 import { DayLandmarkContext, SlotKind } from "@/lib/planning-engine/types";
-import { haversineKm } from "@/lib/maps/directions";
+import { estimateDurationMin } from "@/lib/maps/travel-estimate";
 import { defaultTravelMin } from "@/lib/schedule/timeline";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -20,20 +20,13 @@ export const TRAVEL_TRAFFIC_BUFFER = 1.15;
 
 export const MIN_SEGMENT_TRAVEL_MIN = 10;
 
-/** Estimate travel minutes from straight-line distance (same formula as maps/directions fallback). */
+/** Estimate travel minutes from straight-line distance (mode-aware FAM-78 fallback). */
 export function estimateTravelMinBetween(
   from: Located,
   to: Located,
   plan: TripPlan,
 ): number {
-  const straight = haversineKm(from.lat, from.lng, to.lat, to.lng);
-  const walking = plan.transportationType === "walking";
-  const roadFactor = walking ? 1.3 : 1.45;
-  const distanceKm = Math.max(0.5, Math.round(straight * roadFactor * 10) / 10);
-  const fromDistance = walking
-    ? Math.round(distanceKm * 12)
-    : Math.round(distanceKm * 3.2 + 5);
-
+  const fromDistance = estimateDurationMin(from, to, plan);
   // Never schedule less travel than the age/transport base gap.
   return Math.max(defaultTravelMin(plan), fromDistance);
 }

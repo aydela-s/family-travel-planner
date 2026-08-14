@@ -78,6 +78,22 @@ describe("haversine travel estimates — Phase 4", () => {
     expect(near).toBeGreaterThanOrEqual(defaultTravelMin(plan));
   });
 
+  it("estimates public transit slower than driving for the same hop", () => {
+    const balboa = sanDiego.landmarks.find((l) => l.name === "Balboa Park")!;
+    const laJolla = sanDiego.landmarks.find((l) => l.name === "La Jolla Cove")!;
+    const car = estimateTravelMinBetween(
+      balboa,
+      laJolla,
+      basePlan({ transportationType: "car-rental", children: [10] }),
+    );
+    const transit = estimateTravelMinBetween(
+      balboa,
+      laJolla,
+      basePlan({ transportationType: "public-transportation", children: [10] }),
+    );
+    expect(transit).toBeGreaterThan(car);
+  });
+
   it("builds per-leg gaps from day landmark context", () => {
     const plan = basePlan({ children: [10] });
     const ctx = buildLandmarkContext(sanDiego, plan, 1, 2);

@@ -287,6 +287,7 @@ function preferOpenPool(
   pickedNames: Set<string>,
   alreadyPicked: Landmark[],
   radiusKm: number,
+  plan: TripPlan,
   visitWindow?: VisitWindow,
   wantedTags: LandmarkInterestTag[] = [],
 ): Landmark[] {
@@ -296,15 +297,23 @@ function preferOpenPool(
     list.filter((l) => isLandmarkOpenForVisit(l, visitWindow));
   const matchesInterest = (l: Landmark) =>
     wantedTags.length === 0 || l.interestTags.some((t) => wantedTags.includes(t));
+  const budget = travelTimeBudget(plan);
 
   const openPool = openIn(pool);
   if (openPool.length > 0) return openPool;
 
   let wider = cityLandmarks.filter((l) => !pickedNames.has(l.name) && matchesInterest(l));
   if (alreadyPicked.length > 0) {
-    const nearby = wider.filter(
-      (l) => minDistanceKmToPicked(l, alreadyPicked) <= radiusKm,
-    );
+    const nearby = wider.filter((l) => {
+      const nearest = alreadyPicked.reduce((best, p) => {
+        const d = haversineKm(l.lat, l.lng, p.lat, p.lng);
+        const bd = haversineKm(l.lat, l.lng, best.lat, best.lng);
+        return d < bd ? p : best;
+      });
+      const mins = estimateDurationMin(nearest, l, plan);
+      if (mins > 0) return mins <= budget.softMaxMin;
+      return minDistanceKmToPicked(l, alreadyPicked) <= radiusKm;
+    });
     if (nearby.length > 0) wider = nearby;
   }
   const openWider = openIn(wider);
@@ -455,6 +464,7 @@ export function pickLandmarkForFamily(
     pickedNames,
     alreadyPicked,
     radiusKm,
+    plan,
     opts.visitWindow,
     wantedTags,
   );

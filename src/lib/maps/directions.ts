@@ -1,5 +1,5 @@
 import { CityConfig } from "@/config/city-pricing";
-import { WALKABLE_TAXI_KM } from "@/config/travel-times";
+import { directionsTravelMode, WALKABLE_TAXI_KM } from "@/config/travel-times";
 import {
   choosePublicTransitFare,
   estimateFuelCostForDriving,
@@ -42,11 +42,20 @@ export async function getDirections(
   }
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const travelMode = directionsTravelMode(transportType);
 
   if (apiKey) {
     try {
-      const mode = transportType === "walking" ? "walking" : "driving";
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${from.lat},${from.lng}&destination=${to.lat},${to.lng}&mode=${mode}&key=${apiKey}`;
+      const params = new URLSearchParams({
+        origin: `${from.lat},${from.lng}`,
+        destination: `${to.lat},${to.lng}`,
+        mode: travelMode,
+        key: apiKey,
+      });
+      if (travelMode === "transit") {
+        params.set("departure_time", String(Math.floor(Date.now() / 1000)));
+      }
+      const url = `https://maps.googleapis.com/maps/api/directions/json?${params.toString()}`;
       const res = await fetch(url);
       const data = await res.json();
       const leg = data.routes?.[0]?.legs?.[0];
@@ -64,8 +73,7 @@ export async function getDirections(
     }
   }
 
-  const walking = transportType === "walking";
-  const { distanceKm, durationMin } = estimateRoutedMetrics(straight, walking);
+  const { distanceKm, durationMin } = estimateRoutedMetrics(straight, travelMode);
 
   const { cost, provider } =
     transportType === "taxis"

@@ -19,6 +19,17 @@ export const TRAVEL_TIME_BY_MODE: Record<TransportationType, TravelTimeBudget> =
 /** Consecutive stops closer than this are treated as walkable — no taxi fare. */
 export const WALKABLE_TAXI_KM = 0.4;
 
+/** Google Directions `mode` for a trip transportation type. */
+export type DirectionsTravelMode = "walking" | "driving" | "transit";
+
+export function directionsTravelMode(
+  transportType: string | undefined,
+): DirectionsTravelMode {
+  if (transportType === "walking") return "walking";
+  if (transportType === "public-transportation") return "transit";
+  return "driving";
+}
+
 type TravelTimePlan = Pick<
   TripPlan,
   "transportationType" | "travelStyle" | "walkingLimit" | "children"
@@ -58,4 +69,16 @@ export function travelTimeBudget(plan: TravelTimePlan): TravelTimeBudget {
   preferredMin = Math.max(10, preferredMin);
   softMaxMin = Math.max(preferredMin + 8, softMaxMin);
   return { preferredMin, softMaxMin };
+}
+
+/**
+ * Arrival/departure stay inside the preferred full-day window, not the
+ * high-value soft max (Torrey Pines from downtown is a full-day hop).
+ */
+export function travelDayBudget(plan: TravelTimePlan): TravelTimeBudget {
+  const full = travelTimeBudget(plan);
+  return {
+    preferredMin: Math.max(10, Math.round(full.preferredMin * 0.7)),
+    softMaxMin: full.preferredMin,
+  };
 }

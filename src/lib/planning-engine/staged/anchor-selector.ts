@@ -1,10 +1,11 @@
 import type { CityConfig, Landmark, LandmarkInterestTag } from "@/config/city-pricing";
 import { clusterRadiusKm } from "@/config/cluster-distances";
-import { travelTimeBudget } from "@/config/travel-times";
+import { travelDayBudget, travelTimeBudget } from "@/config/travel-times";
 import { haversineKm } from "@/lib/maps/directions";
 import {
   estimateDurationMin,
   isHighValueAttraction,
+  stayTravelMin,
   travelFrictionScore,
 } from "@/lib/maps/travel-estimate";
 import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
@@ -88,13 +89,32 @@ function isFlexibleOutdoor(landmark: Landmark): boolean {
   );
 }
 
-/** Distance score for arrival/departure — proximity dominates age/scenic fit. */
-function scoreStayProximity(km: number | null, maxKm: number): number {
+function farLimits(day: DayBlueprint, plan: TripPlan): { maxKm: number; maxMin: number; preferredMin: number } {
+  const far = day.constraints.find((c) => c.type === "avoid_far_attractions");
+  const travelDay = day.role === "arrival" || day.role === "departure";
+  const budget = travelDay ? travelDayBudget(plan) : travelTimeBudget(plan);
+  const maxMin = far && far.type === "avoid_far_attractions" ? far.maxMin : budget.softMaxMin;
+  const preferredMin = travelDay ? budget.preferredMin : budget.preferredMin;
+  const maxKm = far && far.type === "avoid_far_attractions" ? far.maxKm : LOW_FRICTION_STAY_KM;
+  return { maxKm, maxMin, preferredMin };
+}
+
+/** Time-first stay score; km is a comparison fallback when coords exist. */
+function scoreStayProximity(
+  durationMin: number | null,
+  km: number | null,
+  preferredMin: number,
+  maxMin: number,
+): number {
+  if (durationMin != null) {
+    if (durationMin <= preferredMin) return 70 - durationMin * 0.8;
+    if (durationMin <= maxMin) return 28 - (durationMin - preferredMin) * 1.2;
+    return -70 - (durationMin - maxMin) * 2.5;
+  }
   if (km == null) return 0;
   if (km <= LOW_FRICTION_PREFERRED_KM) return 70 - km * 2;
-  if (km <= maxKm) return 28 - (km - LOW_FRICTION_PREFERRED_KM) * 3;
-  // Beyond ~20–30 min: steep penalty (Torrey Pines / far La Jolla from downtown)
-  return -70 - (km - maxKm) * 5;
+  if (km <= LOW_FRICTION_STAY_KM) return 28 - (km - LOW_FRICTION_PREFERRED_KM) * 3;
+  return -70 - (km - LOW_FRICTION_STAY_KM) * 5;
 }
 
 function isLowWalkingFriendly(landmark: Landmark): boolean {
@@ -148,9 +168,10 @@ export function filterAnchorCandidates(
 
   // Arrival/departure: prefer free flexible outdoor near stay when options exist
   if (day.role === "arrival" || day.role === "departure") {
-    const far = day.constraints.find((c) => c.type === "avoid_far_attractions");
-    const maxKm = far && far.type === "avoid_far_attractions" ? far.maxKm : LOW_FRICTION_STAY_KM;
+    const { maxKm, maxMin, preferredMin } = farLimits(day, plan);
     const isNear = (l: Landmark) => {
+      const mins = stayTravelMin(l, plan);
+      if (mins != null) return mins <= maxMin;
       const km = stayKm(l, plan);
       return km == null || km <= maxKm;
     };
@@ -158,13 +179,26 @@ export function filterAnchorCandidates(
     // Prefer unused near-stay; if ledger exhausted locally, reuse near landmarks
     // rather than falling through to far unused POIs (e.g. Torrey Pines).
     let nearPool = unused.filter(isNear);
-    if (nearPool.length === 0) {
-      nearPool = city.landmarks.filter(isNear);
+    const unusedFree = nearPool.filter(
+      (l) => l.adultPrice <= 0 && !l.interestTags.includes("theme-parks"),
+    );
+    if (unusedFree.length > 0) {
+      nearPool = unusedFree;
+    } else {
+      const reusedFree = city.landmarks.filter(
+        (l) =>
+          isNear(l) && l.adultPrice <= 0 && !l.interestTags.includes("theme-parks"),
+      );
+      if (reusedFree.length > 0) nearPool = reusedFree;
+      else if (nearPool.length === 0) {
+        nearPool = city.landmarks.filter(isNear);
+      }
     }
     if (nearPool.length > 0) pool = nearPool;
 
-    // Prefer the soft sweet-spot ring (~15–20 min) when anything qualifies
     const nearPreferred = pool.filter((l) => {
+      const mins = stayTravelMin(l, plan);
+      if (mins != null) return mins <= preferredMin;
       const km = stayKm(l, plan);
       return km == null || km <= LOW_FRICTION_PREFERRED_KM;
     });
@@ -269,17 +303,18 @@ export function scoreAnchorCandidate(
     else if (isIndoorPlayExperience(landmark)) score -= 50;
   }
 
-  const far = day.constraints.find((c) => c.type === "avoid_far_attractions");
-  const maxKm =
-    far && far.type === "avoid_far_attractions" ? far.maxKm : LOW_FRICTION_STAY_KM;
+  const { maxKm, maxMin, preferredMin } = farLimits(day, plan);
+  const stayMin = stayTravelMin(landmark, plan);
 
   if (lowFrictionDay) {
     // Priority: 1 near stay → 2 free/flexible → 3 low walking → 4 scenic only if close
-    score += scoreStayProximity(km, maxKm);
+    score += scoreStayProximity(stayMin, km, preferredMin, maxMin);
 
     if (hasTicketRequirement(landmark) || landmark.adultPrice > 0) {
       // Departure: paid only when very close; arrival: always steep
-      if (day.role === "departure" && km != null && km <= LOW_FRICTION_PREFERRED_KM) {
+      const closePaid =
+        stayMin != null ? stayMin <= preferredMin : km != null && km <= LOW_FRICTION_PREFERRED_KM;
+      if (day.role === "departure" && closePaid) {
         score -= 45;
       } else {
         score -= 70;
@@ -313,8 +348,7 @@ export function scoreAnchorCandidate(
 
     // Near-stay parks/playgrounds beat scenic beaches that require a longer drive
     if (
-      km != null &&
-      km <= LOW_FRICTION_PREFERRED_KM &&
+      (stayMin != null ? stayMin <= preferredMin : km != null && km <= LOW_FRICTION_PREFERRED_KM) &&
       (isOutdoorPlayground(landmark) || landmark.interestTags.includes("parks"))
     ) {
       score += 45;
@@ -322,7 +356,11 @@ export function scoreAnchorCandidate(
 
     // Scenic / nature / beach bonus only when geographically close — never overrides near-stay
     if (landmark.interestTags.some((t) => ["nature", "beaches"].includes(t))) {
-      if (km != null && km <= LOW_FRICTION_PREFERRED_KM) score += 10;
+      if (stayMin != null) {
+        if (stayMin <= preferredMin) score += 10;
+        else if (stayMin <= maxMin) score += 2;
+        else score -= 30;
+      } else if (km != null && km <= LOW_FRICTION_PREFERRED_KM) score += 10;
       else if (km != null && km <= maxKm) score += 2;
       else if (km != null && km > maxKm) score -= 30;
     }
@@ -334,16 +372,27 @@ export function scoreAnchorCandidate(
       score -= 40;
     }
     if (landmark.indoor && hasTicketRequirement(landmark)) score -= 35;
-  } else if (far && far.type === "avoid_far_attractions" && km != null) {
-    if (km > far.maxKm) score -= 40;
-    else score += Math.max(0, 15 - km);
+  } else if (hasConstraint(day, "avoid_far_attractions")) {
+    if (stayMin != null) {
+      if (stayMin > maxMin) score -= 40;
+      else score += Math.max(0, 18 - stayMin * 0.4);
+    } else if (km != null) {
+      if (km > maxKm) score -= 40;
+      else score += Math.max(0, 15 - km);
+    }
   }
 
   for (const g of day.goals) {
-    if (g.type === "prefer_near_stay_or_flexible_outdoor" && km != null && !lowFrictionDay) {
-      if (km <= g.maxKm) score += 18;
-      else if (isFlexibleOutdoor(landmark)) score += 8;
-      else score -= 12;
+    if (g.type === "prefer_near_stay_or_flexible_outdoor" && !lowFrictionDay) {
+      if (stayMin != null) {
+        if (stayMin <= g.maxMin) score += 18;
+        else if (isFlexibleOutdoor(landmark)) score += 8;
+        else score -= 12;
+      } else if (km != null) {
+        if (km <= g.maxKm) score += 18;
+        else if (isFlexibleOutdoor(landmark)) score += 8;
+        else score -= 12;
+      }
     }
     if (g.type === "dedicated_experience" && landmark.interestTags.includes(g.tag)) {
       score += 28;
@@ -410,22 +459,27 @@ function lowFrictionFallback(
   plan: TripPlan,
   day: DayBlueprint,
 ): Landmark | null {
-  const far = day.constraints.find((c) => c.type === "avoid_far_attractions");
-  const maxKm =
-    far && far.type === "avoid_far_attractions" ? far.maxKm : LOW_FRICTION_STAY_KM;
+  const { maxKm, maxMin } = farLimits(day, plan);
 
   const near = city.landmarks
     .filter((l) => {
-      const km = stayKm(l, plan);
-      if (km != null && km > maxKm) return false;
+      const mins = stayTravelMin(l, plan);
+      if (mins != null && mins > maxMin) return false;
+      if (mins == null) {
+        const km = stayKm(l, plan);
+        if (km != null && km > maxKm) return false;
+      }
       if (l.adultPrice > 0) return false;
       if (l.interestTags.includes("theme-parks")) return false;
       return true;
     })
     .sort((a, b) => {
+      const ta = stayTravelMin(a, plan) ?? 99;
+      const tb = stayTravelMin(b, plan) ?? 99;
       const ka = stayKm(a, plan) ?? 99;
       const kb = stayKm(b, plan) ?? 99;
       return (
+        ta - tb ||
         ka - kb ||
         Number(isOutdoorPlayground(b)) - Number(isOutdoorPlayground(a)) ||
         a.name.localeCompare(b.name)

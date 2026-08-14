@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { CITY_CONFIGS } from "@/config/city-pricing";
-import { TRAVEL_TIME_BY_MODE, travelTimeBudget } from "@/config/travel-times";
+import {
+  directionsTravelMode,
+  TRAVEL_TIME_BY_MODE,
+  travelDayBudget,
+  travelTimeBudget,
+} from "@/config/travel-times";
 import { getDirections } from "@/lib/maps/directions";
-import { estimateDurationMin, travelFrictionScore } from "@/lib/maps/travel-estimate";
+import {
+  estimateDurationMin,
+  estimateRoutedMetrics,
+  travelFrictionScore,
+} from "@/lib/maps/travel-estimate";
 import { applyDailyThemes, buildTripStrategy } from "@/lib/planning-engine/staged";
 import { selectSupportForDay } from "@/lib/planning-engine/staged/support-selector";
 import { TripPlan } from "@/types/trip-plan";
@@ -62,6 +71,40 @@ describe("FAM-78 travel-time budgets", () => {
     const normal = travelFrictionScore(budget.softMaxMin - 2, budget);
     const highValue = travelFrictionScore(budget.softMaxMin - 2, budget, { highValue: true });
     expect(highValue).toBeGreaterThan(normal);
+  });
+
+  it("tightens arrival/departure windows vs full-day preferred", () => {
+    const taxi = plan({ transportationType: "taxis" });
+    const car = plan({ transportationType: "car-rental" });
+    const taxiDay = travelDayBudget(taxi);
+    const carDay = travelDayBudget(car);
+    expect(taxiDay.softMaxMin).toBe(travelTimeBudget(taxi).preferredMin);
+    expect(carDay.softMaxMin).toBe(travelTimeBudget(car).preferredMin);
+    expect(taxiDay.preferredMin).toBeLessThan(carDay.preferredMin);
+    expect(taxiDay.softMaxMin).toBeLessThan(carDay.softMaxMin);
+  });
+
+  it("maps public transit to Google transit mode, not driving", () => {
+    expect(directionsTravelMode("public-transportation")).toBe("transit");
+    expect(directionsTravelMode("taxis")).toBe("driving");
+    expect(directionsTravelMode("car-rental")).toBe("driving");
+    expect(directionsTravelMode("walking")).toBe("walking");
+  });
+
+  it("estimates transit hops slower than the same driving hop", () => {
+    const drive = estimateRoutedMetrics(8, "driving");
+    const transit = estimateRoutedMetrics(8, "transit");
+    expect(transit.durationMin).toBeGreaterThan(drive.durationMin);
+    const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
+    const stay = { lat: 32.7157, lng: -117.1611 };
+    const cove = city.landmarks.find((l) => l.name === "La Jolla Cove")!;
+    const byCar = estimateDurationMin(stay, cove, plan({ transportationType: "car-rental" }));
+    const byTransit = estimateDurationMin(
+      stay,
+      cove,
+      plan({ transportationType: "public-transportation" }),
+    );
+    expect(byTransit).toBeGreaterThan(byCar);
   });
 });
 

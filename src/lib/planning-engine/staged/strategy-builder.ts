@@ -6,6 +6,7 @@ import {
   LOW_FRICTION_PREFERRED_KM,
   LOW_FRICTION_STAY_KM,
 } from "@/lib/planning-engine/staged/landmark-experience";
+import { travelDayBudget } from "@/config/travel-times";
 import {
   TRIP_BLUEPRINT_VERSION,
   type DayBlueprint,
@@ -45,37 +46,51 @@ export function assignDayRoles(dayCount: number): DayRole[] {
 }
 
 /**
- * Arrival/departure stay-proximity band (~20–30 min drive).
- * Convenience level nudges the soft preferred band, not the hard outer ring.
+ * Arrival/departure stay-proximity band.
+ * Time is primary (FAM-78); km stays as a comparison fallback.
  */
-function stayNearKm(rules: PlanningRules): number {
-  switch (rules.convenienceLevel) {
-    case "high":
-      return LOW_FRICTION_STAY_KM;
-    case "low":
-      return LOW_FRICTION_PREFERRED_KM;
-    default:
-      return Math.round((LOW_FRICTION_PREFERRED_KM + LOW_FRICTION_STAY_KM) / 2);
-  }
+function stayNearLimits(plan: TripPlan, rules: PlanningRules): { maxKm: number; maxMin: number } {
+  const day = travelDayBudget({
+    transportationType: plan.transportationType || rules.transportPreference,
+    travelStyle: plan.travelStyle || rules.pace,
+    walkingLimit: plan.walkingLimit,
+    children: plan.children,
+  });
+  let preferredKm = Math.round((LOW_FRICTION_PREFERRED_KM + LOW_FRICTION_STAY_KM) / 2);
+  if (rules.convenienceLevel === "high") preferredKm = LOW_FRICTION_STAY_KM;
+  if (rules.convenienceLevel === "low") preferredKm = LOW_FRICTION_PREFERRED_KM;
+  return { maxKm: preferredKm, maxMin: day.preferredMin };
+}
+
+function farLimits(plan: TripPlan, rules: PlanningRules): { maxKm: number; maxMin: number } {
+  const day = travelDayBudget({
+    transportationType: plan.transportationType || rules.transportPreference,
+    travelStyle: plan.travelStyle || rules.pace,
+    walkingLimit: plan.walkingLimit,
+    children: plan.children,
+  });
+  return { maxKm: LOW_FRICTION_STAY_KM, maxMin: day.softMaxMin };
 }
 
 /** Baseline goals/constraints from day role — Theme Generator adds experience goals later. */
 export function goalsAndConstraintsForRole(
   role: DayRole,
   rules: PlanningRules,
+  plan: TripPlan,
 ): { goals: DayGoal[]; constraints: DayConstraint[]; dayBudgetIntent: DayBlueprint["dayBudgetIntent"] } {
-  const near = stayNearKm(rules);
+  const near = stayNearLimits(plan, rules);
+  const far = farLimits(plan, rules);
 
   if (role === "arrival") {
     return {
       goals: [
         { type: "low_friction" },
         { type: "keep_energy_low" },
-        { type: "prefer_near_stay_or_flexible_outdoor", maxKm: near },
+        { type: "prefer_near_stay_or_flexible_outdoor", maxKm: near.maxKm, maxMin: near.maxMin },
         ...(rules.napWindows.length > 0 ? [{ type: "honor_nap_windows" as const }] : []),
       ],
       constraints: [
-        { type: "avoid_far_attractions", maxKm: LOW_FRICTION_STAY_KM },
+        { type: "avoid_far_attractions", maxKm: far.maxKm, maxMin: far.maxMin },
         { type: "avoid_high_risk_time_sensitive_anchor" },
         { type: "avoid_fixed_time_experiences" },
         { type: "avoid_paid_tickets" },
@@ -96,10 +111,10 @@ export function goalsAndConstraintsForRole(
       goals: [
         { type: "easy_exit" },
         { type: "keep_energy_low" },
-        { type: "prefer_near_stay_or_flexible_outdoor", maxKm: near },
+        { type: "prefer_near_stay_or_flexible_outdoor", maxKm: near.maxKm, maxMin: near.maxMin },
       ],
       constraints: [
-        { type: "avoid_far_attractions", maxKm: LOW_FRICTION_STAY_KM },
+        { type: "avoid_far_attractions", maxKm: far.maxKm, maxMin: far.maxMin },
         { type: "avoid_fixed_time_experiences" },
         { type: "avoid_paid_tickets" },
         { type: "prefer_free_anchor" },
@@ -188,7 +203,7 @@ export function buildTripStrategy(
 
   const days: DayBlueprint[] = dates.map((date, i) => {
     const role = roles[i] ?? "full";
-    const { goals, constraints, dayBudgetIntent } = goalsAndConstraintsForRole(role, rules);
+    const { goals, constraints, dayBudgetIntent } = goalsAndConstraintsForRole(role, rules, plan);
     return {
       dayIndex: i + 1,
       date,
