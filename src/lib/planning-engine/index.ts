@@ -20,6 +20,7 @@ import {
   buildScheduleFromBlueprint,
   planMealsOnBlueprint,
   resolvePlannerEngine,
+  validateAndRepairBlueprint,
 } from "@/lib/planning-engine/staged";
 import type { PlannerEngine, TripBlueprint } from "@/lib/planning-engine/staged/types";
 import { PlanOptions } from "@/lib/planning-engine/types";
@@ -243,7 +244,8 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
   function buildFullRawStaged(p: TripPlan): { raw: RawItinerary; blueprint: TripBlueprint } {
     const withStops = commitStopsToBlueprint(blueprint, p, city);
     const withMeals = planMealsOnBlueprint(withStops, p, city);
-    const days = withMeals.days.map((dayBp) => {
+    const { blueprint: repaired } = validateAndRepairBlueprint(withMeals, p, city);
+    const days = repaired.days.map((dayBp) => {
       const adjustment = getAdjustmentContext(undefined, dayBp.dayIndex);
       const { activities, ctx } = buildScheduleFromBlueprint(dayBp, p, city);
       return {
@@ -251,7 +253,7 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
         activities: fixRawDayActivities(activities, p, adjustment, ctx),
       };
     });
-    return { raw: { days }, blueprint: withMeals };
+    return { raw: { days }, blueprint: repaired };
   }
 
   let raw: RawItinerary;
@@ -307,6 +309,9 @@ export {
   selectSupportForDay,
   planMealsOnBlueprint,
   buildScheduleFromBlueprint,
+  validateBlueprint,
+  repairBlueprint,
+  validateAndRepairBlueprint,
 } from "@/lib/planning-engine/staged";
 export type {
   PlannerEngine,

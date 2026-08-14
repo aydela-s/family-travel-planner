@@ -53,6 +53,11 @@ export {
   buildScheduleFromBlueprint,
   type StagedDaySchedule,
 } from "@/lib/planning-engine/staged/schedule-builder";
+export { validateBlueprint } from "@/lib/planning-engine/staged/validate-blueprint";
+export {
+  repairBlueprint,
+  validateAndRepairBlueprint,
+} from "@/lib/planning-engine/staged/repair-blueprint";
 export {
   TRIP_BLUEPRINT_VERSION,
   type CommittedStop,

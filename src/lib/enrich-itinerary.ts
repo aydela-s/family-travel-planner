@@ -12,7 +12,6 @@ import { estimateDailyTransport, formatTransportDisplay } from "@/lib/maps/direc
 import { buildRouteSegments } from "@/lib/maps/route-segments";
 import { buildStaticMapUrl } from "@/lib/maps/static-map";
 import { normalizeRawItinerary } from "@/lib/itinerary";
-import { pickLandmarkForFamily } from "@/lib/schedule/family-profile";
 import { isGroceryActivity } from "@/lib/schedule/meal-planning";
 import {
   extractLandmarkFromTitle,
@@ -30,7 +29,7 @@ import {
   rescheduleEnrichedActivities,
   validateEnrichedDay,
 } from "@/lib/schedule/fix-itinerary";
-import { itemDurationMin, isUnpaidTimelineActivity, parseTimeToMinutes } from "@/lib/schedule/timeline";
+import { itemDurationMin, isUnpaidTimelineActivity } from "@/lib/schedule/timeline";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
 import { maybeAddAccommodationGroceryStop, summarizeDailyCost, type DaySpendSummary } from "@/lib/pricing/budget";
 import { familyActivityCost } from "@/lib/pricing/activity-cost";
@@ -132,7 +131,6 @@ async function enrichDay(
   tripExcludedLandmarks: Set<string> = new Set(),
 ): Promise<ItineraryDay> {
   const date = addDays(plan.startDate, dayIndex);
-  let activitySlot = 0;
   const pickedLandmarks: Landmark[] = [];
 
   const activities: ItineraryActivity[] = rawDay.activities.map((a) => {
@@ -167,28 +165,33 @@ async function enrichDay(
         if (named?.placeId) act.placeId = named.placeId;
         return act;
       }
-      const startMin = parseTimeToMinutes(a.time);
-      const endMin = startMin + itemDurationMin(a, plan);
+      // Resolve landmarks from the planned title only — never re-pick a different POI.
       const fromTitle = extractLandmarkFromTitle(a.title);
-      const matched = fromTitle ? findLandmarkByName(city.landmarks, fromTitle) : undefined;
-      const landmark =
-        matched ??
-        pickLandmarkForFamily(city, plan, rawDay.day, activitySlot, pickedLandmarks, {
-          visitWindow: { startMin, endMin },
-          excludeNames: tripExcludedLandmarks,
-        });
-      pickedLandmarks.push(landmark);
-      tripExcludedLandmarks.add(landmark.name);
-      activitySlot += 1;
-      act.location = {
-        name: landmark.name,
-        lat: landmark.lat,
-        lng: landmark.lng,
-      };
-      act.activityCost = familyActivityCost(landmark, plan.adults, plan.children);
-      if (landmark.placeId) act.placeId = landmark.placeId;
-      if (typeof landmark.rating === "number") act.rating = landmark.rating;
-      if (typeof landmark.reviewCount === "number") act.reviewCount = landmark.reviewCount;
+      const matched =
+        (fromTitle ? findLandmarkByName(city.landmarks, fromTitle) : undefined) ??
+        city.landmarks.find((l) => a.title.includes(l.name));
+      if (matched) {
+        pickedLandmarks.push(matched);
+        tripExcludedLandmarks.add(matched.name);
+        act.location = {
+          name: matched.name,
+          lat: matched.lat,
+          lng: matched.lng,
+        };
+        act.activityCost = familyActivityCost(matched, plan.adults, plan.children);
+        if (matched.placeId) act.placeId = matched.placeId;
+        if (typeof matched.rating === "number") act.rating = matched.rating;
+        if (typeof matched.reviewCount === "number") act.reviewCount = matched.reviewCount;
+      } else {
+        // Keep planned title; pin coords to last known stop or city center without swapping POIs.
+        const anchor = pickedLandmarks[pickedLandmarks.length - 1] ?? city.landmarks[0]!;
+        act.location = {
+          name: fromTitle?.trim() || anchor.name,
+          lat: anchor.lat,
+          lng: anchor.lng,
+        };
+        act.activityCost = 0;
+      }
     } else if (a.type === "meal") {
       const restaurant = findRestaurantByName(city, a.title);
       const titleLandmarkName = extractLandmarkFromTitle(a.title);
