@@ -35,9 +35,6 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
       // App Router soft navigations need manual $pageview capture.
       capture_pageview: false,
       capture_pageleave: true,
-      // Sentry already covers errors and session replay.
-      disable_session_recording: true,
-      capture_exceptions: false,
     });
   }, []);
 

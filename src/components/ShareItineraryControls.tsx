@@ -10,6 +10,7 @@ import {
   labelClassName,
 } from "@/components/plan-wizard/shared";
 import {
+  itineraryEngagementKey,
   trackItineraryDownloaded,
   trackItineraryShared,
 } from "@/lib/analytics";
@@ -37,6 +38,13 @@ export default function ShareItineraryControls({
   const titleId = useId();
 
   const [downloadError, setDownloadError] = useState("");
+
+  const engagementKey = itineraryEngagementKey({
+    destination: plan?.destination ?? itinerary.destination,
+    startDate: plan?.startDate,
+    endDate: plan?.endDate,
+    tripStartFormatted: itinerary.tripStartFormatted,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -82,7 +90,7 @@ export default function ShareItineraryControls({
             }
           : undefined,
       });
-      trackItineraryDownloaded({ export_format: "pdf" });
+      trackItineraryDownloaded({ export_format: "pdf" }, engagementKey);
     } catch {
       setDownloadError("Couldn’t create the PDF. Please try again.");
     }
@@ -111,7 +119,7 @@ export default function ShareItineraryControls({
         return;
       }
       setStatus("sent");
-      trackItineraryShared({ share_method: "email" });
+      trackItineraryShared({ share_method: "email" }, engagementKey);
     } catch {
       setStatus("error");
       setError("Couldn’t reach the server. Check your connection and try again.");

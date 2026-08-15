@@ -1,19 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const capture = vi.fn();
-
-vi.mock("posthog-js", () => ({
-  default: {
-    __loaded: true,
-    capture: (...args: unknown[]) => capture(...args),
-  },
-}));
-
 import {
   ANALYTICS_EVENTS,
+  itineraryEngagementKey,
   itineraryProductProps,
+  resetItineraryEngagementTracking,
+  setAnalyticsCaptureForTests,
   trackFeedbackSubmitted,
   trackItineraryDownloaded,
+  trackItineraryEngaged,
   trackItineraryGenerated,
   trackItineraryShared,
   trackItineraryViewed,
@@ -24,8 +19,12 @@ import {
 import { WIZARD_STEP_IDS, WIZARD_STEP_TITLES } from "@/lib/plan-wizard/step-gate";
 import type { TripPlan } from "@/types/trip-plan";
 
+const capture = vi.fn();
+
 afterEach(() => {
   capture.mockClear();
+  resetItineraryEngagementTracking();
+  setAnalyticsCaptureForTests(null);
 });
 
 const samplePlan: TripPlan = {
@@ -43,6 +42,12 @@ const samplePlan: TripPlan = {
   budgetStyle: "save",
   interests: ["Beaches & Waterfronts"],
 };
+
+const engagementKey = itineraryEngagementKey({
+  destination: samplePlan.destination,
+  startDate: samplePlan.startDate,
+  endDate: samplePlan.endDate,
+});
 
 describe("analytics helper", () => {
   it("keeps wizard step IDs aligned with titles", () => {
@@ -63,13 +68,17 @@ describe("analytics helper", () => {
   });
 
   it("emits the product funnel events with centralized names", () => {
+    setAnalyticsCaptureForTests((event, properties) => {
+      capture(event, properties);
+    });
+
     trackPlannerStarted();
     trackPlannerStepViewed("destination", 0);
     trackPlannerCompleted(itineraryProductProps(samplePlan));
     trackItineraryGenerated(itineraryProductProps(samplePlan));
     trackItineraryViewed(itineraryProductProps(samplePlan));
-    trackItineraryDownloaded({ export_format: "pdf" });
-    trackItineraryShared({ share_method: "email" });
+    trackItineraryDownloaded({ export_format: "pdf" }, engagementKey);
+    trackItineraryShared({ share_method: "email" }, engagementKey);
     trackFeedbackSubmitted({ source: "floating_button" });
 
     expect(capture.mock.calls.map((c) => c[0])).toEqual([
@@ -79,6 +88,7 @@ describe("analytics helper", () => {
       ANALYTICS_EVENTS.itineraryGenerated,
       ANALYTICS_EVENTS.itineraryViewed,
       ANALYTICS_EVENTS.itineraryDownloaded,
+      ANALYTICS_EVENTS.itineraryEngaged,
       ANALYTICS_EVENTS.itineraryShared,
       ANALYTICS_EVENTS.feedbackSubmitted,
     ]);
@@ -92,5 +102,45 @@ describe("analytics helper", () => {
     expect(capture).toHaveBeenCalledWith(ANALYTICS_EVENTS.itineraryShared, {
       share_method: "email",
     });
+  });
+
+  it("fires itinerary_engaged only once per itinerary/session across download and share", () => {
+    setAnalyticsCaptureForTests((event, properties) => {
+      capture(event, properties);
+    });
+
+    trackItineraryDownloaded({ export_format: "pdf" }, engagementKey);
+    trackItineraryShared({ share_method: "email" }, engagementKey);
+    trackItineraryEngaged(engagementKey);
+
+    const engaged = capture.mock.calls.filter(
+      (c) => c[0] === ANALYTICS_EVENTS.itineraryEngaged,
+    );
+    expect(engaged).toHaveLength(1);
+    expect(
+      capture.mock.calls.filter((c) => c[0] === ANALYTICS_EVENTS.itineraryDownloaded),
+    ).toHaveLength(1);
+    expect(
+      capture.mock.calls.filter((c) => c[0] === ANALYTICS_EVENTS.itineraryShared),
+    ).toHaveLength(1);
+  });
+
+  it("allows itinerary_engaged again for a different itinerary key", () => {
+    setAnalyticsCaptureForTests((event, properties) => {
+      capture(event, properties);
+    });
+
+    const otherKey = itineraryEngagementKey({
+      destination: "Paris",
+      startDate: "2026-09-01",
+      endDate: "2026-09-05",
+    });
+
+    trackItineraryDownloaded({ export_format: "pdf" }, engagementKey);
+    trackItineraryDownloaded({ export_format: "pdf" }, otherKey);
+
+    expect(
+      capture.mock.calls.filter((c) => c[0] === ANALYTICS_EVENTS.itineraryEngaged),
+    ).toHaveLength(2);
   });
 });
