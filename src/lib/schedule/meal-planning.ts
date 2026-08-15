@@ -224,12 +224,24 @@ export function applyPackedFewerLonger<T extends RawActivity & { endTime: string
 
 export function isDinnerMeal(a: RawActivity): boolean {
   if (a.type !== "meal") return false;
-  const title = a.title.toLowerCase();
-  // Prefer the title — notes may mention dinner while describing lunch/breakfast.
-  if (COOK_DINNER.test(title) || title.includes("dinner")) return true;
-  if (title.includes("lunch") || title.includes("breakfast") || title.includes("picnic")) {
+  // Skeleton slot wins — venue names like "Medieval Times Dinner & Tournament"
+  // must not reclassify breakfast/lunch as dinner (collapses all meals to 5:00p).
+  if (a.slotKind === "dinner") return true;
+  if (
+    a.slotKind === "breakfast" ||
+    a.slotKind === "lunch" ||
+    a.slotKind === "grocery"
+  ) {
     return false;
   }
+
+  const title = a.title.toLowerCase();
+  if (/\bbreakfast\b/.test(title) || /\blunch\b/.test(title) || /\bpicnic\b/.test(title)) {
+    return false;
+  }
+  if (COOK_DINNER.test(title)) return true;
+  // Meal-slot dinner wording — not a landmark that merely contains "Dinner".
+  if (/^dinner\b/.test(title) || /\bdinner (in|at|near|from)\b/.test(title)) return true;
   return parseTimeToMinutes(a.time) >= 17 * 60;
 }
 

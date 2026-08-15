@@ -40,7 +40,10 @@ describe("packed San Diego schedule quality (FAM-70)", () => {
     const balanced = buildDaySkeleton(sdPacked({ travelStyle: "balanced" }), 1, 5).map(
       (s) => s.kind,
     );
-    expect(balanced).toContain("midday_rest");
+    // Balanced keeps an afternoon activity slot; idle midday_rest is for relaxed-only.
+    expect(balanced).toContain("afternoon_activity");
+    expect(balanced).not.toContain("midday_rest");
+    expect(balanced).not.toContain("extra_activity");
   });
 
   it("fills the morning until lunch when hotel breakfast starts the day early", () => {

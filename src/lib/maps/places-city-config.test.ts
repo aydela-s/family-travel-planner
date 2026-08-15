@@ -3,12 +3,14 @@ import { detectCity } from "@/lib/city-detect";
 import { planTrip } from "@/lib/planning-engine";
 import {
   adultPriceFromPriceLevel,
+  ageTagsForPlaceName,
   buildCityConfigFromPlaces,
   interestTagsForSearchCategory,
   isCuratedCity,
   landmarkFromTopActivity,
   landmarksFromPlacesResults,
   placesSearchCategoriesFromInterests,
+  refineInterestTagsForPlaceName,
   restaurantFromTopActivity,
   resolvePlanningCity,
 } from "@/lib/maps/places-city-config";
@@ -46,6 +48,9 @@ function place(overrides: Partial<TopActivity> & Pick<TopActivity, "id" | "name"
     longitude: -96.8,
     photoRef: null,
     score: 40,
+    types: ["tourist_attraction"],
+    primaryType: "tourist_attraction",
+    websiteUri: null,
     ...overrides,
   };
 }
@@ -63,6 +68,63 @@ describe("places → CityConfig mapping (FAM-59)", () => {
     expect(
       interestTagsForSearchCategory("science museum children's museum interactive exhibits"),
     ).toEqual(["interactive"]);
+    expect(placesSearchCategoriesFromInterests(["Shopping"])).toEqual([
+      "shopping mall outlet center premium outlets galleria",
+    ]);
+    expect(
+      interestTagsForSearchCategory("shopping mall outlet center premium outlets galleria"),
+    ).toEqual(["shopping"]);
+  });
+
+  it("uses kid-oriented Places queries for young children (FAM age fit)", () => {
+    expect(
+      placesSearchCategoriesFromInterests(
+        ["Shows & Entertainment", "Sports & Recreation", "Museums & Art"],
+        { youngestChildAge: 3 },
+      ),
+    ).toEqual([
+      "children's theater family show puppet show kids entertainment magic show",
+      "family recreation center kids sports ice skating bowling community center",
+      "children's museum family art activity pottery painting kids museum",
+    ]);
+    expect(
+      interestTagsForSearchCategory(
+        "children's theater family show puppet show kids entertainment magic show",
+      ),
+    ).toEqual(["entertainment"]);
+  });
+
+  it("strips shopping tags from strip centers and generic plazas", () => {
+    expect(refineInterestTagsForPlaceName("The Hill", ["shopping"])).toEqual(["parks"]);
+    expect(refineInterestTagsForPlaceName("The Shops at Park Lane", ["shopping"])).toEqual([
+      "parks",
+    ]);
+    expect(refineInterestTagsForPlaceName("Lincoln Park", ["shopping"])).toEqual(["parks"]);
+    expect(refineInterestTagsForPlaceName("NorthPark Center", ["shopping"])).toEqual(["shopping"]);
+    expect(refineInterestTagsForPlaceName("Dallas Premium Outlets", ["shopping"])).toEqual([
+      "shopping",
+    ]);
+  });
+
+  it("tags adult theaters/opera as tween/teen, not toddler/child", () => {
+    expect(ageTagsForPlaceName("Dallas Opera", ["entertainment"])).toEqual(["tween", "teen"]);
+    expect(ageTagsForPlaceName("Majestic Theatre", ["entertainment"])).toEqual(["tween", "teen"]);
+    expect(ageTagsForPlaceName("The Bomb Factory", ["entertainment"])).toEqual(["tween", "teen"]);
+    expect(ageTagsForPlaceName("Children's Theater of Dallas", ["entertainment"])).toEqual([
+      "toddler",
+      "child",
+      "tween",
+    ]);
+    expect(ageTagsForPlaceName("Nasher Sculpture Center", ["museums"])).toEqual([
+      "child",
+      "tween",
+      "teen",
+    ]);
+    expect(ageTagsForPlaceName("Paint Your Own Pottery Studio", ["museums"])).toEqual([
+      "toddler",
+      "child",
+      "tween",
+    ]);
   });
 
   it("maps TopActivity into a Landmark with place metadata", () => {
@@ -122,6 +184,23 @@ describe("places → CityConfig mapping (FAM-59)", () => {
     );
     expect(arcade?.ageTags).toEqual(["tween", "teen"]);
     expect(softPlay?.ageTags).toEqual(["toddler", "child"]);
+  });
+
+  it("does not treat adult concert venues as all-ages entertainment", () => {
+    const opera = landmarkFromTopActivity(place({ id: "opera", name: "Dallas Opera" }), [
+      "entertainment",
+    ]);
+    const bomb = landmarkFromTopActivity(
+      place({
+        id: "bomb",
+        name: "The Bomb Factory",
+        types: ["performing_arts_theater"],
+        primaryType: "performing_arts_theater",
+      }),
+      ["entertainment"],
+    );
+    expect(opera?.ageTags).toEqual(["tween", "teen"]);
+    expect(bomb?.ageTags).toEqual(["tween", "teen"]);
   });
 
   it("does not tag city parks or soft play as theme parks", () => {

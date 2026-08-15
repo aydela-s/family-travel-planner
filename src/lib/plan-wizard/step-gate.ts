@@ -18,7 +18,22 @@ export const WIZARD_STEP_TITLES = [
   "Summary",
 ] as const;
 
+/** Stable analytics IDs — same order as `WIZARD_STEP_TITLES`. */
+export const WIZARD_STEP_IDS = [
+  "destination",
+  "dates",
+  "travelers",
+  "stay",
+  "getting_around",
+  "travel_style",
+  "naps_food",
+  "budget",
+  "interests",
+  "summary",
+] as const;
+
 export type WizardStepTitle = (typeof WIZARD_STEP_TITLES)[number];
+export type WizardStepId = (typeof WIZARD_STEP_IDS)[number];
 
 /**
  * Whether a step has everything required to leave it.

@@ -17,6 +17,7 @@ import type { CityRestaurant } from "@/config/city-restaurants";
 import { detectCity, detectCityFromPlan } from "@/lib/city-detect";
 import {
   DEFAULT_PLACES_RADIUS_METERS,
+  MAX_RESTAURANT_RESULTS,
   type PlacesLocationBias,
   type TopActivity,
 } from "@/lib/maps/get-top-activities";
@@ -35,7 +36,6 @@ import type { BudgetStyle, TripPlan } from "@/types/trip-plan";
 export const MIN_PLACES_LANDMARKS = 4;
 const MAX_CATEGORIES = 8;
 export const PLACES_RESTAURANT_CATEGORY = "family restaurants";
-const MAX_PLACES_RESTAURANTS = 12;
 
 const INDOOR_TAGS = new Set<LandmarkInterestTag>([
   "museums",
@@ -60,11 +60,25 @@ export function isCuratedCity(city: CityConfig): boolean {
 }
 
 /** Wizard labels (or free text) used as Places text-search categories. */
-export function placesSearchCategoriesFromInterests(interests: string[]): string[] {
+export type PlacesSearchCategoryOptions = {
+  /** Youngest child age — drives kid-oriented remaps for Shows / Sports / Museums. */
+  youngestChildAge?: number | null;
+};
+
+/** Prefer kid-oriented Places queries when the trip includes young children. */
+export function prefersKidOrientedPlacesQueries(youngestChildAge?: number | null): boolean {
+  return typeof youngestChildAge === "number" && Number.isFinite(youngestChildAge) && youngestChildAge <= 10;
+}
+
+export function placesSearchCategoriesFromInterests(
+  interests: string[],
+  options: PlacesSearchCategoryOptions = {},
+): string[] {
   const labels = interests.map((i) => i.trim()).filter(Boolean);
   if (labels.length === 0) {
     return ["family attractions", "parks", "museums"];
   }
+  const kidQueries = prefersKidOrientedPlacesQueries(options.youngestChildAge);
   // Map wizard labels to Places queries that match the category intent.
   const queries = labels.map((label) => {
     if (label === "Interactive Museums") {
@@ -75,6 +89,30 @@ export function placesSearchCategoriesFromInterests(interests: string[]): string
     }
     if (label === "Playgrounds & Indoor Play" || label === "Playgrounds") {
       return "indoor playground soft play kids play cafe";
+    }
+    if (label === "Shows & Entertainment" || label === "Shows") {
+      return kidQueries
+        ? "children's theater family show puppet show kids entertainment magic show"
+        : "family musical theater live show";
+    }
+    if (label === "Sports & Recreation") {
+      return kidQueries
+        ? "family recreation center kids sports ice skating bowling community center"
+        : "family recreation bike rental ice skating bowling";
+    }
+    if (label === "Museums & Art") {
+      return kidQueries
+        ? "children's museum family art activity pottery painting kids museum"
+        : "art museum family gallery";
+    }
+    if (label === "Shopping") {
+      return "shopping mall outlet center premium outlets galleria";
+    }
+    if (label === "Swimming & Water Play") {
+      return "family aquatic center indoor water park swimming pool splash pad";
+    }
+    if (label === "Beaches & Waterfronts") {
+      return "beach waterfront boardwalk swimming";
     }
     return label;
   });
@@ -97,6 +135,24 @@ export function interestTagsForSearchCategory(category: string): LandmarkInteres
   }
   if (/indoor playground|soft play|play cafe/.test(lower)) {
     return ["playgrounds", "indoor-play"];
+  }
+  if (/children'?s?\s+theater|family\s+show|puppet\s+show|kids?\s+entertainment|magic\s+show/.test(lower)) {
+    return ["entertainment"];
+  }
+  if (/family\s+recreation|kids?\s+sports|community\s+center|ice\s+skating/.test(lower)) {
+    return ["sports"];
+  }
+  if (/family\s+art|pottery|painting|kids?\s+museum|children'?s?\s+museum/.test(lower)) {
+    return ["museums"];
+  }
+  if (/shopping\s+mall|outlet\s+center|premium\s+outlets|galleria/.test(lower)) {
+    return ["shopping"];
+  }
+  if (/aquatic\s+center|indoor\s+water\s+park|splash\s+pad|swimming\s+pool/.test(lower)) {
+    return ["beaches"];
+  }
+  if (/beach\s+waterfront|boardwalk\s+swimming/.test(lower)) {
+    return ["beaches"];
   }
   for (const [label, tags] of Object.entries(INTEREST_LABEL_TO_TAGS)) {
     if (lower.includes(label.toLowerCase()) || label.toLowerCase().includes(lower)) {
@@ -134,6 +190,9 @@ const LOOK_DONT_TOUCH_MUSEUM_NAME =
 const HANDS_ON_INTERACTIVE_NAME =
   /\b(perot|meow\s*wolf|children'?s\s+museum|science\s+(center|museum)|discovery\s+center|bubble\s+planet|hands[-\s]?on|planetarium)\b/i;
 
+const DESTINATION_SHOPPING_LANDMARK_NAME =
+  /\b(mall|outlet|outlets|galleria|premium\s+outlets|northpark|westfield|shopping\s+district|grapevine\s+mills|mills)\b/i;
+
 export function refineInterestTagsForPlaceName(
   name: string,
   tags: LandmarkInterestTag[],
@@ -166,6 +225,19 @@ export function refineInterestTagsForPlaceName(
     if (!next.includes("museums")) next.push("museums");
   } else if (HANDS_ON_INTERACTIVE_NAME.test(name)) {
     if (!next.includes("interactive")) next.push("interactive");
+  }
+
+  // Only destination malls/outlets keep the shopping tag — strip centers and
+  // random plazas ("The Hill", "Lincoln Park") must not schedule as shopping.
+  if (next.includes("shopping") && !DESTINATION_SHOPPING_LANDMARK_NAME.test(name)) {
+    next = next.filter((t) => t !== "shopping");
+    if (next.length === 0) next.push("parks");
+  }
+
+  // Aquatic centers / water parks count as water-play (beaches coverage), not theme parks alone.
+  if (/\b(aquatic|indoor\s+water\s*park|water\s*park|splash\s*pad)\b/i.test(name)) {
+    if (!next.includes("beaches")) next.push("beaches");
+    next = next.filter((t) => t !== "theme-parks");
   }
 
   return next;
@@ -249,20 +321,72 @@ function openingHoursForTags(tags: LandmarkInterestTag[]): LandmarkOpeningHours 
 const DEFAULT_AGE_TAGS: LandmarkAgeTag[] = ["toddler", "child", "tween", "teen"];
 
 const ARCADE_OR_TEEN_VENUE =
-  /\b(arcade|bowling|laser\s*tag|escape\s*room|vr\s*experience|go[\s-]?kart|axe\s*throw)\b/i;
+  /\b(arcade|laser\s*tag|escape\s*room|vr\s*experience|go[\s-]?kart|axe\s*throw)\b/i;
 
-/** Age bands implied by the venue name when Places doesn't provide them. */
+const FAMILY_BOWLING_OR_SKATING =
+  /\b(bowling|ice\s*rink|ice\s*skating|roller\s*skating|mini\s*golf)\b/i;
+
+const KID_SHOW_NAME =
+  /\b(children'?s?\s+(theatre|theater|show)|puppet|magic\s*show|circus|disney\s*on\s*ice|family\s*(show|musical|theatre|theater)|kids?\s*(show|theatre|theater))\b/i;
+
+const ADULT_SHOW_VENUE =
+  /\b(opera|symphony|philharmonic|ballet|comedy\s*club|improv|concert\s*hall|music\s*hall|amphitheatre|amphitheater|bomb\s*factory|performing\s*arts|majestic\s+(theatre|theater)|dinner\s*(&|and)\s*tournament|medieval\s*times)\b/i;
+
+const ADULT_SPORTS_VENUE =
+  /\b(stadium|arena|nfl|nba|mlb|nhl|crossfit|boxing\s*gym|fitness\s*center)\b/i;
+
+const KID_REC_VENUE =
+  /\b(recreation\s*center|rec\s*center|ymca|ywca|community\s*center|family\s*fun)\b/i;
+
+const ADULT_ART_VENUE =
+  /\b(sculpture|art\s+museum|gallery|opera\s+house|symphony)\b/i;
+
+const KID_MUSEUM_OR_ART_ACTIVITY =
+  /\b(children'?s\s+museum|kids?\s+museum|pottery|paint[\s-]?your[\s-]?own|paint\s+pottery|porcelain|family\s+art|craft\s+workshop)\b/i;
+
+/** Age bands implied by the venue name / Places types when Places doesn't provide them. */
 export function ageTagsForPlaceName(
   name: string,
   tags: LandmarkInterestTag[],
+  placeTypes: string[] = [],
 ): LandmarkAgeTag[] {
-  // Arcades / bowling / laser tag are a poor fit for toddlers and young preschoolers.
-  if (ARCADE_OR_TEEN_VENUE.test(name)) return ["tween", "teen"];
+  const types = placeTypes.map((t) => t.toLowerCase());
+
+  if (KID_SHOW_NAME.test(name) || KID_MUSEUM_OR_ART_ACTIVITY.test(name) || KID_REC_VENUE.test(name)) {
+    return ["toddler", "child", "tween"];
+  }
   if (tags.includes("indoor-play") || INDOOR_PLAY_NAME.test(name)) {
     return ["toddler", "child"];
   }
+  if (FAMILY_BOWLING_OR_SKATING.test(name)) {
+    return ["child", "tween", "teen"];
+  }
+  if (ARCADE_OR_TEEN_VENUE.test(name)) return ["tween", "teen"];
+
+  if (
+    ADULT_SHOW_VENUE.test(name) ||
+    types.includes("performing_arts_theater") ||
+    types.includes("concert_hall") ||
+    types.includes("opera_house")
+  ) {
+    return ["tween", "teen"];
+  }
+  if (ADULT_SPORTS_VENUE.test(name) || types.includes("stadium") || types.includes("arena")) {
+    return ["tween", "teen"];
+  }
+  if (
+    ADULT_ART_VENUE.test(name) ||
+    LOOK_DONT_TOUCH_MUSEUM_NAME.test(name) ||
+    types.includes("art_gallery")
+  ) {
+    return ["child", "tween", "teen"];
+  }
   if (tags.includes("theme-parks") || REAL_THEME_PARK_NAME.test(name)) {
     return ["toddler", "child", "tween", "teen"];
+  }
+  if (tags.includes("entertainment") && !KID_SHOW_NAME.test(name)) {
+    // Generic entertainment from Places without a kid-show signal — older kids only.
+    return ["tween", "teen"];
   }
   return DEFAULT_AGE_TAGS;
 }
@@ -283,7 +407,7 @@ export function landmarkFromTopActivity(
     adultPrice: adultPriceForPlace(place.name, tags, place.priceLevel),
     openingHours: openingHoursForTags(tags),
     intensity: intensityForTags(tags),
-    ageTags: ageTagsForPlaceName(place.name, tags),
+    ageTags: ageTagsForPlaceName(place.name, tags, place.types ?? []),
     interestTags: tags,
     indoor: indoorForTags(tags),
     placeId: place.id,
@@ -349,7 +473,7 @@ export function restaurantsFromPlacesResults(places: TopActivity[]): CityRestaur
     const key = restaurant.name.toLowerCase();
     if (!byName.has(key)) byName.set(key, restaurant);
   }
-  return [...byName.values()].slice(0, MAX_PLACES_RESTAURANTS);
+  return [...byName.values()].slice(0, MAX_RESTAURANT_RESULTS);
 }
 
 function locationBiasFromCity(lat: number, lng: number): PlacesLocationBias | undefined {
@@ -361,6 +485,7 @@ function locationBiasFromCity(lat: number, lng: number): PlacesLocationBias | un
 
 export type BuildPlacesCityOptions = GetOrFetchOptions & {
   minLandmarks?: number;
+  youngestChildAge?: number | null;
 };
 
 /**
@@ -372,7 +497,9 @@ export async function buildCityConfigFromPlaces(
   interests: string[],
   options: BuildPlacesCityOptions = {},
 ): Promise<CityConfig | null> {
-  const categories = placesSearchCategoriesFromInterests(interests);
+  const categories = placesSearchCategoriesFromInterests(interests, {
+    youngestChildAge: options.youngestChildAge,
+  });
   const detected = detectCity(destination);
   const location =
     options.location ?? locationBiasFromCity(detected.lat, detected.lng);
@@ -418,7 +545,12 @@ export async function buildCityConfigFromPlaces(
 export async function resolvePlanningCity(
   plan: Pick<
     TripPlan,
-    "destination" | "interests" | "destinationLat" | "destinationLng" | "destinationPlaceId"
+    | "destination"
+    | "interests"
+    | "destinationLat"
+    | "destinationLng"
+    | "destinationPlaceId"
+    | "children"
   >,
   options: BuildPlacesCityOptions = {},
 ): Promise<CityConfig> {
@@ -427,11 +559,15 @@ export async function resolvePlanningCity(
     return detected;
   }
 
+  const youngestChildAge =
+    options.youngestChildAge ??
+    (plan.children.length > 0 ? Math.min(...plan.children) : null);
   const center = await resolveDestinationCenter(plan, options);
   const location = locationBiasFromCity(center.lat, center.lng);
   const fromPlaces = await buildCityConfigFromPlaces(plan.destination, plan.interests, {
     ...options,
     location,
+    youngestChildAge,
   });
   if (fromPlaces) {
     return {

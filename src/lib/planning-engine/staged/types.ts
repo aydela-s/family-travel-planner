@@ -30,6 +30,7 @@ export type ThemeId =
   | "nature_parks"
   | "food_market"
   | "shopping"
+  | "museums"
   | "history"
   | "scenic"
   | "mixed_family"

@@ -17,9 +17,18 @@ import { getDatesValidationError } from "@/lib/planning-engine/date-validation";
 import {
   findFirstIncompleteWizardStep,
   isWizardStepComplete,
+  WIZARD_STEP_IDS,
   WIZARD_STEP_TITLES,
   type WizardStepTitle,
 } from "@/lib/plan-wizard/step-gate";
+import {
+  itineraryProductProps,
+  trackItineraryGenerated,
+  trackItineraryViewed,
+  trackPlannerCompleted,
+  trackPlannerStarted,
+  trackPlannerStepViewed,
+} from "@/lib/analytics";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import StepTransition from "./StepTransition";
 import DestinationStep from "./steps/DestinationStep";
@@ -135,6 +144,9 @@ export default function TripPlanWizard() {
   const [isStepBusy, setIsStepBusy] = useState(false);
   /** Blocks double Continue / Enter while Stay geocode (or any advance) is in flight. */
   const advancingRef = useRef(false);
+  const plannerStartedRef = useRef(false);
+  const lastStepViewedRef = useRef<number | null>(null);
+  const lastItineraryViewedKeyRef = useRef<string | null>(null);
   /** Always a real step component — never a blank dynamic() loading shell. */
   const [StepComponent, setStepComponent] =
     useState<ComponentType<StepProps>>(() => DestinationStep);
@@ -143,6 +155,12 @@ export default function TripPlanWizard() {
   const isFirstStep = stepIndex === 0;
   const isLastStep = stepIndex === TOTAL_STEPS - 1;
   const continueBusy = isAdvancing || isStepBusy;
+
+  function markPlannerStarted() {
+    if (plannerStartedRef.current || shareId) return;
+    plannerStartedRef.current = true;
+    trackPlannerStarted();
+  }
 
   async function goToStep(nextIndex: number, direction: "forward" | "back") {
     const component = await ensureStepComponent(nextIndex);
@@ -154,6 +172,30 @@ export default function TripPlanWizard() {
   useEffect(() => {
     setIsStepBusy(false);
   }, [stepIndex]);
+
+  // Funnel: one step-viewed per entry while the wizard (not itinerary) is showing.
+  useEffect(() => {
+    if (shareId || itinerary || isLoading) return;
+    if (lastStepViewedRef.current === stepIndex) return;
+    lastStepViewedRef.current = stepIndex;
+    const stepId = WIZARD_STEP_IDS[stepIndex];
+    if (!stepId) return;
+    trackPlannerStepViewed(stepId, stepIndex);
+  }, [stepIndex, itinerary, isLoading, shareId]);
+
+  // Funnel: itinerary actually on screen (generated or opened via share link).
+  useEffect(() => {
+    if (!itinerary || isLoading) return;
+    const fingerprint = itinerary.days
+      .map((d) => `${d.day}:${d.activities.map((a) => a.title).join(",")}`)
+      .join(";");
+    const viewKey = `${shareId ?? "gen"}:${fingerprint}`;
+    if (lastItineraryViewedKeyRef.current === viewKey) return;
+    lastItineraryViewedKeyRef.current = viewKey;
+    trackItineraryViewed(itineraryProductProps(formData));
+    // formData is read once when a distinct itinerary first appears on screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: dedupe by itinerary fingerprint only
+  }, [itinerary, isLoading, shareId]);
 
   // While the user fills this step, warm the next one(s) so Continue feels instant.
   useEffect(() => {
@@ -227,6 +269,9 @@ export default function TripPlanWizard() {
   }, [shareId]);
 
   function updateFormData(updates: Partial<TripPlan>) {
+    if (updates.destinationPlaceId) {
+      markPlannerStarted();
+    }
     setFormData((current) => ({ ...current, ...updates }));
     setError("");
   }
@@ -291,6 +336,7 @@ export default function TripPlanWizard() {
         }
       }
 
+      markPlannerStarted();
       // Load next step first, then swap — avoids a blank dynamic() flash.
       await goToStep(fromIndex + 1, "forward");
       setError("");
@@ -344,6 +390,7 @@ export default function TripPlanWizard() {
         };
       setItinerary(itineraryData as Itinerary);
       setIsDemo(demo || Boolean(data.demo));
+      trackItineraryGenerated(itineraryProductProps(plan));
 
       if (effectiveTransport && effectiveTransport !== formData.transportationType) {
         setFormData((current) => ({
@@ -385,6 +432,7 @@ export default function TripPlanWizard() {
       })();
       return;
     }
+    trackPlannerCompleted(itineraryProductProps(formData));
     setUseDemoNext(demo);
     callGenerateApi({ demo });
   }
@@ -397,6 +445,9 @@ export default function TripPlanWizard() {
     setStepDirection("forward");
     setFormData(initialTripPlan);
     setError("");
+    plannerStartedRef.current = false;
+    lastStepViewedRef.current = null;
+    lastItineraryViewedKeyRef.current = null;
   }
 
   function applyPlanUpdateFromChips(updates: Partial<TripPlan>) {

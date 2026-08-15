@@ -8,7 +8,7 @@ import {
   isHeavyDayLandmark,
   isIndoorPlayExperience,
   isOutdoorPlayground,
-  isShorelineBeachExperience,
+  isBeachThemeAnchor,
   isThemeParkExperience,
   LOW_FRICTION_STAY_KM,
   pairingAllowedForDay,
@@ -36,7 +36,7 @@ function cityHasRestaurant(city: CityConfig, name: string): boolean {
 }
 
 function anchorMatchesTheme(day: DayBlueprint, anchor: Landmark): boolean {
-  if (day.theme.id === "beach") return isShorelineBeachExperience(anchor);
+  if (day.theme.id === "beach") return isBeachThemeAnchor(anchor);
   if (day.theme.id === "play_indoor") return isIndoorPlayExperience(anchor);
   if (day.theme.id === "playgrounds") return isOutdoorPlayground(anchor);
   const primary = day.theme.primaryTags;
@@ -107,10 +107,10 @@ function validateDay(
     });
   }
 
-  if (day.theme.id === "beach" && !isShorelineBeachExperience(anchor)) {
+  if (day.theme.id === "beach" && !isBeachThemeAnchor(anchor)) {
     out.push({
       code: "beach_not_shoreline",
-      message: `Beach day anchor "${anchor.name}" is not a shoreline experience.`,
+      message: `Beach day anchor "${anchor.name}" is not a shoreline or family water-play stop.`,
       day: day.dayIndex,
       repairHint: "regenerate_anchor",
     });

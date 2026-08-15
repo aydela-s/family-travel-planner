@@ -188,6 +188,7 @@ export function CounterControl({
 export const activityInterestOptions = [
   { label: "Parks & Gardens", emoji: "🌳" },
   { label: "Beaches & Waterfronts", emoji: "🌊" },
+  { label: "Swimming & Water Play", emoji: "🏊" },
   { label: "Nature & Scenic Views", emoji: "🌿" },
   { label: "History & Landmarks", emoji: "🏛️" },
   { label: "Museums & Art", emoji: "🎨" },

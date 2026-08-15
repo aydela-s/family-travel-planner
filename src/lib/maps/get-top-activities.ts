@@ -1,9 +1,20 @@
 /**
  * Server-side only — never import into a client component.
  *
- * Places API (New) Text Search → filter low-rated/low-review results →
- * ranked list for itinerary / AI "pick from this list" context (FAM-58).
+ * Places API (New) Text Search → family-friendly filter + rank (FAM-58 / FAM-60).
  */
+
+import {
+  familyPlaceScore,
+  isBlockedFamilyPlace,
+  placeKindForCategory,
+  type FamilyPlaceKind,
+} from "@/lib/maps/family-friendly-places";
+import {
+  isDestinationShoppingPlace,
+  isShoppingSearchCategory,
+  shoppingPlaceScoreBoost,
+} from "@/lib/maps/shopping-places";
 
 export type TopActivity = {
   id: string;
@@ -17,6 +28,11 @@ export type TopActivity = {
   longitude: number | null;
   photoRef: string | null;
   score: number;
+  /** Places types used for family filter / ranking (FAM-60). */
+  types: string[];
+  primaryType: string | null;
+  /** Official website when Places returns one — shopping quality gate. */
+  websiteUri: string | null;
 };
 
 /** Raw place shape from Places API (New) searchText (field-masked). */
@@ -29,11 +45,16 @@ export type PlacesSearchTextPlace = {
   formattedAddress?: string;
   location?: { latitude?: number; longitude?: number };
   photos?: Array<{ name?: string }>;
+  types?: string[];
+  primaryType?: string;
+  websiteUri?: string;
 };
 
 export const MIN_RATING = 4.3;
 export const MIN_REVIEWS = 150;
 export const MAX_RESULTS = 15;
+export const MAX_ATTRACTION_RESULTS = 15;
+export const MAX_RESTAURANT_RESULTS = 12;
 
 export class PlacesApiKeyMissingError extends Error {
   constructor() {
@@ -67,11 +88,31 @@ export function activityScore(rating: number, reviewCount: number): number {
   return rating * Math.log(reviewCount + 1);
 }
 
+export function defaultMaxResultsForKind(kind: FamilyPlaceKind): number {
+  return kind === "restaurant" ? MAX_RESTAURANT_RESULTS : MAX_ATTRACTION_RESULTS;
+}
+
+export type RankTopActivitiesOptions = {
+  maxResults?: number;
+  /** Attraction vs restaurant preferred-type boosts (FAM-60). */
+  kind?: FamilyPlaceKind;
+  /** Original search category — shopping searches apply mall/outlet quality gates. */
+  category?: string;
+};
+
 /** Pure filter + rank — unit-tested without network. */
 export function rankTopActivitiesFromPlaces(
   places: PlacesSearchTextPlace[],
-  maxResults: number = MAX_RESULTS,
+  maxResultsOrOptions: number | RankTopActivitiesOptions = MAX_RESULTS,
 ): TopActivity[] {
+  const options: RankTopActivitiesOptions =
+    typeof maxResultsOrOptions === "number"
+      ? { maxResults: maxResultsOrOptions }
+      : maxResultsOrOptions;
+  const kind = options.kind ?? "attraction";
+  const maxResults = options.maxResults ?? defaultMaxResultsForKind(kind);
+  const shoppingCategory = isShoppingSearchCategory(options.category ?? "");
+
   return places
     .filter(
       (p): p is PlacesSearchTextPlace & { id: string; rating: number; userRatingCount: number } =>
@@ -81,19 +122,62 @@ export function rankTopActivitiesFromPlaces(
         typeof p.userRatingCount === "number" &&
         p.userRatingCount >= MIN_REVIEWS,
     )
-    .map((p) => ({
-      id: p.id,
-      name: p.displayName?.text ?? "Unknown",
-      rating: p.rating,
-      reviewCount: p.userRatingCount,
-      priceLevel: p.priceLevel ?? null,
-      address: p.formattedAddress ?? null,
-      latitude: p.location?.latitude ?? null,
-      longitude: p.location?.longitude ?? null,
-      photoRef: p.photos?.[0]?.name ?? null,
-      score: activityScore(p.rating, p.userRatingCount),
-    }))
-    .sort((a, b) => b.score - a.score)
+    .filter((p) => {
+      const name = p.displayName?.text ?? "Unknown";
+      return !isBlockedFamilyPlace({
+        name,
+        types: p.types,
+        primaryType: p.primaryType,
+      });
+    })
+    .filter((p) => {
+      if (!shoppingCategory) return true;
+      return isDestinationShoppingPlace({
+        name: p.displayName?.text ?? "Unknown",
+        types: p.types,
+        primaryType: p.primaryType,
+        websiteUri: p.websiteUri,
+      });
+    })
+    .map((p) => {
+      const name = p.displayName?.text ?? "Unknown";
+      const types = [...(p.types ?? [])];
+      if (p.primaryType && !types.includes(p.primaryType)) {
+        types.unshift(p.primaryType);
+      }
+      const websiteUri = p.websiteUri?.trim() || null;
+      const base = familyPlaceScore({
+        rating: p.rating,
+        reviewCount: p.userRatingCount,
+        types: p.types,
+        primaryType: p.primaryType,
+        kind,
+      });
+      const shopBoost = shoppingCategory
+        ? shoppingPlaceScoreBoost({
+            name,
+            types: p.types,
+            primaryType: p.primaryType,
+            websiteUri,
+          })
+        : 0;
+      return {
+        id: p.id,
+        name,
+        rating: p.rating,
+        reviewCount: p.userRatingCount,
+        priceLevel: p.priceLevel ?? null,
+        address: p.formattedAddress ?? null,
+        latitude: p.location?.latitude ?? null,
+        longitude: p.location?.longitude ?? null,
+        photoRef: p.photos?.[0]?.name ?? null,
+        types,
+        primaryType: p.primaryType ?? null,
+        websiteUri,
+        score: base + shopBoost,
+      };
+    })
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
     .slice(0, maxResults);
 }
 
@@ -130,7 +214,8 @@ export async function getTopActivities(
     return [];
   }
 
-  const maxResults = options.maxResults ?? MAX_RESULTS;
+  const kind = placeKindForCategory(cat);
+  const maxResults = options.maxResults ?? defaultMaxResultsForKind(kind);
   const fetchImpl = options.fetchImpl ?? fetch;
   const query = `${cat} in ${dest}`;
 
@@ -165,6 +250,9 @@ export async function getTopActivities(
         "places.formattedAddress",
         "places.location",
         "places.photos",
+        "places.types",
+        "places.primaryType",
+        "places.websiteUri",
       ].join(","),
     },
     body: JSON.stringify(body),
@@ -176,5 +264,9 @@ export async function getTopActivities(
   }
 
   const data = (await response.json()) as { places?: PlacesSearchTextPlace[] };
-  return rankTopActivitiesFromPlaces(data.places ?? [], maxResults);
+  return rankTopActivitiesFromPlaces(data.places ?? [], {
+    maxResults,
+    kind,
+    category: cat,
+  });
 }

@@ -1,3 +1,4 @@
+import { getFamilyAgeProfile } from "@/lib/schedule/family-profile";
 import { TripPlan, TravelStyle } from "@/types/trip-plan";
 
 /** When packed drops to fewer stops, stretch remaining activities to this length. */
@@ -15,6 +16,17 @@ export type IntensityConfig = {
   activityDurationMin: number;
   longBreak: boolean;
 };
+
+/**
+ * Real family trips with a midday nap (e.g. toddler 12:30–2 at home) rarely do
+ * two outings the same day. Balanced + nap + young kids → one hero activity.
+ * Packed stays denser; relaxed was already one stop.
+ */
+export function prefersSingleActivityDays(plan: TripPlan): boolean {
+  if ((plan.naps?.length ?? 0) === 0) return false;
+  const profile = getFamilyAgeProfile(plan);
+  return profile.hasToddler || profile.hasYoungChild;
+}
 
 export function getIntensityConfig(plan: TripPlan): IntensityConfig {
   const style = plan.travelStyle || "balanced";
@@ -46,6 +58,19 @@ export function getIntensityConfig(plan: TripPlan): IntensityConfig {
       restBlocks: 1,
       restDurationMin: 25,
       activityDurationMin: 75,
+      longBreak: false,
+    };
+  }
+
+  if (prefersSingleActivityDays(plan)) {
+    return {
+      style: "balanced",
+      maxActivities: 1,
+      includeAfternoonActivity: true,
+      includeExtraActivity: false,
+      restBlocks: 1,
+      restDurationMin: 35,
+      activityDurationMin: 105,
       longBreak: false,
     };
   }

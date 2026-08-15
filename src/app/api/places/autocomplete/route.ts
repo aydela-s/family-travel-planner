@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const latParam = searchParams.get("lat");
   const lngParam = searchParams.get("lng");
 
-  if (!query || query.length < 2) {
+  if (!query || query.length < 1) {
     return NextResponse.json({ suggestions: [] });
   }
 

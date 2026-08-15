@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { coordsForDestinationPick } from "@/lib/destination-bias";
+import {
+  getLocalPlaceSuggestions,
+  mergePlaceSuggestions,
+} from "@/lib/places-autocomplete";
 
 type Suggestion = { label: string; placeId: string };
 
@@ -12,12 +16,16 @@ export type DestinationSelection = {
   lng: number | null;
 };
 
+const MIN_QUERY_LEN = 1;
+/** Debounce network only — local catalog paints immediately. */
+const NETWORK_DEBOUNCE_MS = 120;
+
 /**
  * City autocomplete from Google Places `(cities)` + local popular fallback.
  * Typing updates the field; only picking a suggestion commits a resolved center.
  *
- * Known cities resolve instantly from local coords; Place Details only refines
- * (or fills in) in the background so the Continue button rarely waits.
+ * Local matches appear on the first letter; Places results merge in without
+ * hiding the list while the request is in flight.
  */
 export default function DestinationAutocomplete({
   value,
@@ -59,7 +67,7 @@ export default function DestinationAutocomplete({
   }, []);
 
   useEffect(() => {
-    if (query.length < 2) {
+    if (query.length < MIN_QUERY_LEN) {
       setSuggestions([]);
       setFetchError(false);
       setLoading(false);
@@ -75,12 +83,17 @@ export default function DestinationAutocomplete({
       return;
     }
 
+    // Paint local catalog immediately so typing never waits on Places.
+    const local = getLocalPlaceSuggestions(query);
+    setSuggestions(local);
+    setFetchError(false);
+    setOpen(true);
+
     const seq = ++requestSeq.current;
     const controller = new AbortController();
 
     const timer = setTimeout(async () => {
       setLoading(true);
-      setFetchError(false);
       try {
         const res = await fetch(
           `/api/places/autocomplete?q=${encodeURIComponent(query)}`,
@@ -88,25 +101,31 @@ export default function DestinationAutocomplete({
         );
         if (seq !== requestSeq.current) return;
         if (!res.ok) {
-          setSuggestions([]);
+          // Keep local rows; only show empty-state error when nothing local either.
+          setSuggestions(getLocalPlaceSuggestions(query));
           setFetchError(true);
           setOpen(true);
           return;
         }
         const data = (await res.json()) as { suggestions?: Suggestion[] };
         if (seq !== requestSeq.current) return;
-        setSuggestions(data.suggestions ?? []);
+        const remote = data.suggestions ?? [];
+        // API already merges Google+local; re-merge with a fresh local pass so a
+        // slower response can't wipe an updated prefix's instant rows.
+        setSuggestions(
+          mergePlaceSuggestions(remote, getLocalPlaceSuggestions(query)),
+        );
         setOpen(true);
       } catch {
         if (controller.signal.aborted) return;
         if (seq !== requestSeq.current) return;
-        setSuggestions([]);
+        setSuggestions(getLocalPlaceSuggestions(query));
         setFetchError(true);
         setOpen(true);
       } finally {
         if (seq === requestSeq.current) setLoading(false);
       }
-    }, 180);
+    }, NETWORK_DEBOUNCE_MS);
 
     return () => {
       clearTimeout(timer);
@@ -177,9 +196,11 @@ export default function DestinationAutocomplete({
     });
   }
 
-  const showPanel = open && query.length >= 2 && !loading;
+  const canShow = open && query.length >= MIN_QUERY_LEN && pickedLabelRef.current !== query;
+  // Keep the list visible while Places loads — hiding it made typing feel broken.
+  const showList = canShow && suggestions.length > 0;
   const showEmptyState =
-    showPanel && suggestions.length === 0 && pickedLabelRef.current !== query;
+    canShow && !loading && suggestions.length === 0;
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -195,20 +216,20 @@ export default function DestinationAutocomplete({
         }}
         onFocus={() => {
           if (pickedLabelRef.current === query) return;
-          if (suggestions.length > 0 || query.length >= 2) setOpen(true);
+          if (suggestions.length > 0 || query.length >= MIN_QUERY_LEN) setOpen(true);
         }}
         placeholder="Start typing a city..."
         className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3.5 text-ink shadow-sm outline-none transition placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary-muted"
         autoComplete="off"
         aria-autocomplete="list"
-        aria-expanded={showPanel && (suggestions.length > 0 || showEmptyState)}
+        aria-expanded={showList || showEmptyState}
       />
       {loading && (
         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">
           Searching…
         </span>
       )}
-      {showPanel && suggestions.length > 0 && (
+      {showList && (
         <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-border bg-surface py-2 shadow-[var(--shadow-card)]">
           {suggestions.map((s) => (
             <li key={`${s.placeId}-${s.label}`}>

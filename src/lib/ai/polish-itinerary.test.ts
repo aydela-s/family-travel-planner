@@ -71,7 +71,7 @@ function sampleItinerary(): Itinerary {
 
 describe("fallback display titles", () => {
   it("maps internal theme ids to vacation-style titles, not catalog labels", () => {
-    expect(fallbackDisplayTitle("beach")).toBe("Beach Day");
+    expect(fallbackDisplayTitle("beach")).toBe("Beach & Water Day");
     expect(fallbackDisplayTitle("interactive")).toBe("Hands-On Discovery Day");
     expect(fallbackDisplayTitle("arrival")).toBe("Easy Arrival Day");
     expect(fallbackDisplayTitle("not-a-theme")).toBeUndefined();

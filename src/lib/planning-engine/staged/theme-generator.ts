@@ -38,6 +38,10 @@ function isPlayTheme(theme: ThemeDefinition): boolean {
   return PLAY_THEME_IDS.has(theme.id);
 }
 
+function isShoppingTheme(theme: ThemeDefinition): boolean {
+  return theme.id === "shopping";
+}
+
 /**
  * Short trips with many interests: at most one dedicated play theme day so beach /
  * interactive / entertainment still get slots. Longer trips may use both indoor + outdoor play.
@@ -56,6 +60,29 @@ function maxPlayThemesForTrip(
   );
   if (nonPlayCoverage.length === 0) return 2;
   if (fullDayCount(blueprint) >= 6) return 2;
+  return 1;
+}
+
+/**
+ * Shopping is a highlight day, not a filler. Cap dedicated shopping themes when
+ * other interests still need coverage.
+ */
+function maxShoppingThemesForTrip(
+  blueprint: TripBlueprint,
+  eligible: ThemeDefinition[],
+): number {
+  const otherCoverage = eligible.filter(
+    (t) =>
+      !isShoppingTheme(t) &&
+      t.coverageTags.length > 0 &&
+      t.id !== "scenic" &&
+      t.id !== "mixed_family" &&
+      t.id !== "recovery",
+  );
+  if (otherCoverage.length === 0) {
+    return Math.max(1, Math.ceil(fullDayCount(blueprint) / 2));
+  }
+  if (fullDayCount(blueprint) >= 7) return 2;
   return 1;
 }
 
@@ -328,7 +355,9 @@ export function applyDailyThemes(
   const reserved = new Map<LandmarkInterestTag, number>();
   const consumeRareOnArrivalDeparture = fullDayCount(blueprint) <= 2;
   const maxPlayThemes = maxPlayThemesForTrip(blueprint, eligible);
+  const maxShoppingThemes = maxShoppingThemesForTrip(blueprint, eligible);
   let playThemesAssigned = 0;
+  let shoppingThemesAssigned = 0;
   let previousThemeId: ThemeId | null = null;
   let previousPaid = false;
   let fullDayIndex = 0;
@@ -377,6 +406,12 @@ export function applyDailyThemes(
     if (playThemesAssigned >= maxPlayThemes) {
       const withoutPlay = candidates.filter((t) => !isPlayTheme(t));
       if (withoutPlay.length > 0) candidates = withoutPlay;
+    }
+
+    // Cap shopping so mall days don't crowd out museums / other interests
+    if (shoppingThemesAssigned >= maxShoppingThemes) {
+      const withoutShopping = candidates.filter((t) => !isShoppingTheme(t));
+      if (withoutShopping.length > 0) candidates = withoutShopping;
     }
 
     // When remaining full days are scarce, prefer themes that close uncovered gaps
@@ -437,6 +472,12 @@ export function applyDailyThemes(
       if (alt) chosen = alt.theme;
     }
 
+    // Final shopping-cap guard
+    if (isShoppingTheme(chosen) && shoppingThemesAssigned >= maxShoppingThemes) {
+      const alt = ranked.find((r) => !isShoppingTheme(r.theme));
+      if (alt) chosen = alt.theme;
+    }
+
     const intent = budgetIntentForFullDay(
       plan,
       fullDayIndex,
@@ -450,6 +491,7 @@ export function applyDailyThemes(
     previousPaid = intent === "paid" || (intent === "either" && chosen.typicallyPaid);
     fullDayIndex += 1;
     if (isPlayTheme(chosen)) playThemesAssigned += 1;
+    if (isShoppingTheme(chosen)) shoppingThemesAssigned += 1;
 
     if (
       chosen.highIntensity &&
@@ -513,6 +555,9 @@ export function applyDailyThemes(
     ).length;
     if (isPlayTheme(cover) && playAssigned >= maxPlayThemes) continue;
 
+    const shoppingAssigned = adjusted.filter((d) => d.theme.id === "shopping").length;
+    if (isShoppingTheme(cover) && shoppingAssigned >= maxShoppingThemes) continue;
+
     const canPlaceAt = (i: number): boolean => {
       const prevId = adjusted[i - 1]?.theme.id;
       const nextId = adjusted[i + 1]?.theme.id;
@@ -553,10 +598,13 @@ export function applyDailyThemes(
           (d.theme.id === "entertainment" || d.theme.id === "scenic" || d.theme.id === "shopping"),
       );
     }
-    // Beach / interactive: may replace entertainment or a surplus play day
+    // Museums / beach / interactive: may replace entertainment, shopping, or surplus play
     if (
       idx < 0 &&
-      (gap.tag === "beaches" || gap.tag === "interactive" || gap.tag === "entertainment")
+      (gap.tag === "beaches" ||
+        gap.tag === "interactive" ||
+        gap.tag === "entertainment" ||
+        gap.tag === "museums")
     ) {
       idx = adjusted.findIndex((d, i) => {
         if (d.role !== "full" || !canPlaceAt(i)) return false;

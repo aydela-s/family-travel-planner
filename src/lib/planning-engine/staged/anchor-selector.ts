@@ -20,6 +20,8 @@ import {
   isIndoorPlayExperience,
   isOutdoorPlayground,
   isShorelineBeachExperience,
+  isBeachThemeAnchor,
+  isFamilyWaterPlayExperience,
   isThemeParkExperience,
   LOW_FRICTION_PREFERRED_KM,
   LOW_FRICTION_STAY_KM,
@@ -154,8 +156,8 @@ export function filterAnchorCandidates(
 
   // Beach theme: shoreline / ocean experience must beat bay parks when available
   if (hasConstraint(day, "prefer_shoreline_beach_anchor") || day.theme.id === "beach") {
-    const shoreline = pool.filter(isShorelineBeachExperience);
-    if (shoreline.length > 0) pool = shoreline;
+    const water = pool.filter(isBeachThemeAnchor);
+    if (water.length > 0) pool = water;
   }
 
   // Indoor play vs outdoor playgrounds — do not mix coverage buckets
@@ -177,6 +179,14 @@ export function filterAnchorCandidates(
     }
   }
 
+  // Shopping only on shopping-themed days — never as filler on mix / museum days.
+  if (day.theme.id === "shopping") {
+    const malls = pool.filter((l) => l.interestTags.includes("shopping"));
+    if (malls.length > 0) pool = malls;
+  } else {
+    pool = pool.filter((l) => !l.interestTags.includes("shopping"));
+  }
+
   // Preferred experience types (soft pre-filter when enough options)
   const preferred = day.theme.preferredExperienceTypes;
   if (preferred.length > 0) {
@@ -191,11 +201,12 @@ export function filterAnchorCandidates(
 
   // Arrival/departure: prefer free flexible outdoor near stay when options exist
   if (day.role === "arrival" || day.role === "departure") {
-    // Easy exit / travel days never use theme parks or soft-play centers.
+    // Easy exit / travel days never use theme parks, soft-play, or shopping malls.
     pool = pool.filter(
       (l) =>
         !isThemeParkExperience(l) &&
         !l.interestTags.includes("theme-parks") &&
+        !l.interestTags.includes("shopping") &&
         !isIndoorPlayExperience(l),
     );
     // Never soft-reuse a stop already used earlier in the trip while unused options remain.
@@ -327,12 +338,13 @@ export function scoreAnchorCandidate(
     score -= 40;
   }
 
-  // Beach-first: shoreline anchors win; bay/park beaches lose hard
+  // Beach-first: shoreline / aquatic anchors win; bay/park beaches lose hard
   if (hasConstraint(day, "prefer_shoreline_beach_anchor") || day.theme.id === "beach") {
     if (isShorelineBeachExperience(landmark)) score += 55;
+    else if (isFamilyWaterPlayExperience(landmark)) score += 50;
     else if (landmark.interestTags.includes("beaches") && /\bpark\b/i.test(landmark.name)) {
       score -= 50;
-    } else if (!landmark.interestTags.includes("beaches")) {
+    } else if (!landmark.interestTags.includes("beaches") && !isFamilyWaterPlayExperience(landmark)) {
       score -= 30;
     }
   }
@@ -636,6 +648,7 @@ export function selectSoftFiller(
       !exclude.has(l.name) &&
       l.intensity !== "high" &&
       !l.interestTags.includes("theme-parks") &&
+      !l.interestTags.includes("shopping") &&
       !sharesAnyDayActivityCategory(l, today) &&
       pairingAllowedForDay(anchor, l) &&
       today.every((t) => pairingAllowedForDay(t, l)) &&

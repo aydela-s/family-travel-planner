@@ -12,7 +12,7 @@ import { markExperienceCompletedByKeys } from "@/lib/planning-engine/staged/expe
 import {
   isIndoorPlayExperience,
   isOutdoorPlayground,
-  isShorelineBeachExperience,
+  isBeachThemeAnchor,
   isThemeParkExperience,
   isYoungChildOnlyLandmark,
 } from "@/lib/planning-engine/staged/landmark-experience";
@@ -85,7 +85,7 @@ export function coverageKeysFromLandmark(landmark: Landmark): string[] {
 }
 
 function anchorMatchesTheme(day: DayBlueprint, anchor: Landmark): boolean {
-  if (day.theme.id === "beach") return isShorelineBeachExperience(anchor);
+  if (day.theme.id === "beach") return isBeachThemeAnchor(anchor);
   if (day.theme.id === "play_indoor") return isIndoorPlayExperience(anchor);
   if (day.theme.id === "playgrounds") return isOutdoorPlayground(anchor);
   const primary = day.theme.primaryTags;

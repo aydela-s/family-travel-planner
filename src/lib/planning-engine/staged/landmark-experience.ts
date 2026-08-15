@@ -21,6 +21,31 @@ export function isShorelineBeachExperience(landmark: Landmark): boolean {
   return false;
 }
 
+/**
+ * Inland water play that satisfies a water/beach interest day:
+ * aquatic centers, indoor water parks, splash pads, family pools (Dallas JCC, Heights Aquatic).
+ */
+export function isFamilyWaterPlayExperience(landmark: Landmark): boolean {
+  const n = landmark.name.toLowerCase();
+  if (
+    !/\b(aquatic|water\s*park|waterpark|splash\s*pad|swim|swimming|pool|jcc)\b/.test(n)
+  ) {
+    return false;
+  }
+  // Don't treat aquarium visits as "water play" swim days.
+  if (/\baquarium\b/.test(n)) return false;
+  return (
+    landmark.interestTags.includes("beaches") ||
+    landmark.interestTags.includes("sports") ||
+    landmark.interestTags.includes("theme-parks")
+  );
+}
+
+/** Valid hero for a beach / water-play themed day (coastal shore OR inland swim). */
+export function isBeachThemeAnchor(landmark: Landmark): boolean {
+  return isShorelineBeachExperience(landmark) || isFamilyWaterPlayExperience(landmark);
+}
+
 const INDOOR_PLAY_NAME =
   /\b(kids\s*empire|soft\s*play|dino\s*kidz|fritz'?s?\s*adventure|adventure\s*park|urban\s*air|sky\s*zone|bounce\s*house|trampolin|indoor\s*play|play\s*cafe)\b/i;
 
@@ -55,6 +80,8 @@ export const DAY_EXCLUSIVE_ACTIVITY_TAGS = [
   "interactive",
   "indoor-play",
   "playgrounds",
+  "shopping",
+  "museums",
 ] as const;
 
 export function dayActivityCategories(landmark: Landmark): Set<string> {

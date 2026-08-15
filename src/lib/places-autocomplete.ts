@@ -182,6 +182,12 @@ export const POPULAR_CITIES: PopularCity[] = [
 ];
 
 function cityMatchesQuery(city: PopularCity, normalized: string): boolean {
+  const name = city.name.toLowerCase();
+  const aliases = (city.aliases ?? []).map((a) => a.toLowerCase());
+  // Single letter: prefix-only so "d" → Dallas, not every city with an "a".
+  if (normalized.length === 1) {
+    return name.startsWith(normalized) || aliases.some((a) => a.startsWith(normalized));
+  }
   const countryLabel = getCountryLabel(city.country);
   const haystack = [city.name, city.country, countryLabel, ...(city.aliases ?? [])]
     .join(" ")
@@ -205,7 +211,7 @@ export function getLocalPlaceSuggestions(
   limit = 8,
 ): PlaceSuggestion[] {
   const normalized = query.trim().toLowerCase();
-  if (normalized.length < 2) return [];
+  if (normalized.length < 1) return [];
 
   const seen = new Set<string>();
   const out: PlaceSuggestion[] = [];

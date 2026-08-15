@@ -10,6 +10,7 @@ import {
   inputClassName,
   labelClassName,
 } from "@/components/plan-wizard/shared";
+import { trackFeedbackSubmitted } from "@/lib/analytics";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
@@ -40,6 +41,7 @@ export default function FeedbackPage() {
         return;
       }
       setStatus("sent");
+      trackFeedbackSubmitted({ source: "feedback_page" });
     } catch {
       setStatus("error");
       setError("Couldn’t reach the server. Check your connection and try again.");

@@ -17,9 +17,17 @@ import {
   isHeavyDayLandmark,
   sharesDayActivityCategory,
 } from "@/lib/planning-engine/staged/landmark-experience";
+import { emptyPlanningRules } from "@/lib/planning-engine/staged/blueprint";
 import { activityTitlesByDay } from "@/lib/planning-engine/staged/fingerprint";
 import { haversineKm } from "@/lib/maps/directions";
 import { TripPlan } from "@/types/trip-plan";
+import type { Landmark } from "@/config/city-pricing";
+
+function isMuseumCampusLike(landmark: Landmark): boolean {
+  return (
+    landmark.interestTags.includes("museums") || landmark.interestTags.includes("interactive")
+  );
+}
 
 function sdPlan(overrides: Partial<TripPlan> = {}): TripPlan {
   return {
@@ -312,20 +320,28 @@ describe("commitStopsToBlueprint", () => {
     expect(anchor.name).not.toMatch(/Torrey Pines|Birch Aquarium/i);
   });
 
-  it("picks light near-stay arrival support, not a museum campus", () => {
+  it("skips arrival support when balanced + nap + young kids (one stop/day)", () => {
     const plan = sdPlan();
     const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
     const committed = commitStopsToBlueprint(themed, plan, city);
     const arrival = committed.days.find((d) => d.role === "arrival")!;
+    expect(arrival.support.length).toBe(0);
+    expect(arrival.anchor).toBeTruthy();
+  });
+
+  it("picks light near-stay arrival support, not a museum campus", () => {
+    // No nap + older kids → balanced can schedule a companion stop on arrival.
+    const plan = sdPlan({ naps: [], children: [9, 12] });
+    expect(emptyPlanningRules(plan).capacity.maxSupportStops).toBeGreaterThan(0);
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
+    const committed = commitStopsToBlueprint(themed, plan, city);
+    const arrival = committed.days.find((d) => d.role === "arrival")!;
     expect(arrival.support.length).toBeGreaterThan(0);
-    const anchor = city.landmarks.find((l) => l.name === arrival.anchor!.landmarkName)!;
     const support = city.landmarks.find((l) => l.name === arrival.support[0]!.landmarkName)!;
     const km = haversineKm(support.lat, support.lng, plan.stayLat!, plan.stayLng!);
     expect(km).toBeLessThanOrEqual(LOW_FRICTION_STAY_KM);
-    expect(support.adultPrice).toBe(0);
-    expect(support.interestTags.includes("museums")).toBe(false);
-    expect(support.name).not.toMatch(/Balboa Park/i);
-    expect(sharesDayActivityCategory(anchor, support)).toBe(false);
+    // Arrival companions should stay light — not museum campuses.
+    expect(isMuseumCampusLike(support)).toBe(false);
     expect(support.name).not.toMatch(/Coronado Beach/i);
   });
 

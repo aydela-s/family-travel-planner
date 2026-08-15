@@ -4,6 +4,7 @@ import {
   type PlanningRules,
   type TripBlueprint,
 } from "@/lib/planning-engine/staged/types";
+import { getIntensityConfig } from "@/lib/schedule/travel-style";
 
 /** Placeholder rules — Strategy Builder uses this as the Budget/Pace compiler seed. */
 export function emptyPlanningRules(plan: TripPlan): PlanningRules {
@@ -11,6 +12,7 @@ export function emptyPlanningRules(plan: TripPlan): PlanningRules {
   const pace: TravelStyle = plan.travelStyle || "balanced";
   const transportPreference: TransportationType =
     plan.transportationType || "public-transportation";
+  const intensity = getIntensityConfig(plan);
 
   return {
     budgetStyle,
@@ -31,12 +33,13 @@ export function emptyPlanningRules(plan: TripPlan): PlanningRules {
     transportPreference,
     convenienceLevel: budgetStyle === "splurge" ? "high" : budgetStyle === "save" ? "low" : "medium",
     capacity: {
-      maxActivitiesPerDay: pace === "packed" ? 3 : pace === "relaxed" ? 1 : 2,
-      maxSupportStops: pace === "packed" ? 2 : pace === "relaxed" ? 0 : 1,
+      maxActivitiesPerDay: intensity.maxActivities,
+      maxSupportStops:
+        intensity.maxActivities <= 1 ? 0 : pace === "packed" ? 2 : 1,
       preferHalfDayAnchor: pace !== "relaxed",
       includeMiddayRest: pace !== "packed",
-      activityDurationMin: pace === "packed" ? 75 : pace === "relaxed" ? 105 : 90,
-      restDurationMin: pace === "packed" ? 25 : pace === "relaxed" ? 50 : 35,
+      activityDurationMin: intensity.activityDurationMin,
+      restDurationMin: intensity.restDurationMin,
     },
     napWindows: plan.naps ?? [],
   };

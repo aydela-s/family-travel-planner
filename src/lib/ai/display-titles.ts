@@ -8,7 +8,7 @@ import type { Itinerary } from "@/types/itinerary";
 export const FALLBACK_DISPLAY_TITLES: Record<ThemeId, string> = {
   arrival: "Easy Arrival Day",
   departure: "Easy Exit Day",
-  beach: "Beach Day",
+  beach: "Beach & Water Day",
   play_indoor: "Indoor Play Day",
   playgrounds: "Playground Day",
   interactive: "Hands-On Discovery Day",
@@ -19,6 +19,7 @@ export const FALLBACK_DISPLAY_TITLES: Record<ThemeId, string> = {
   nature_parks: "Parks & Nature Day",
   food_market: "Market Day",
   shopping: "Shopping Day",
+  museums: "Museums & Art Day",
   history: "History Day",
   scenic: "Scenic Day",
   mixed_family: "Family Mix Day",

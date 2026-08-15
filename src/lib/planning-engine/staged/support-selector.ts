@@ -193,7 +193,16 @@ export function selectSupportForDay(
   pool = pool.filter((l) => pairingAllowedForDay(anchor, l));
   pool = pool.filter((l) => fitsBudgetStyle(l, plan.budgetStyle));
 
+  // Shopping stops only belong on shopping days (and never as arrival companions).
+  if (day.theme.id === "shopping") {
+    // Shopping day is single-activity via max_activities — support usually empty.
+  } else {
+    pool = pool.filter((l) => !l.interestTags.includes("shopping"));
+  }
+
   if (day.role === "arrival") {
+    // Never use museum campuses as arrival companions — too heavy for travel day.
+    pool = pool.filter((l) => !isMuseumCampus(l));
     const dayBudget = travelDayBudget(plan);
     const nearStay = pool.filter((l) => {
       const mins = stayTravelMin(l, plan);

@@ -9,6 +9,8 @@ export type { LandmarkInterestTag };
 export const INTEREST_LABEL_TO_TAGS: Record<string, LandmarkInterestTag[]> = {
   "Parks & Gardens": ["parks"],
   "Beaches & Waterfronts": ["beaches"],
+  // Inland pools / aquatic centers / indoor water parks (same coverage as beaches).
+  "Swimming & Water Play": ["beaches"],
   // Nature excludes manicured parks/gardens (see interest-categories.md).
   "Nature & Scenic Views": ["nature"],
   "History & Landmarks": ["history"],

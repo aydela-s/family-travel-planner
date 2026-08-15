@@ -135,8 +135,17 @@ export const THEME_CATALOG: ThemeDefinition[] = [
     id: "shopping",
     label: "Shopping",
     coverageTags: ["shopping"],
-    preferredExperienceTypes: ["shopping", "food-markets"],
+    preferredExperienceTypes: ["shopping"],
     typicallyPaid: false,
+    highIntensity: false,
+    interestDriven: true,
+  },
+  {
+    id: "museums",
+    label: "Museums",
+    coverageTags: ["museums"],
+    preferredExperienceTypes: ["museums", "history", "interactive"],
+    typicallyPaid: true,
     highIntensity: false,
     interestDriven: true,
   },
@@ -236,6 +245,21 @@ export function themeGoalsAndConstraints(
     constraints.push({
       type: "discourage_anchor_tags",
       tags: ["beaches", "theme-parks", "history", "museums"],
+    });
+  }
+
+  if (theme.id === "museums") {
+    constraints.push({
+      type: "discourage_anchor_tags",
+      tags: ["shopping", "theme-parks", "beaches"],
+    });
+  }
+
+  if (theme.id === "shopping") {
+    constraints.push({ type: "max_activities", n: 1 });
+    constraints.push({
+      type: "discourage_anchor_tags",
+      tags: ["museums", "interactive", "theme-parks"],
     });
   }
 

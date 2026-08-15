@@ -6,12 +6,28 @@ import type { BudgetStyle, TripPlan } from "@/types/trip-plan";
 /**
  * Target counts for each selected primary interest across the trip.
  * Short trips still get at least 1 for each selected interest when catalog may allow.
+ * Shopping is capped at 1 on multi-interest trips so malls don't dominate.
  */
 export function targetForInterest(dayCount: number, interestCount: number): number {
   if (dayCount <= 0 || interestCount <= 0) return 0;
   if (dayCount === 1) return 1;
   if (dayCount === 2) return 1;
   return Math.max(1, Math.ceil(dayCount / Math.max(interestCount, 1)));
+}
+
+/** Per-tag ceiling — shopping stays a highlight, not half the trip. */
+export function maxTargetForInterestTag(
+  tag: LandmarkInterestTag,
+  dayCount: number,
+  interestCount: number,
+): number | null {
+  if (tag !== "shopping") return null;
+  if (interestCount <= 1) {
+    return Math.max(1, Math.ceil(dayCount / 2));
+  }
+  // Multi-interest: at most one dedicated shopping experience on trips ≤5 days.
+  if (dayCount <= 5) return 1;
+  return 2;
 }
 
 /**
@@ -58,14 +74,16 @@ export function buildExperienceCoverageTargets(
 
   // Target from unique coverage buckets (playgrounds + indoor-play are separate),
   // so a 5-day / 4-interest trip does not demand 2× every split bucket.
-  const target = targetForInterest(dayCount, Math.max(byKey.size, labels.length, 1));
+  const bucketCount = Math.max(byKey.size, labels.length, 1);
+  const baseTarget = targetForInterest(dayCount, bucketCount);
   for (const item of byKey.values()) {
-    item.target = target;
+    const capped = maxTargetForInterestTag(item.tag, dayCount, bucketCount);
+    item.target = capped == null ? baseTarget : Math.min(baseTarget, capped);
   }
 
   const budgetStyle: BudgetStyle = plan.budgetStyle || "balanced";
   const first = [...byKey.values()][0];
-  if (budgetStyle === "splurge" && first) {
+  if (budgetStyle === "splurge" && first && first.tag !== "shopping") {
     byKey.set(first.key, { ...first, target: first.target + 1 });
   }
 

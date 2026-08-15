@@ -3,6 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+function warmPlanWizard() {
+  void import("@/components/plan-wizard/TripPlanWizard");
+  void import("@/components/plan-wizard/steps/DestinationStep");
+  void import("@/components/DestinationAutocomplete");
+  void import("@/components/plan-wizard/steps/DatesStep");
+}
+
 /**
  * Silently warm `/plan` RSC + the destination-first wizard chunk while the
  * landing page is idle — so “Plan my trip” can paint step 1 immediately.
@@ -12,13 +19,12 @@ export default function PrefetchPlan() {
 
   useEffect(() => {
     router.prefetch("/plan");
+    // Start immediately; idle callback was often too late if the user clicked fast.
+    warmPlanWizard();
+
     const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1));
     const id = idle(() => {
-      void import("@/components/plan-wizard/TripPlanWizard");
-      void import("@/components/plan-wizard/steps/DestinationStep");
-      void import("@/components/DestinationAutocomplete");
-      // First Continue target after Destination
-      void import("@/components/plan-wizard/steps/DatesStep");
+      warmPlanWizard();
     });
     return () => {
       if (typeof window.cancelIdleCallback === "function") {

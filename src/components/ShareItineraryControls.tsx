@@ -9,6 +9,10 @@ import {
   inputClassName,
   labelClassName,
 } from "@/components/plan-wizard/shared";
+import {
+  trackItineraryDownloaded,
+  trackItineraryShared,
+} from "@/lib/analytics";
 import { downloadItineraryPdf } from "@/lib/itinerary-pdf";
 import { Itinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
@@ -78,6 +82,7 @@ export default function ShareItineraryControls({
             }
           : undefined,
       });
+      trackItineraryDownloaded({ export_format: "pdf" });
     } catch {
       setDownloadError("Couldn’t create the PDF. Please try again.");
     }
@@ -106,6 +111,7 @@ export default function ShareItineraryControls({
         return;
       }
       setStatus("sent");
+      trackItineraryShared({ share_method: "email" });
     } catch {
       setStatus("error");
       setError("Couldn’t reach the server. Check your connection and try again.");

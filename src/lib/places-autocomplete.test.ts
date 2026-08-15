@@ -48,6 +48,15 @@ describe("getLocalPlaceSuggestions — FAM-16 popular cities", () => {
     expect(suggestions[0]?.label).toBe("Dallas, USA");
   });
 
+  it("suggests on the first letter via name prefix (not mid-string)", () => {
+    const suggestions = getLocalPlaceSuggestions("d");
+    expect(suggestions.some((s) => /dallas/i.test(s.label))).toBe(true);
+    // "a" must not match every city that merely contains the letter a.
+    const aOnly = getLocalPlaceSuggestions("a");
+    expect(aOnly.length).toBeGreaterThan(0);
+    expect(aOnly.every((s) => s.label.toLowerCase().startsWith("a"))).toBe(true);
+  });
+
   it("suggests New York via nyc alias", () => {
     const suggestions = getLocalPlaceSuggestions("nyc");
     expect(suggestions.some((s) => /new york/i.test(s.label))).toBe(true);

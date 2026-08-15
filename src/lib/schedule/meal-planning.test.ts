@@ -347,3 +347,74 @@ describe("high-intensity recovery rest — Phase 6", () => {
     expect(highDur).toBe(lowDur + HIGH_INTENSITY_REST_BONUS_MIN);
   });
 });
+
+describe("isDinnerMeal — landmark names containing Dinner", () => {
+  it("does not treat breakfast/lunch near Medieval Times Dinner as dinner", () => {
+    expect(
+      isDinnerMeal({
+        time: "08:00",
+        title: "Pastries or café breakfast near Medieval Times Dinner & Tournament",
+        type: "meal",
+        slotKind: "breakfast",
+      }),
+    ).toBe(false);
+    expect(
+      isDinnerMeal({
+        time: "12:00",
+        title: "Picnic or sandwich lunch near Medieval Times Dinner & Tournament",
+        type: "meal",
+        slotKind: "lunch",
+      }),
+    ).toBe(false);
+    expect(
+      isDinnerMeal({
+        time: "17:00",
+        title: "Dinner in the Medieval Times Dinner & Tournament area",
+        type: "meal",
+        slotKind: "dinner",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps distinct meal times when venue name includes Dinner", () => {
+    const plan = balancedPlan([3, 6]);
+    const scheduled = rescheduleActivitiesWithMealAnchors(
+      [
+        {
+          time: "08:00",
+          title: "Pastries or café breakfast near Medieval Times Dinner & Tournament",
+          type: "meal",
+          slotKind: "breakfast",
+        },
+        {
+          time: "10:00",
+          title: "Family time at Medieval Times Dinner & Tournament",
+          type: "activity",
+        },
+        {
+          time: "12:00",
+          title: "Picnic or sandwich lunch near Medieval Times Dinner & Tournament",
+          type: "meal",
+          slotKind: "lunch",
+        },
+        {
+          time: "17:00",
+          title: "Dinner in the Medieval Times Dinner & Tournament area",
+          type: "meal",
+          slotKind: "dinner",
+        },
+      ],
+      plan,
+    );
+
+    const breakfast = scheduled.find((a) => a.slotKind === "breakfast")!;
+    const lunch = scheduled.find((a) => a.slotKind === "lunch")!;
+    const dinner = scheduled.find((a) => a.slotKind === "dinner")!;
+    expect(parseTimeToMinutes(breakfast.time)).toBeLessThan(11 * 60);
+    expect(parseTimeToMinutes(lunch.time)).toBeGreaterThanOrEqual(11 * 60);
+    expect(parseTimeToMinutes(lunch.time)).toBeLessThan(16 * 60);
+    expect(parseTimeToMinutes(dinner.time)).toBeGreaterThanOrEqual(17 * 60);
+    expect(breakfast.time).not.toBe(dinner.time);
+    expect(lunch.time).not.toBe(dinner.time);
+  });
+});
