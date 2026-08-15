@@ -4,14 +4,12 @@ import {
   resolveDestinationBias,
 } from "@/lib/destination-bias";
 import { enrichQuery } from "@/lib/places-geocode";
+import { autocompletePlacesNew } from "@/lib/maps/places-autocomplete-new";
+import { resolvePlacesApiKey } from "@/lib/maps/get-top-activities";
 import {
   getLocalPlaceSuggestions,
   mergePlaceSuggestions,
-  shouldLogGooglePlacesFailure,
-  type PlaceSuggestion,
 } from "@/lib/places-autocomplete";
-
-type GooglePrediction = { description: string; place_id: string };
 
 /** Metro-scale bias so stay results stay near the destination (e.g. Dallas → N. Texas). */
 const STAY_BIAS_RADIUS_M = 50_000;
@@ -28,7 +26,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ suggestions: [] });
   }
 
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const apiKey = resolvePlacesApiKey();
   const isAddress = mode === "address";
   const bias = isAddress ? resolveDestinationBias(destination) : null;
 
@@ -41,49 +39,27 @@ export async function GET(request: Request) {
       ? Number(lngParam)
       : bias?.lng;
 
-  let googleSuggestions: PlaceSuggestion[] = [];
+  let googleSuggestions: Awaited<ReturnType<typeof autocompletePlacesNew>> = [];
 
   if (apiKey) {
     try {
       const input =
         isAddress && bias?.cityName ? enrichQuery(query, bias.cityName) : query;
-      const typesParam = isAddress ? "" : `&types=${encodeURIComponent("(cities)")}`;
-      let url =
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
-        `?input=${encodeURIComponent(input)}` +
-        typesParam +
-        `&key=${apiKey}`;
 
-      if (typeof lat === "number" && !Number.isNaN(lat) && typeof lng === "number" && !Number.isNaN(lng)) {
-        url +=
-          `&location=${encodeURIComponent(`${lat},${lng}`)}` +
-          `&radius=${STAY_BIAS_RADIUS_M}`;
-      }
-
-      if (isAddress && bias?.country) {
-        url += `&components=${encodeURIComponent(`country:${bias.country}`)}`;
-      }
-
-      const res = await fetch(url);
-      const data = (await res.json()) as {
-        status?: string;
-        error_message?: string;
-        predictions?: GooglePrediction[];
-      };
-
-      if (shouldLogGooglePlacesFailure(data.status)) {
-        console.warn("Google Places autocomplete failure:", {
-          status: data.status,
-          error_message: data.error_message,
-          query: input,
-          mode,
-        });
-      }
-
-      googleSuggestions = (data.predictions ?? []).map((p) => ({
-        label: p.description,
-        placeId: p.place_id,
-      }));
+      googleSuggestions = await autocompletePlacesNew({
+        input,
+        apiKey,
+        includedPrimaryTypes: isAddress ? undefined : ["(cities)"],
+        includedRegionCodes:
+          isAddress && bias?.country ? [bias.country] : undefined,
+        locationBias:
+          typeof lat === "number" &&
+          !Number.isNaN(lat) &&
+          typeof lng === "number" &&
+          !Number.isNaN(lng)
+            ? { lat, lng, radiusMeters: STAY_BIAS_RADIUS_M }
+            : undefined,
+      });
 
       if (isAddress && bias?.cityName) {
         googleSuggestions = rankStaySuggestionsByDestination(
@@ -92,7 +68,7 @@ export async function GET(request: Request) {
         );
       }
     } catch (err) {
-      console.warn("Google Places autocomplete request failed:", err);
+      console.warn("Places Autocomplete (New) request failed:", err);
       if (isAddress) {
         return NextResponse.json({ suggestions: [] });
       }
@@ -103,8 +79,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ suggestions: googleSuggestions });
   }
 
-  // Cities mode: always merge local catalog so popular cities (e.g. Dallas) still appear
-  // when Google is empty, denied, or missing a key (FAM-16).
+  // Cities mode: merge local catalog so popular cities still appear when Google
+  // is empty, denied, or missing a key (FAM-16).
   const local = getLocalPlaceSuggestions(query);
   return NextResponse.json({
     suggestions: mergePlaceSuggestions(googleSuggestions, local),

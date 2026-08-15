@@ -1,4 +1,4 @@
-import { detectCity } from "@/lib/city-detect";
+import { detectCityFromPlan } from "@/lib/city-detect";
 import { isGroceryActivity, isDinnerMeal } from "@/lib/schedule/meal-planning";
 import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { activityTitleForLandmark, pickAlternateLandmark } from "@/lib/planning-engine/adjust-landmarks";
@@ -79,7 +79,7 @@ function applyAddActivity(
   if (ctx.activityCount >= 3 && ctx.eveningGapMin < 90) {
     return { applied: false, message: "Day is too full to add another stop", activities };
   }
-  const city = detectCity(plan.destination);
+  const city = detectCityFromPlan(plan);
   const names = activities.filter((a) => a.type === "activity").map((a) => a.title);
   const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 3, "default", names);
   const newAct: RawActivity = {
@@ -100,7 +100,7 @@ function applyReplaceMain(
   if (idx < 0) {
     return { applied: false, message: "No main morning activity to replace", activities };
   }
-  const city = detectCity(plan.destination);
+  const city = detectCityFromPlan(plan);
   const current = activities[idx].title;
   const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 0, "default", [current]);
   return {
@@ -119,7 +119,7 @@ function applyOutdoor(
   plan: TripPlan,
   ctx: DayAdjustContext,
 ): AdjustApplyResult {
-  const city = detectCity(plan.destination);
+  const city = detectCityFromPlan(plan);
   const indices = activityIndices(activities);
   if (indices.length === 0) {
     return { applied: false, message: "No activities to adjust", activities };
@@ -159,7 +159,7 @@ function applyEatOut(activities: RawActivity[], plan: TripPlan, ctx: DayAdjustCo
   if (dIdx < 0) {
     return { applied: false, message: "No dinner slot found", activities };
   }
-  const city = detectCity(plan.destination);
+  const city = detectCityFromPlan(plan);
   const near = city.landmarks[ctx.dayNumber % city.landmarks.length];
   const restaurant = pickRestaurantForMeal(city, plan, {
     meal: "dinner",
@@ -182,7 +182,7 @@ function applyPlayground(
   plan: TripPlan,
   ctx: DayAdjustContext,
 ): AdjustApplyResult {
-  const city = detectCity(plan.destination);
+  const city = detectCityFromPlan(plan);
   const indices = activityIndices(activities).filter((i) => parseTimeToMinutes(activities[i].time) >= 12 * 60);
   const idx = indices[0] ?? findMorningActivityIndex(activities);
   if (idx < 0) {
@@ -208,7 +208,7 @@ function applyEveningActivity(
   if (ctx.eveningGapMin < 75) {
     return { applied: false, message: "Not enough time before dinner for another stop", activities };
   }
-  const city = detectCity(plan.destination);
+  const city = detectCityFromPlan(plan);
   const landmark = pickAlternateLandmark(city, plan, ctx.dayNumber, 4, "default", []);
   const newAct: RawActivity = {
     time: "17:30",

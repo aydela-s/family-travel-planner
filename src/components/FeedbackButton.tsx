@@ -89,7 +89,7 @@ export default function FeedbackButton() {
   }
 
   // Dedicated /feedback page already has the form — don’t stack a floating launcher.
-  // Wizard opts in from step 2 onward via FeedbackVisibilityProvider.
+  // Planner (itinerary view) opts in via FeedbackVisibilityProvider — never the wizard (FAM-79).
   if (pathname === "/feedback" || !allowed) {
     return null;
   }

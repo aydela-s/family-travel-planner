@@ -14,7 +14,7 @@ import { formatCoverDateRange } from "@/lib/itinerary-export";
 import { formatNapsSummary, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { updatesForPlanChip, type PlanChipUpdateKey } from "@/lib/plan-selection-updates";
-import { detectCity } from "@/lib/city-detect";
+import { detectCityFromPlan } from "@/lib/city-detect";
 import {
   isPublicTransitSelectable,
   transportationOptionsForCity,
@@ -82,7 +82,7 @@ function interestsLabel(plan: TripPlan): string {
 }
 
 function buildChips(plan: TripPlan): ChipDef[] {
-  const city = detectCity(plan.destination);
+  const city = detectCityFromPlan(plan);
   const transitSelectable = isPublicTransitSelectable(city);
   const transportOptions = transportationOptionsForCity(city);
   const chips: ChipDef[] = [

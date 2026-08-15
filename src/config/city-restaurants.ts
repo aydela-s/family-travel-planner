@@ -676,5 +676,8 @@ export const CITY_RESTAURANTS: Record<string, CityRestaurant[]> = {
 };
 
 export function restaurantsForCityId(cityId: string): CityRestaurant[] {
-  return CITY_RESTAURANTS[cityId] ?? CITY_RESTAURANTS.default;
+  // Places-built / unknown cities must NOT inherit NYC "default" fakes —
+  // those pins are in Manhattan and produce multi-thousand-dollar taxi legs.
+  if (cityId === "default" || cityId.startsWith("places:")) return [];
+  return CITY_RESTAURANTS[cityId] ?? [];
 }

@@ -13,7 +13,7 @@ import {
   LandmarkInterestTag,
   LandmarkOpeningHours,
 } from "@/config/city-pricing";
-import { detectCity } from "@/lib/city-detect";
+import { detectCity, detectCityFromPlan } from "@/lib/city-detect";
 import {
   getOrFetchTopActivities,
   type GetOrFetchOptions,
@@ -54,7 +54,20 @@ export function placesSearchCategoriesFromInterests(interests: string[]): string
   if (labels.length === 0) {
     return ["family attractions", "parks", "museums"];
   }
-  return [...new Set(labels)].slice(0, MAX_CATEGORIES);
+  // Map wizard labels to Places queries that match the category intent.
+  const queries = labels.map((label) => {
+    if (label === "Interactive Museums") {
+      return "science museum children's museum interactive exhibits";
+    }
+    if (label === "Theme Parks") {
+      return "theme park amusement park water park";
+    }
+    if (label === "Playgrounds & Indoor Play" || label === "Playgrounds") {
+      return "indoor playground soft play kids play cafe";
+    }
+    return label;
+  });
+  return [...new Set(queries)].slice(0, MAX_CATEGORIES);
 }
 
 export function interestTagsForSearchCategory(category: string): LandmarkInterestTag[] {
@@ -64,6 +77,16 @@ export function interestTagsForSearchCategory(category: string): LandmarkInteres
   }
   // Free-text fallbacks (e.g. "zoos", "family attractions")
   const lower = trimmed.toLowerCase();
+  // Places query remaps from placesSearchCategoriesFromInterests
+  if (/science museum|children'?s museum|interactive exhibit/.test(lower)) {
+    return ["interactive"];
+  }
+  if (/theme park|amusement park|water park/.test(lower)) {
+    return ["theme-parks"];
+  }
+  if (/indoor playground|soft play|play cafe/.test(lower)) {
+    return ["playgrounds", "indoor-play"];
+  }
   for (const [label, tags] of Object.entries(INTEREST_LABEL_TO_TAGS)) {
     if (lower.includes(label.toLowerCase()) || label.toLowerCase().includes(lower)) {
       return tags;
@@ -73,9 +96,88 @@ export function interestTagsForSearchCategory(category: string): LandmarkInteres
   if (/museum|gallery/.test(lower)) return ["museums"];
   if (/playground|soft play|bounce/.test(lower)) return ["playgrounds", "indoor-play"];
   if (/beach|waterfront|harbor/.test(lower)) return ["beaches"];
+  // Theme / amusement before generic "park" so "theme park" isn't tagged as parks.
+  if (/theme\s*park|amusement|water\s*park|waterpark|roller\s*coaster/.test(lower)) {
+    return ["theme-parks"];
+  }
   if (/park|garden/.test(lower)) return ["parks"];
-  if (/theme|amusement|roller/.test(lower)) return ["theme-parks"];
   return ["parks"];
+}
+
+/**
+ * Theme Parks = amusement / water parks / major ticketed parks — not city parks or soft play.
+ * Places text search for "Theme Parks" often returns green spaces; demote those.
+ */
+const REAL_THEME_PARK_NAME =
+  /\b(theme\s*park|amusement|water\s*park|waterpark|six\s*flags|disney|universal|legoland|seaworld|cedar\s*point|busch\s*gardens|roller\s*coaster|ferris\s*wheel)\b/i;
+
+const CITY_OR_GARDEN_PARK_NAME =
+  /\b(park|garden|arboretum|greenbelt|plaza|commons)\b/i;
+
+const INDOOR_PLAY_NAME =
+  /\b(kids\s*empire|soft\s*play|bounce\s*house|trampolin|indoor\s*play|play\s*cafe|urban\s*air|sky\s*zone|peekn?\s*play)\b/i;
+
+const LOOK_DONT_TOUCH_MUSEUM_NAME =
+  /\b(sculpture|art\s+museum|gallery|samurai|history\s+museum|nasher|barbier|mueller)\b/i;
+
+const HANDS_ON_INTERACTIVE_NAME =
+  /\b(perot|meow\s*wolf|children'?s\s+museum|science\s+(center|museum)|discovery\s+center|bubble\s+planet|hands[-\s]?on|planetarium)\b/i;
+
+export function refineInterestTagsForPlaceName(
+  name: string,
+  tags: LandmarkInterestTag[],
+): LandmarkInterestTag[] {
+  let next = [...tags];
+
+  if (next.includes("theme-parks") && !REAL_THEME_PARK_NAME.test(name)) {
+    if (INDOOR_PLAY_NAME.test(name)) {
+      next = next.filter((t) => t !== "theme-parks");
+      if (!next.includes("indoor-play")) next.push("indoor-play");
+      if (!next.includes("playgrounds")) next.push("playgrounds");
+    } else if (CITY_OR_GARDEN_PARK_NAME.test(name)) {
+      next = next.filter((t) => t !== "theme-parks");
+      if (!next.includes("parks")) next.push("parks");
+    } else {
+      // Unknown venue returned under Theme Parks search — drop the ticketed tag.
+      next = next.filter((t) => t !== "theme-parks");
+      if (next.length === 0) next.push("parks");
+    }
+  }
+
+  // Art / history museums must not satisfy "Interactive Museums".
+  if (LOOK_DONT_TOUCH_MUSEUM_NAME.test(name)) {
+    next = next.filter((t) => t !== "interactive");
+    if (!next.includes("museums")) next.push("museums");
+  } else if (HANDS_ON_INTERACTIVE_NAME.test(name)) {
+    if (!next.includes("interactive")) next.push("interactive");
+  }
+
+  return next;
+}
+
+/** Public beaches/parks are free; theme/amusement parks stay ticketed. */
+export function adultPriceForPlace(
+  name: string,
+  tags: LandmarkInterestTag[],
+  priceLevel: string | null,
+): number {
+  const mapped = adultPriceFromPriceLevel(priceLevel);
+  if (tags.includes("theme-parks") || REAL_THEME_PARK_NAME.test(name)) {
+    return mapped > 0 ? mapped : 40;
+  }
+  if (
+    tags.includes("beaches") ||
+    tags.includes("parks") ||
+    tags.includes("nature") ||
+    tags.includes("playgrounds")
+  ) {
+    // Soft play / indoor play centers are usually ticketed.
+    if (tags.includes("indoor-play") || INDOOR_PLAY_NAME.test(name)) {
+      return mapped > 0 ? mapped : 20;
+    }
+    return 0;
+  }
+  return mapped;
 }
 
 export function adultPriceFromPriceLevel(priceLevel: string | null): number {
@@ -124,12 +226,13 @@ export function landmarkFromTopActivity(
   if (typeof place.latitude !== "number" || typeof place.longitude !== "number") {
     return null;
   }
-  const tags = interestTags.length > 0 ? interestTags : (["parks"] as LandmarkInterestTag[]);
+  const raw = interestTags.length > 0 ? interestTags : (["parks"] as LandmarkInterestTag[]);
+  const tags = refineInterestTagsForPlaceName(place.name, raw);
   return {
     name: place.name,
     lat: place.latitude,
     lng: place.longitude,
-    adultPrice: adultPriceFromPriceLevel(place.priceLevel),
+    adultPrice: adultPriceForPlace(place.name, tags, place.priceLevel),
     openingHours: openingHoursForTags(tags),
     intensity: intensityForTags(tags),
     ageTags: DEFAULT_AGE_TAGS,
@@ -157,8 +260,16 @@ export function landmarksFromPlacesResults(
         continue;
       }
       // Merge interest tags when the same place appears under multiple categories.
-      const merged = new Set([...existing.interestTags, ...landmark.interestTags]);
-      byName.set(key, { ...existing, interestTags: [...merged] });
+      const merged = refineInterestTagsForPlaceName(existing.name, [
+        ...new Set([...existing.interestTags, ...landmark.interestTags]),
+      ]);
+      byName.set(key, {
+        ...existing,
+        interestTags: merged,
+        intensity: intensityForTags(merged),
+        indoor: indoorForTags(merged),
+        openingHours: openingHoursForTags(merged),
+      });
     }
   }
   return [...byName.values()];
@@ -195,15 +306,16 @@ export async function buildCityConfigFromPlaces(
     return null;
   }
 
-  const center = landmarks[0]!;
+  const detected = detectCity(destination);
   const shortName = destination.split(",")[0]?.trim() || destination.trim() || DEFAULT_CITY.name;
 
   return {
     ...DEFAULT_CITY,
     id: `places:${shortName.toLowerCase().replace(/\s+/g, "-")}`,
     name: shortName,
-    lat: center.lat,
-    lng: center.lng,
+    // Prefer known destination center (Places pick / popular); not first zoo pin.
+    lat: detected.lat,
+    lng: detected.lng,
     landmarks,
   };
 }
@@ -212,10 +324,10 @@ export async function buildCityConfigFromPlaces(
  * Curated cities unchanged; non-curated try Places, else DEFAULT_CITY clone.
  */
 export async function resolvePlanningCity(
-  plan: Pick<TripPlan, "destination" | "interests">,
+  plan: Pick<TripPlan, "destination" | "interests" | "destinationLat" | "destinationLng">,
   options: BuildPlacesCityOptions = {},
 ): Promise<CityConfig> {
-  const detected = detectCity(plan.destination);
+  const detected = detectCityFromPlan(plan);
   if (isCuratedCity(detected)) {
     return detected;
   }
@@ -224,5 +336,21 @@ export async function resolvePlanningCity(
     plan.interests,
     options,
   );
-  return fromPlaces ?? detected;
+  if (fromPlaces) {
+    // Keep Places-resolved destination center when the wizard already pinned one.
+    if (
+      typeof plan.destinationLat === "number" &&
+      typeof plan.destinationLng === "number" &&
+      Number.isFinite(plan.destinationLat) &&
+      Number.isFinite(plan.destinationLng)
+    ) {
+      return {
+        ...fromPlaces,
+        lat: plan.destinationLat,
+        lng: plan.destinationLng,
+      };
+    }
+    return fromPlaces;
+  }
+  return detected;
 }

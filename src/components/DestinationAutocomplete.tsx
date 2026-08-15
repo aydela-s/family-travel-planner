@@ -1,20 +1,37 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { resolveDestinationBias } from "@/lib/destination-bias";
 
 type Suggestion = { label: string; placeId: string };
 
+export type DestinationSelection = {
+  destination: string;
+  placeId: string;
+  lat: number | null;
+  lng: number | null;
+};
+
+/**
+ * City autocomplete from Google Places `(cities)` + local popular fallback.
+ * Typing updates the field; only picking a suggestion commits a resolved center.
+ */
 export default function DestinationAutocomplete({
   value,
   onChange,
+  onSelect,
 }: {
   value: string;
-  onChange: (value: string) => void;
+  /** Fired while typing — clears a previous Places selection on the plan. */
+  onChange: (destination: string) => void;
+  /** Fired when the user picks a suggestion (coords from Details or popular bias). */
+  onSelect: (selection: DestinationSelection) => void;
 }) {
   const [query, setQuery] = useState(value);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [fetchError, setFetchError] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const requestSeq = useRef(0);
@@ -91,24 +108,73 @@ export default function DestinationAutocomplete({
     };
   }, [query]);
 
-  function selectSuggestion(s: Suggestion) {
+  async function selectSuggestion(s: Suggestion) {
     pickedLabelRef.current = s.label;
-    requestSeq.current += 1; // cancel in-flight search for the typed prefix
+    requestSeq.current += 1;
     setQuery(s.label);
-    onChange(s.label);
     setSuggestions([]);
     setFetchError(false);
     setLoading(false);
     setOpen(false);
+    setResolving(true);
+
+    let lat: number | null = null;
+    let lng: number | null = null;
+    let label = s.label;
+    let placeId = s.placeId;
+
+    try {
+      const res = await fetch(
+        `/api/places/details?placeId=${encodeURIComponent(s.placeId)}`,
+      );
+      if (res.ok) {
+        const data = (await res.json()) as {
+          address?: string;
+          placeId?: string;
+          lat?: number;
+          lng?: number;
+        };
+        if (typeof data.lat === "number" && typeof data.lng === "number") {
+          lat = data.lat;
+          lng = data.lng;
+        }
+        if (data.address?.trim()) label = data.address.trim();
+        if (data.placeId) placeId = data.placeId;
+      }
+    } catch {
+      // fall through to popular bias
+    }
+
+    if (lat == null || lng == null) {
+      const bias = resolveDestinationBias(label);
+      if (typeof bias.lat === "number" && typeof bias.lng === "number") {
+        lat = bias.lat;
+        lng = bias.lng;
+      }
+    }
+
+    setResolving(false);
+
+    if (lat == null || lng == null) {
+      pickedLabelRef.current = null;
+      setFetchError(true);
+      setOpen(true);
+      return;
+    }
+
+    pickedLabelRef.current = label;
+    setQuery(label);
+    onSelect({ destination: label, placeId, lat, lng });
   }
 
-  const showPanel = open && query.length >= 2 && !loading;
+  const showPanel = open && query.length >= 2 && !loading && !resolving;
   const showEmptyState =
     showPanel && suggestions.length === 0 && pickedLabelRef.current !== query;
 
   return (
     <div ref={wrapperRef} className="relative">
       <input
+        id="destination"
         type="text"
         value={query}
         onChange={(e) => {
@@ -127,9 +193,9 @@ export default function DestinationAutocomplete({
         aria-autocomplete="list"
         aria-expanded={showPanel && (suggestions.length > 0 || showEmptyState)}
       />
-      {loading && (
+      {(loading || resolving) && (
         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">
-          Searching...
+          {resolving ? "Confirming…" : "Searching..."}
         </span>
       )}
       {showPanel && suggestions.length > 0 && (
@@ -138,7 +204,7 @@ export default function DestinationAutocomplete({
             <li key={`${s.placeId}-${s.label}`}>
               <button
                 type="button"
-                onClick={() => selectSuggestion(s)}
+                onClick={() => void selectSuggestion(s)}
                 className="w-full px-4 py-2.5 text-left text-sm text-ink transition hover:bg-primary-muted"
               >
                 {s.label}
@@ -150,8 +216,8 @@ export default function DestinationAutocomplete({
       {showEmptyState && (
         <div className="absolute z-20 mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm leading-relaxed text-muted shadow-[var(--shadow-card)]">
           {fetchError
-            ? "Couldn’t load city suggestions — you can still type your destination and continue."
-            : "No cities found — you can still type your destination and continue."}
+            ? "Couldn’t confirm that city. Pick another suggestion from the list."
+            : "No cities found — pick a suggested city from the list to continue."}
         </div>
       )}
     </div>

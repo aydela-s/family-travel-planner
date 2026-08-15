@@ -8,7 +8,7 @@ export default function DestinationStep({ formData, updateFormData }: StepProps)
       <StepIntro
         emoji="🌍"
         title="Where are you headed?"
-        subtitle="Start typing — we'll suggest cities and normalize the name for pricing."
+        subtitle="Pick a city from the suggestions so we can plan around the right place."
       />
 
       <div>
@@ -17,7 +17,22 @@ export default function DestinationStep({ formData, updateFormData }: StepProps)
         </label>
         <DestinationAutocomplete
           value={formData.destination}
-          onChange={(destination) => updateFormData({ destination })}
+          onChange={(destination) =>
+            updateFormData({
+              destination,
+              destinationPlaceId: "",
+              destinationLat: null,
+              destinationLng: null,
+            })
+          }
+          onSelect={(selection) =>
+            updateFormData({
+              destination: selection.destination,
+              destinationPlaceId: selection.placeId,
+              destinationLat: selection.lat,
+              destinationLng: selection.lng,
+            })
+          }
         />
       </div>
     </div>

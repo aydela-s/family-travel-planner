@@ -18,7 +18,8 @@ export const INTEREST_LABEL_TO_TAGS: Record<string, LandmarkInterestTag[]> = {
   "Playgrounds & Indoor Play": ["playgrounds", "indoor-play"],
   "Zoos & Aquariums": ["zoos"],
   "Theme Parks": ["theme-parks"],
-  "Interactive Museums": ["interactive", "museums"],
+  // Hands-on only — do not alias to look-don't-touch art/history museums (see interest-categories.md).
+  "Interactive Museums": ["interactive"],
   "Food Markets": ["food-markets"],
   Shopping: ["shopping"],
   "Shows & Entertainment": ["entertainment"],

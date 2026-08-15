@@ -4,6 +4,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import FeedbackButton from "@/components/FeedbackButton";
 import { FeedbackVisibilityProvider } from "@/components/FeedbackVisibility";
+import { PostHogProvider } from "@/components/PostHogProvider";
 import { BRAND } from "@/config/brand";
 import "./globals.css";
 
@@ -34,10 +35,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${poppins.variable} antialiased`}>
-        <FeedbackVisibilityProvider>
-          {children}
-          <FeedbackButton />
-        </FeedbackVisibilityProvider>
+        <PostHogProvider>
+          <FeedbackVisibilityProvider>
+            {children}
+            <FeedbackButton />
+          </FeedbackVisibilityProvider>
+        </PostHogProvider>
         <SpeedInsights />
         <Analytics />
       </body>

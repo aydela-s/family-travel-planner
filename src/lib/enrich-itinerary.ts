@@ -1,5 +1,5 @@
 import { CityConfig, Landmark, PRICING_DISCLAIMER } from "@/config/city-pricing";
-import { detectCity } from "@/lib/city-detect";
+import { detectCityFromPlan } from "@/lib/city-detect";
 import {
   addDays,
   alignTitleWithTimeOfDay,
@@ -352,7 +352,7 @@ export async function enrichItinerary(
   plan: TripPlan,
   options?: EnrichOptions,
 ): Promise<Itinerary> {
-  const city = options?.cityOverride ?? detectCity(plan.destination);
+  const city = options?.cityOverride ?? detectCityFromPlan(plan);
   const normalized = normalizeRawItinerary(raw, plan);
   const prepared = prepareItineraryForEnrich(
     normalized,

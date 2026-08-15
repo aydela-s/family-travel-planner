@@ -943,8 +943,9 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
     // Last resort: force-trim the final stop to the dinner boundary (never extend).
     const lastEnd = parseTimeToMinutes(last.endTime);
     if (latestItemEnd > lastStart && latestItemEnd < lastEnd) {
-      result[lastIdx] = { ...last, endTime: minutesToTime(latestItemEnd) };
-      cursor = latestItemEnd;
+      const trimmed = scheduleSpan(lastStart, Math.max(15, latestItemEnd - lastStart));
+      result[lastIdx] = { ...last, time: trimmed.time, endTime: trimmed.endTime };
+      cursor = parseTimeToMinutes(trimmed.endTime);
     }
     break;
   }
@@ -969,8 +970,9 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
         const lastStart = parseTimeToMinutes(last.time);
         const lastEnd = parseTimeToMinutes(last.endTime);
         if (latestItemEnd > lastStart && latestItemEnd < lastEnd) {
-          result[lastIdx] = { ...last, endTime: minutesToTime(latestItemEnd) };
-          cursor = latestItemEnd;
+          const trimmed = scheduleSpan(lastStart, Math.max(15, latestItemEnd - lastStart));
+          result[lastIdx] = { ...last, time: trimmed.time, endTime: trimmed.endTime };
+          cursor = parseTimeToMinutes(trimmed.endTime);
         }
         break;
       }

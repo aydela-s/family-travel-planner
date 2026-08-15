@@ -128,9 +128,23 @@ export function filterAnchorCandidates(
   plan: TripPlan,
   ledgerNames: Set<string>,
   visitWindow?: VisitWindow,
+  priorFullDayAnchors: Set<string> = new Set(),
 ): Landmark[] {
   const unused = city.landmarks.filter((l) => !ledgerNames.has(l.name));
-  let pool = unused.length > 0 ? unused : [...city.landmarks];
+  const notPriorFullAnchor = city.landmarks.filter((l) => !priorFullDayAnchors.has(l.name));
+  // Full days: never reopen a prior full-day anchor while any other landmark exists.
+  // Prefer unused; if support ate the pool, promote landmarks that were only support.
+  // Travel days may soft-reuse near stay (including prior anchors).
+  let pool: Landmark[];
+  if (day.role === "arrival" || day.role === "departure") {
+    pool = unused.length > 0 ? unused : [...city.landmarks];
+  } else if (unused.length > 0) {
+    pool = unused;
+  } else if (notPriorFullAnchor.length > 0) {
+    pool = notPriorFullAnchor;
+  } else {
+    pool = [];
+  }
 
   const req = requiredAnchorTags(day);
   if (req) {
@@ -306,6 +320,24 @@ export function scoreAnchorCandidate(
   const { maxKm, maxMin, preferredMin } = farLimits(day, plan);
   const stayMin = stayTravelMin(landmark, plan);
 
+  if (day.theme.id === "play_indoor") {
+    // Prefer neighborhood soft-play over a 30+ min drive across the metro.
+    if (stayMin != null) {
+      if (stayMin <= 15) score += 35;
+      else if (stayMin <= 25) score += 10;
+      else score -= Math.min(80, (stayMin - 25) * 3);
+    } else if (km != null) {
+      if (km <= 8) score += 25;
+      else if (km > 20) score -= Math.min(80, (km - 20) * 2);
+    }
+  }
+  if (day.theme.id === "playgrounds") {
+    if (stayMin != null) {
+      if (stayMin <= 15) score += 30;
+      else if (stayMin > 25) score -= Math.min(60, (stayMin - 25) * 2);
+    }
+  }
+
   if (lowFrictionDay) {
     // Priority: 1 near stay → 2 free/flexible → 3 low walking → 4 scenic only if close
     score += scoreStayProximity(stayMin, km, preferredMin, maxMin);
@@ -451,6 +483,8 @@ export type SelectAnchorOptions = {
   ledgerNames: Set<string>;
   /** Soft-exclude landmarks (e.g. toddler-only when rebalancing mixed families). */
   softExcludeNames?: Set<string>;
+  /** Full-day anchors already used this trip — hard-avoid while alternatives exist. */
+  priorFullDayAnchors?: Set<string>;
 };
 
 /** Last-resort near-stay pick for arrival/departure — never leave the low-friction ring. */
@@ -502,6 +536,7 @@ export function selectAnchorForDay(
     plan,
     opts.ledgerNames,
     opts.visitWindow,
+    opts.priorFullDayAnchors,
   );
   if (opts.softExcludeNames && opts.softExcludeNames.size > 0) {
     const filtered = candidates.filter((l) => !opts.softExcludeNames!.has(l.name));
@@ -512,7 +547,27 @@ export function selectAnchorForDay(
       const near = lowFrictionFallback(city, plan, day);
       if (near) return near;
     }
-    return city.landmarks.find((l) => !opts.ledgerNames.has(l.name)) ?? city.landmarks[0]!;
+    const prior = opts.priorFullDayAnchors ?? new Set<string>();
+    const unusedAny = city.landmarks.filter((l) => !opts.ledgerNames.has(l.name));
+    const notPriorAnchor = city.landmarks.filter((l) => !prior.has(l.name));
+    const pool =
+      unusedAny.length > 0
+        ? unusedAny
+        : notPriorAnchor.length > 0
+          ? notPriorAnchor
+          : day.role === "arrival" || day.role === "departure"
+            ? city.landmarks
+            : notPriorAnchor;
+    if (pool.length === 0) {
+      return city.landmarks[0]!;
+    }
+    const ranked = [...pool]
+      .map((lm) => ({
+        lm,
+        score: scoreAnchorCandidate(lm, day, plan, opts.ledgerNames),
+      }))
+      .sort((a, b) => b.score - a.score || a.lm.name.localeCompare(b.lm.name));
+    return ranked[0]!.lm;
   }
 
   const ranked = [...candidates]

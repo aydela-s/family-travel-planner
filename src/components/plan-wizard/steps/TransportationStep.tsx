@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { StepProps, TransportationType } from "@/types/trip-plan";
-import { detectCity } from "@/lib/city-detect";
+import { detectCityFromPlan } from "@/lib/city-detect";
 import { TRANSPORTATION_LABELS } from "@/lib/format-labels";
 import {
   isPublicTransitSelectable,
@@ -20,7 +20,7 @@ const OPTION_EMOJI: Record<TransportationType, string> = {
 };
 
 export default function TransportationStep({ formData, updateFormData }: StepProps) {
-  const city = detectCity(formData.destination);
+  const city = detectCityFromPlan(formData);
   const options = transportationOptionsForCity(city);
   const transitSelectable = isPublicTransitSelectable(city);
   const limitedWarning = limitedTransitWarning(city);

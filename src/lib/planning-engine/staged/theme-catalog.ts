@@ -72,7 +72,7 @@ export const THEME_CATALOG: ThemeDefinition[] = [
     id: "interactive",
     label: "Interactive",
     coverageTags: ["interactive"],
-    preferredExperienceTypes: ["interactive", "museums"],
+    preferredExperienceTypes: ["interactive"],
     typicallyPaid: true,
     highIntensity: false,
     interestDriven: true,
@@ -235,7 +235,7 @@ export function themeGoalsAndConstraints(
   if (theme.id === "interactive") {
     constraints.push({
       type: "discourage_anchor_tags",
-      tags: ["beaches", "theme-parks"],
+      tags: ["beaches", "theme-parks", "history", "museums"],
     });
   }
 

@@ -55,6 +55,12 @@ describe("places → CityConfig mapping (FAM-59)", () => {
       "Parks & Gardens",
     ]);
     expect(interestTagsForSearchCategory("Zoos & Aquariums")).toEqual(["zoos"]);
+    expect(placesSearchCategoriesFromInterests(["Interactive Museums"])).toEqual([
+      "science museum children's museum interactive exhibits",
+    ]);
+    expect(
+      interestTagsForSearchCategory("science museum children's museum interactive exhibits"),
+    ).toEqual(["interactive"]);
   });
 
   it("maps TopActivity into a Landmark with place metadata", () => {
@@ -86,6 +92,65 @@ describe("places → CityConfig mapping (FAM-59)", () => {
     ]);
     expect(landmarks).toHaveLength(1);
     expect(landmarks[0]!.interestTags.sort()).toEqual(["museums", "zoos"].sort());
+  });
+
+  it("does not tag city parks or soft play as theme parks", () => {
+    const fromThemeSearch = landmarksFromPlacesResults([
+      {
+        category: "Theme Parks",
+        places: [
+          place({ id: "1", name: "Klyde Warren Park", latitude: 32.79, longitude: -96.8 }),
+          place({
+            id: "2",
+            name: "Kids Empire Dallas Hillcrest",
+            latitude: 32.84,
+            longitude: -96.78,
+          }),
+          place({ id: "3", name: "Six Flags Over Texas", latitude: 32.75, longitude: -97.07 }),
+        ],
+      },
+    ]);
+    const byName = Object.fromEntries(fromThemeSearch.map((l) => [l.name, l.interestTags]));
+    expect(byName["Klyde Warren Park"]).toEqual(["parks"]);
+    expect(byName["Klyde Warren Park"]).not.toContain("theme-parks");
+    expect(byName["Kids Empire Dallas Hillcrest"]).toContain("indoor-play");
+    expect(byName["Kids Empire Dallas Hillcrest"]).not.toContain("theme-parks");
+    expect(byName["Six Flags Over Texas"]).toContain("theme-parks");
+  });
+
+  it("keeps art museums out of interactive and beaches free", () => {
+    const landmarks = landmarksFromPlacesResults([
+      {
+        category: "Interactive Museums",
+        places: [
+          place({ id: "1", name: "Nasher Sculpture Center", latitude: 32.78, longitude: -96.8 }),
+          place({
+            id: "2",
+            name: "Perot Museum of Nature and Science",
+            latitude: 32.78,
+            longitude: -96.8,
+          }),
+        ],
+      },
+      {
+        category: "Beaches & Waterfronts",
+        places: [
+          place({
+            id: "3",
+            name: "Little Elm Beach",
+            latitude: 33.16,
+            longitude: -96.93,
+            priceLevel: "PRICE_LEVEL_EXPENSIVE",
+          }),
+        ],
+      },
+    ]);
+    const byName = Object.fromEntries(landmarks.map((l) => [l.name, l]));
+    expect(byName["Nasher Sculpture Center"]!.interestTags).not.toContain("interactive");
+    expect(byName["Nasher Sculpture Center"]!.interestTags).toContain("museums");
+    expect(byName["Perot Museum of Nature and Science"]!.interestTags).toContain("interactive");
+    expect(byName["Little Elm Beach"]!.adultPrice).toBe(0);
+    expect(byName["Little Elm Beach"]!.interestTags).toContain("beaches");
   });
 });
 

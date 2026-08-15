@@ -134,6 +134,7 @@ export function commitStopsToBlueprint(
   city: CityConfig,
 ): TripBlueprint {
   const ledgerNames = new Set(blueprint.ledger.landmarkNames);
+  const priorFullDayAnchors = new Set<string>();
   let coverage = blueprint.experienceCoverage;
   const days: DayBlueprint[] = [];
   const profile = getFamilyAgeProfile(plan);
@@ -158,6 +159,7 @@ export function commitStopsToBlueprint(
       visitWindow: anchorWindow,
       ledgerNames,
       softExcludeNames: softExclude,
+      priorFullDayAnchors,
     });
 
     // Full-day theme match: re-pick once if the winner misses the theme
@@ -168,11 +170,13 @@ export function commitStopsToBlueprint(
         visitWindow: anchorWindow,
         ledgerNames,
         softExcludeNames: themedExclude,
+        priorFullDayAnchors,
       });
       if (anchorMatchesTheme(day, retry)) anchor = retry;
     }
 
     ledgerNames.add(anchor.name);
+    if (day.role === "full") priorFullDayAnchors.add(anchor.name);
 
     let support = selectSupportForDay(city, plan, day, anchor, {
       visitWindow: supportVisitWindow(plan, day),

@@ -62,6 +62,25 @@ export async function getDirections(
       if (leg) {
         const distanceKm = leg.distance.value / 1000;
         const durationMin = Math.ceil(leg.duration.value / 60);
+        // Same absurd-leg guard when Google returns a cross-country route from bad pins.
+        if (transportType === "taxis" && (distanceKm > 150 || durationMin > 180)) {
+          const est = estimateRoutedMetrics(straight, travelMode);
+          const cappedKm = Math.min(est.distanceKm, 40);
+          const cappedMin = Math.min(est.durationMin, 60);
+          const { cost, provider } = calculateRideCost(
+            city,
+            cappedKm,
+            cappedMin,
+            providerIndex,
+          );
+          return {
+            distanceKm: cappedKm,
+            durationMin: cappedMin,
+            cost,
+            provider,
+            source: "estimated",
+          };
+        }
         const { cost, provider } =
           transportType === "taxis"
             ? calculateRideCost(city, distanceKm, durationMin, providerIndex)
@@ -74,6 +93,20 @@ export async function getDirections(
   }
 
   const { distanceKm, durationMin } = estimateRoutedMetrics(straight, travelMode);
+
+  // Guard: absurd legs (e.g. leftover NYC pins) must not bill thousands in taxi fare.
+  if (transportType === "taxis" && (distanceKm > 150 || durationMin > 180)) {
+    const cappedKm = Math.min(distanceKm, 40);
+    const cappedMin = Math.min(durationMin, 60);
+    const { cost, provider } = calculateRideCost(city, cappedKm, cappedMin, providerIndex);
+    return {
+      distanceKm: cappedKm,
+      durationMin: cappedMin,
+      cost,
+      provider,
+      source: "estimated",
+    };
+  }
 
   const { cost, provider } =
     transportType === "taxis"

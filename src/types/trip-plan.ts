@@ -30,6 +30,13 @@ export type NapEntry = {
 
 export type TripPlan = {
   destination: string;
+  /**
+   * Places-backed destination center (FAM-57). Set when the user picks a city
+   * from autocomplete — required by the wizard so free-typed names can't plan.
+   */
+  destinationPlaceId?: string;
+  destinationLat?: number | null;
+  destinationLng?: number | null;
   startDate: string;
   endDate: string;
   adults: number;
@@ -57,6 +64,9 @@ export type TripPlan = {
 
 export const initialTripPlan: TripPlan = {
   destination: "",
+  destinationPlaceId: "",
+  destinationLat: null,
+  destinationLng: null,
   startDate: "",
   endDate: "",
   adults: 2,

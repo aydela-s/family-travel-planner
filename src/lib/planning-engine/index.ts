@@ -1,5 +1,5 @@
 import { CityConfig } from "@/config/city-pricing";
-import { detectCity } from "@/lib/city-detect";
+import { detectCityFromPlan } from "@/lib/city-detect";
 import { getTripDayCount, normalizeRawItinerary } from "@/lib/itinerary";
 import { fixRawDayActivities } from "@/lib/schedule/fix-itinerary";
 import { validateTripDates } from "@/lib/planning-engine/date-validation";
@@ -144,7 +144,7 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
   const plannerEngine = resolvePlannerEngine(options?.plannerEngine);
 
   let workingPlan = effectivePlan(plan, options);
-  const city = options?.cityOverride ?? detectCity(workingPlan.destination);
+  const city = options?.cityOverride ?? detectCityFromPlan(workingPlan);
   let transportNote: string | undefined;
 
   const transitResolved = resolveTransitSelection(workingPlan, city);

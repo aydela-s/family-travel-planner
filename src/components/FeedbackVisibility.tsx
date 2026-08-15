@@ -10,7 +10,7 @@ import {
 } from "react";
 
 type FeedbackVisibilityContextValue = {
-  /** When true, the floating Feedback launcher may render. */
+  /** When true, the floating Feedback launcher may render (itinerary/planner only). */
   allowed: boolean;
   setAllowed: (allowed: boolean) => void;
 };

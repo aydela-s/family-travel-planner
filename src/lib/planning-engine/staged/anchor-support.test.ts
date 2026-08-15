@@ -164,6 +164,73 @@ describe("commitStopsToBlueprint", () => {
     expect(committed.ledger.landmarkNames.length).toBeGreaterThanOrEqual(fullNames.length);
   });
 
+  it("does not reuse a full-day indoor-play anchor while unused landmarks remain", () => {
+    const tinyCity = {
+      ...city,
+      id: "places:dallas-tiny",
+      name: "Dallas",
+      landmarks: [
+        {
+          name: "Kids Empire Dallas Hillcrest",
+          lat: 32.84,
+          lng: -96.78,
+          adultPrice: 25,
+          openingHours: { open: "09:00", close: "18:00" },
+          intensity: "high" as const,
+          ageTags: ["toddler", "child"] as const,
+          interestTags: ["indoor-play", "playgrounds"] as const,
+          indoor: true,
+        },
+        {
+          name: "Dallas Zoo",
+          lat: 32.74,
+          lng: -96.81,
+          adultPrice: 30,
+          openingHours: { open: "09:00", close: "17:00" },
+          intensity: "medium" as const,
+          ageTags: ["toddler", "child", "tween"] as const,
+          interestTags: ["zoos"] as const,
+          indoor: false,
+        },
+        {
+          name: "Perot Museum",
+          lat: 32.78,
+          lng: -96.8,
+          adultPrice: 25,
+          openingHours: { open: "10:00", close: "17:00" },
+          intensity: "medium" as const,
+          ageTags: ["child", "tween", "teen"] as const,
+          interestTags: ["museums", "interactive"] as const,
+          indoor: true,
+        },
+        {
+          name: "Klyde Warren Park",
+          lat: 32.79,
+          lng: -96.8,
+          adultPrice: 0,
+          openingHours: { open: "08:00", close: "20:00" },
+          intensity: "low" as const,
+          ageTags: ["toddler", "child", "tween", "teen"] as const,
+          interestTags: ["parks"] as const,
+          indoor: false,
+        },
+      ],
+    };
+    const plan = sdPlan({
+      destination: "Dallas, TX",
+      interests: ["Playgrounds & Indoor Play", "Zoos & Aquariums", "Museums & Art", "Parks & Gardens"],
+    });
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city: tinyCity }), plan, tinyCity);
+    const committed = commitStopsToBlueprint(themed, plan, tinyCity);
+    const fullAnchors = committed.days
+      .filter((d) => d.role === "full")
+      .map((d) => d.anchor!.landmarkName);
+    expect(fullAnchors.filter((n) => n === "Kids Empire Dallas Hillcrest").length).toBeLessThanOrEqual(
+      1,
+    );
+    expect(new Set(fullAnchors).size).toBe(fullAnchors.length);
+  });
+
   it("keeps departure within low-friction stay distance even when near POIs are ledger-used", () => {
     const plan = sdPlan();
     const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);

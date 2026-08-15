@@ -82,6 +82,7 @@ function repairAnchorForDay(
   city: CityConfig,
   ledgerNames: Set<string>,
   badNames: Set<string>,
+  priorFullDayAnchors: Set<string>,
 ): DayBlueprint {
   if (day.anchor) ledgerNames.delete(day.anchor.landmarkName);
   for (const s of day.support) ledgerNames.delete(s.landmarkName);
@@ -93,6 +94,7 @@ function repairAnchorForDay(
     visitWindow: anchorVisitWindow(plan, day),
     ledgerNames,
     softExcludeNames: softExclude,
+    priorFullDayAnchors,
   });
   ledgerNames.add(anchor.name);
 
@@ -177,7 +179,12 @@ export function repairBlueprint(
     );
 
     if (needsAnchor) {
-      day = repairAnchorForDay(day, plan, city, ledgerNames, badNames);
+      const priorFullDayAnchors = new Set(
+        days
+          .filter((d) => d.dayIndex !== dayIndex && d.role === "full" && d.anchor)
+          .map((d) => d.anchor!.landmarkName),
+      );
+      day = repairAnchorForDay(day, plan, city, ledgerNames, badNames, priorFullDayAnchors);
     }
 
     if (needsMeals) {

@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import BackToTopButton from "@/components/BackToTopButton";
 import { useFeedbackVisibility } from "@/components/FeedbackVisibility";
+import { shouldAllowFeedbackLauncher } from "@/lib/feedback-visibility";
 import ItineraryDisplay from "@/components/ItineraryDisplay";
 import LoadingScreen from "@/components/LoadingScreen";
 import { TripNestlyLogo } from "@/components/TripNestlyLogo";
@@ -13,7 +14,12 @@ import { Itinerary } from "@/types/itinerary";
 import { GenerateItineraryOptions } from "@/types/generate";
 import { initialTripPlan, TripPlan } from "@/types/trip-plan";
 import { getDatesValidationError } from "@/lib/planning-engine/date-validation";
-import { isValidNapSelection, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
+import {
+  findFirstIncompleteWizardStep,
+  isWizardStepComplete,
+  WIZARD_STEP_TITLES,
+  type WizardStepTitle,
+} from "@/lib/plan-wizard/step-gate";
 import { resolveStayFromText } from "@/lib/planning-engine/resolve-stay";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import StepTransition from "./StepTransition";
@@ -37,60 +43,24 @@ import {
 const TOTAL_STEPS = 10;
 
 const steps = [
-  {
-    title: "Destination",
-    component: DestinationStep,
-    validate: (plan: TripPlan) => plan.destination.trim() !== "",
-  },
-  {
-    title: "Dates",
-    component: DatesStep,
-    validate: (plan: TripPlan) => getDatesValidationError(plan) === null,
-  },
-  {
-    title: "Travelers",
-    component: TravelersStep,
-    validate: (plan: TripPlan) =>
-      plan.adults >= 1 && plan.children.every((age) => age >= 0 && age <= 17),
-  },
-  {
-    title: "Stay",
-    component: FoodPreferencesStep,
-    validate: (plan: TripPlan) =>
-      plan.accommodationType !== "" &&
-      (isStayNotBookedYet(plan) || (plan.stayAddress ?? "").trim().length >= 2),
-  },
-  {
-    title: "Getting Around",
-    component: TransportationStep,
-    validate: (plan: TripPlan) => plan.transportationType !== "",
-  },
-  {
-    title: "Travel Style",
-    component: TravelStyleStep,
-    validate: (plan: TripPlan) => plan.travelStyle !== "",
-  },
-  {
-    title: "Naps & Food",
-    component: NapScheduleStep,
-    validate: () => true,
-  },
-  {
-    title: "Budget",
-    component: BudgetStyleStep,
-    validate: (plan: TripPlan) => plan.budgetStyle !== "",
-  },
-  {
-    title: "Interests",
-    component: ActivityInterestsStep,
-    validate: (plan: TripPlan) => plan.interests.length > 0,
-  },
-  {
-    title: "Summary",
-    component: SummaryStep,
-    validate: () => true,
-  },
+  { title: "Destination" as const, component: DestinationStep },
+  { title: "Dates" as const, component: DatesStep },
+  { title: "Travelers" as const, component: TravelersStep },
+  { title: "Stay" as const, component: FoodPreferencesStep },
+  { title: "Getting Around" as const, component: TransportationStep },
+  { title: "Travel Style" as const, component: TravelStyleStep },
+  { title: "Naps & Food" as const, component: NapScheduleStep },
+  { title: "Budget" as const, component: BudgetStyleStep },
+  { title: "Interests" as const, component: ActivityInterestsStep },
+  { title: "Summary" as const, component: SummaryStep },
 ] as const;
+
+// Compile-time guard: wizard UI order must match the gate used for skip prevention.
+WIZARD_STEP_TITLES.forEach((title, i) => {
+  if (steps[i]?.title !== title) {
+    throw new Error(`Wizard step order mismatch at ${i}: expected ${title}`);
+  }
+});
 
 type GenerateParams = GenerateItineraryOptions & {
   planOverride?: Partial<TripPlan>;
@@ -113,6 +83,9 @@ export default function TripPlanWizard() {
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [isDemo, setIsDemo] = useState(false);
   const [useDemoNext, setUseDemoNext] = useState(false);
+  const [isAdvancing, setIsAdvancing] = useState(false);
+  /** Blocks double Continue / Enter while Stay geocode (or any advance) is in flight. */
+  const advancingRef = useRef(false);
 
   const currentStep = steps[stepIndex];
   const StepComponent = currentStep.component;
@@ -120,12 +93,21 @@ export default function TripPlanWizard() {
   const isLastStep = stepIndex === TOTAL_STEPS - 1;
   const progress = ((stepIndex + 1) / TOTAL_STEPS) * 100;
 
-  // Feedback launcher: hide on destination (step 1); show from dates onward + result views.
+  // Feedback launcher: only on the itinerary/planner view — never during wizard steps (FAM-79).
   useEffect(() => {
-    const show = stepIndex >= 1 || Boolean(itinerary) || Boolean(shareId);
-    setFeedbackAllowed(show);
+    setFeedbackAllowed(shouldAllowFeedbackLauncher(Boolean(itinerary)));
     return () => setFeedbackAllowed(false);
-  }, [stepIndex, itinerary, shareId, setFeedbackAllowed]);
+  }, [itinerary, setFeedbackAllowed]);
+
+  // Never land on Summary (or past a required step) with gaps — send the user back.
+  useEffect(() => {
+    if (itinerary || isLoading) return;
+    const incomplete = findFirstIncompleteWizardStep(formData);
+    if (incomplete === null || incomplete >= stepIndex) return;
+    setStepDirection("back");
+    setStepIndex(incomplete);
+    setError("Almost there — just fill in what's missing and we'll keep going.");
+  }, [formData, stepIndex, itinerary, isLoading]);
 
   useEffect(() => {
     if (!shareId) return;
@@ -164,17 +146,18 @@ export default function TripPlanWizard() {
   }
 
   function goBack() {
-    if (!isFirstStep) {
-      setStepDirection("back");
-      setStepIndex((index) => index - 1);
-      setError("");
-    }
+    if (isFirstStep || advancingRef.current) return;
+    setStepDirection("back");
+    setStepIndex((index) => index - 1);
+    setError("");
   }
 
-  function getStepError(plan: TripPlan): string | null {
-    const step = steps[stepIndex];
-    if (step.title === "Dates") return getDatesValidationError(plan);
-    if (step.title === "Stay") {
+  function getStepError(plan: TripPlan, title: WizardStepTitle = steps[stepIndex].title): string | null {
+    if (title === "Destination" && !isWizardStepComplete(plan, title)) {
+      return "Pick a city from the suggestions so we can plan in the right place.";
+    }
+    if (title === "Dates") return getDatesValidationError(plan);
+    if (title === "Stay") {
       if (plan.accommodationType === "") {
         return "Choose how you’re staying so we can plan meals and groceries.";
       }
@@ -182,37 +165,44 @@ export default function TripPlanWizard() {
         return "Type your hotel name or stay address, or choose “I don’t know yet”.";
       }
     }
-    if (
-      step.title === "Naps & Food" &&
-      shouldShowNapSection(plan) &&
-      !isValidNapSelection(plan.naps, plan)
-    ) {
+    if (title === "Naps & Food" && !isWizardStepComplete(plan, title)) {
       return "Add a nap window, or choose “No naps needed.”";
     }
-    if (!step.validate(plan)) return "Almost there — just fill in what's missing and we'll keep going.";
+    if (!isWizardStepComplete(plan, title)) {
+      return "Almost there — just fill in what's missing and we'll keep going.";
+    }
     return null;
   }
 
   async function goNext() {
-    const stepError = getStepError(formData);
+    if (advancingRef.current || isLastStep) return;
+
+    const fromIndex = stepIndex;
+    const stepError = getStepError(formData, steps[fromIndex].title);
     if (stepError) {
       setError(stepError);
       return;
     }
 
-    if (steps[stepIndex].title === "Stay") {
-      setError("");
-      const resolved = await resolveStayFromText(formData);
-      if (resolved) {
-        setFormData({ ...formData, ...resolved });
+    advancingRef.current = true;
+    setIsAdvancing(true);
+    try {
+      if (steps[fromIndex].title === "Stay") {
+        setError("");
+        const resolved = await resolveStayFromText(formData);
+        if (resolved) {
+          setFormData((current) => ({ ...current, ...resolved }));
+        }
       }
-    }
 
-    if (!isLastStep) {
+      // Absolute next index — never stack +1 from concurrent Continue clicks.
       setStepDirection("forward");
-      setStepIndex((index) => index + 1);
+      setStepIndex(fromIndex + 1);
       setError("");
       window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      advancingRef.current = false;
+      setIsAdvancing(false);
     }
   }
 
@@ -288,9 +278,14 @@ export default function TripPlanWizard() {
   }
 
   function handleGenerate(demo = false) {
-    const stepError = getStepError(formData);
-    if (stepError) {
-      setError(stepError);
+    const incomplete = findFirstIncompleteWizardStep(formData);
+    if (incomplete !== null) {
+      setStepDirection("back");
+      setStepIndex(incomplete);
+      setError(
+        getStepError(formData, steps[incomplete].title) ??
+          "Almost there — just fill in what's missing and we'll keep going.",
+      );
       return;
     }
     setUseDemoNext(demo);
@@ -329,7 +324,7 @@ export default function TripPlanWizard() {
   }
 
   function handleStepKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "Enter" || isLoading) return;
+    if (e.key !== "Enter" || isLoading || isAdvancing) return;
     const target = e.target as HTMLElement;
     // Let textareas take literal newlines, and let a focused button handle its own Enter activation.
     if (target.tagName === "TEXTAREA" || target.tagName === "BUTTON") return;
@@ -337,7 +332,7 @@ export default function TripPlanWizard() {
     if (isLastStep) {
       handleGenerate(false);
     } else {
-      goNext();
+      void goNext();
     }
   }
 
@@ -454,7 +449,7 @@ export default function TripPlanWizard() {
               <button
                 type="button"
                 onClick={goBack}
-                disabled={isLoading}
+                disabled={isLoading || isAdvancing}
                 className={`order-2 sm:order-1 sm:flex-1 ${btnSecondaryClassName}`}
               >
                 Back
@@ -466,7 +461,7 @@ export default function TripPlanWizard() {
                 <button
                   type="button"
                   onClick={() => handleGenerate(false)}
-                  disabled={isLoading}
+                  disabled={isLoading || isAdvancing}
                   className={`w-full ${btnCtaClassName}`}
                 >
                   Generate itinerary
@@ -474,7 +469,7 @@ export default function TripPlanWizard() {
                 <button
                   type="button"
                   onClick={() => handleGenerate(true)}
-                  disabled={isLoading}
+                  disabled={isLoading || isAdvancing}
                   className={`w-full ${btnGhostClassName}`}
                 >
                   Try demo (free, no API key)
@@ -483,10 +478,11 @@ export default function TripPlanWizard() {
             ) : (
               <button
                 type="button"
-                onClick={goNext}
+                onClick={() => void goNext()}
+                disabled={isAdvancing}
                 className={`order-1 w-full sm:flex-1 ${btnPrimaryClassName}`}
               >
-                Sounds good →
+                {isAdvancing ? "One moment…" : "Sounds good →"}
               </button>
             )}
           </div>

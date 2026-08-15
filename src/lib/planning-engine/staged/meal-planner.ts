@@ -136,7 +136,8 @@ function planSlotMeal(
     // Kitchen + save packs from the rental; other kitchen budgets eat lunch out upstream.
     return { slot, mode: "picnic", nearLandmarkName: near?.name };
   }
-  return { slot, mode: "bakery_casual", nearLandmarkName: near?.name };
+  // No curated restaurants for this city — stay-area dinner (never NYC default fakes).
+  return { slot, mode: "picnic", nearLandmarkName: near?.name };
 }
 
 /** Plan meal intents for one day; mutates usedRestaurants for trip uniqueness. */

@@ -33,9 +33,12 @@ export default function StayAddressField({
   const [fetchError, setFetchError] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const requestSeq = useRef(0);
+  /** When set, query matches a committed pick — don't re-fetch or reopen the list. */
+  const pickedLabelRef = useRef<string | null>(null);
 
   useEffect(() => {
     setQuery(value);
+    if (!value.trim()) pickedLabelRef.current = null;
   }, [value]);
 
   useEffect(() => {
@@ -53,6 +56,14 @@ export default function StayAddressField({
       setSuggestions([]);
       setFetchError(false);
       setLoading(false);
+      return;
+    }
+
+    if (pickedLabelRef.current === query) {
+      setSuggestions([]);
+      setFetchError(false);
+      setLoading(false);
+      setOpen(false);
       return;
     }
 
@@ -102,14 +113,17 @@ export default function StayAddressField({
   }, [query, destination, disabled]);
 
   async function selectSuggestion(s: Suggestion) {
+    pickedLabelRef.current = s.label;
+    requestSeq.current += 1;
     setQuery(s.label);
     onChange(s.label);
     setOpen(false);
     setSuggestions([]);
+    setLoading(false);
+    setFetchError(false);
 
     if (!onSelect) return;
 
-    // Resolve coords via Place Details when we have a Google place id.
     try {
       const res = await fetch(
         `/api/places/details?placeId=${encodeURIComponent(s.placeId)}`,
@@ -130,6 +144,7 @@ export default function StayAddressField({
         lng?: number;
       };
       const address = data.address?.trim() || s.label;
+      pickedLabelRef.current = address;
       setQuery(address);
       onSelect({
         address,
@@ -147,7 +162,8 @@ export default function StayAddressField({
     }
   }
 
-  const showPanel = !disabled && open && query.length >= 2 && !loading;
+  const showPanel =
+    !disabled && open && query.length >= 2 && !loading && pickedLabelRef.current !== query;
 
   return (
     <div ref={wrapperRef} className={`relative ${disabled ? "opacity-50" : ""}`}>
@@ -157,17 +173,21 @@ export default function StayAddressField({
         value={query}
         disabled={disabled}
         onChange={(e) => {
+          pickedLabelRef.current = null;
           const next = e.target.value;
           setQuery(next);
           onChange(next);
           setOpen(true);
         }}
-        onFocus={() => !disabled && query.length >= 2 && setOpen(true)}
+        onFocus={() => {
+          if (disabled || pickedLabelRef.current === query) return;
+          if (query.length >= 2) setOpen(true);
+        }}
         placeholder="Hotel name or street address"
         className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3.5 text-ink shadow-sm outline-none transition placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary-muted disabled:cursor-not-allowed disabled:bg-background"
         autoComplete="off"
         aria-autocomplete="list"
-        aria-expanded={showPanel}
+        aria-expanded={showPanel && suggestions.length > 0}
       />
       {loading && !disabled && (
         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">

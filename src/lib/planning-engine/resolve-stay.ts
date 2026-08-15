@@ -1,4 +1,4 @@
-import { detectCity } from "@/lib/city-detect";
+import { detectCityFromPlan } from "@/lib/city-detect";
 import { geocodeStay } from "@/lib/places-geocode";
 import { hasStayHome, isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { TripPlan } from "@/types/trip-plan";
@@ -11,7 +11,7 @@ export type ResolvedStay = {
 };
 
 function cityCenterStay(plan: TripPlan): ResolvedStay {
-  const city = detectCity(plan.destination);
+  const city = detectCityFromPlan(plan);
   return {
     stayAddress: `${city.name} city center`,
     stayPlaceId: "",
@@ -31,7 +31,7 @@ export async function resolveStayOntoPlan(plan: TripPlan): Promise<TripPlan> {
   if (!typed) return plan;
   if (hasStayHome(plan)) return plan;
 
-  const city = detectCity(plan.destination);
+  const city = detectCityFromPlan(plan);
   const resolved = await geocodeStay({
     query: typed,
     city: city.name,
@@ -69,7 +69,7 @@ export async function resolveStayFromText(plan: TripPlan): Promise<ResolvedStay 
     };
   }
 
-  const city = detectCity(plan.destination);
+  const city = detectCityFromPlan(plan);
   const params = new URLSearchParams({
     q: typed,
     city: city.name,
