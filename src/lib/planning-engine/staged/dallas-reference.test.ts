@@ -16,7 +16,9 @@ import type { TripPlan } from "@/types/trip-plan";
 
 /**
  * Ground-truth profile from a real Dallas family trip (2 weeks, sister's house,
- * kids 3 & 6, nap 12:30–2 at home, taxis, balanced budget, mostly cook-at-home).
+ * kids 3 & 6, nap 12:30–2 at home, taxis, mostly cook-at-home).
+ * Pace for that trip maps to travelStyle "relaxed" (one meaningful outing / day);
+ * the default fixture below stays "balanced" for other interest/POI checks.
  *
  * Activities that worked: Heights Family Aquatic Center, indoor water park,
  * Perot Museum, Bubble Planet, Grapevine Mills, We Rock the Spectrum,
@@ -61,17 +63,32 @@ function landmark(partial: Partial<Landmark> & Pick<Landmark, "name" | "interest
 }
 
 describe("Dallas family reference — pace", () => {
-  it("uses one activity per day for balanced + nap + young kids", () => {
-    const plan = dallasReferencePlan();
+  it("uses one activity per day for relaxed + young kids (Dallas-style outing)", () => {
+    const plan = dallasReferencePlan({ travelStyle: "relaxed" });
     expect(prefersSingleActivityDays(plan)).toBe(true);
     expect(getIntensityConfig(plan).maxActivities).toBe(1);
     expect(emptyPlanningRules(plan).capacity.maxActivitiesPerDay).toBe(1);
     expect(emptyPlanningRules(plan).capacity.maxSupportStops).toBe(0);
   });
 
-  it("still allows packed days to schedule more than one stop", () => {
-    const plan = dallasReferencePlan({ travelStyle: "packed" });
-    expect(getIntensityConfig(plan).maxActivities).toBeGreaterThan(1);
+  it("gives balanced + young kids two activity slots (not collapsed by nap)", () => {
+    const plan = dallasReferencePlan({ travelStyle: "balanced" });
+    expect(prefersSingleActivityDays(plan)).toBe(false);
+    expect(getIntensityConfig(plan).maxActivities).toBe(2);
+    expect(emptyPlanningRules(plan).capacity.maxActivitiesPerDay).toBe(2);
+    expect(emptyPlanningRules(plan).capacity.maxSupportStops).toBe(1);
+    // Nap softens load budget vs no-nap, but does not drop to a single slot.
+    const withNap = getIntensityConfig(plan).maxLoadUnits;
+    const noNap = getIntensityConfig(dallasReferencePlan({ naps: [] })).maxLoadUnits;
+    expect(withNap).toBeLessThan(noNap);
+  });
+
+  it("still allows packed days to schedule more than balanced", () => {
+    const balanced = dallasReferencePlan({ travelStyle: "balanced" });
+    const packed = dallasReferencePlan({ travelStyle: "packed" });
+    expect(getIntensityConfig(packed).maxActivities).toBeGreaterThan(
+      getIntensityConfig(balanced).maxActivities,
+    );
   });
 });
 

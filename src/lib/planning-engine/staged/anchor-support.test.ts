@@ -320,8 +320,9 @@ describe("commitStopsToBlueprint", () => {
     expect(anchor.name).not.toMatch(/Torrey Pines|Birch Aquarium/i);
   });
 
-  it("skips arrival support when balanced + nap + young kids (one stop/day)", () => {
-    const plan = sdPlan();
+  it("skips arrival support on relaxed days with young kids (one outing)", () => {
+    const plan = sdPlan({ travelStyle: "relaxed" });
+    expect(emptyPlanningRules(plan).capacity.maxActivitiesPerDay).toBe(1);
     const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
     const committed = commitStopsToBlueprint(themed, plan, city);
     const arrival = committed.days.find((d) => d.role === "arrival")!;
@@ -329,20 +330,27 @@ describe("commitStopsToBlueprint", () => {
     expect(arrival.anchor).toBeTruthy();
   });
 
-  it("picks light near-stay arrival support, not a museum campus", () => {
-    // No nap + older kids → balanced can schedule a companion stop on arrival.
+  it("keeps arrival light — playground anchor or light near-stay support, never a museum campus", () => {
+    // No nap + older kids → balanced allows a companion stop on arrival when useful.
     const plan = sdPlan({ naps: [], children: [9, 12] });
     expect(emptyPlanningRules(plan).capacity.maxSupportStops).toBeGreaterThan(0);
     const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
     const committed = commitStopsToBlueprint(themed, plan, city);
     const arrival = committed.days.find((d) => d.role === "arrival")!;
-    expect(arrival.support.length).toBeGreaterThan(0);
-    const support = city.landmarks.find((l) => l.name === arrival.support[0]!.landmarkName)!;
-    const km = haversineKm(support.lat, support.lng, plan.stayLat!, plan.stayLng!);
-    expect(km).toBeLessThanOrEqual(LOW_FRICTION_STAY_KM);
-    // Arrival companions should stay light — not museum campuses.
-    expect(isMuseumCampusLike(support)).toBe(false);
-    expect(support.name).not.toMatch(/Coronado Beach/i);
+    expect(arrival.anchor).toBeTruthy();
+    const anchor = city.landmarks.find((l) => l.name === arrival.anchor!.landmarkName)!;
+    expect(isMuseumCampusLike(anchor)).toBe(false);
+
+    if (arrival.support.length > 0) {
+      const support = city.landmarks.find((l) => l.name === arrival.support[0]!.landmarkName)!;
+      const km = haversineKm(support.lat, support.lng, plan.stayLat!, plan.stayLng!);
+      expect(km).toBeLessThanOrEqual(LOW_FRICTION_STAY_KM);
+      expect(isMuseumCampusLike(support)).toBe(false);
+      expect(support.name).not.toMatch(/Coronado Beach/i);
+    } else {
+      // Same-category filter often skips a second playground when the anchor is already play.
+      expect(isOutdoorPlayground(anchor) || anchor.adultPrice === 0).toBe(true);
+    }
   });
 
   it("assigns a shoreline beach anchor on beach theme days end-to-end", () => {

@@ -40,6 +40,7 @@ export function emptyPlanningRules(plan: TripPlan): PlanningRules {
       includeMiddayRest: pace !== "packed",
       activityDurationMin: intensity.activityDurationMin,
       restDurationMin: intensity.restDurationMin,
+      maxLoadUnits: intensity.maxLoadUnits,
     },
     napWindows: plan.naps ?? [],
   };

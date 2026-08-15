@@ -9,6 +9,7 @@ import {
   travelFrictionScore,
 } from "@/lib/maps/travel-estimate";
 import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
+import { fitsInDailyLoadBudget } from "@/lib/schedule/activity-load";
 import { isLandmarkOpenForVisit, type VisitWindow } from "@/lib/schedule/landmark-hours";
 import {
   dayAlreadyHasHeavyLandmark,
@@ -284,6 +285,23 @@ export function selectSupportForDay(
     if (picked.some((p) => !pairingAllowedForDay(p, row.lm))) continue;
     if (dayAlreadyHasHeavyLandmark([anchor, ...picked]) && isHeavyDayLandmark(row.lm)) continue;
     if (!fitsBudgetStyle(row.lm, plan.budgetStyle)) continue;
+    // FAM-77: long/high-intensity stops consume more capacity than raw counts.
+    // Arrival light playground companions stay exempt — they are deliberately near-stay fillers.
+    const skipLoadGate = day.role === "arrival" && isLightArrivalSupport(row.lm);
+    if (!skipLoadGate) {
+      const hopMin = estimateDurationMin(
+        picked.length > 0 ? picked[picked.length - 1]! : anchor,
+        row.lm,
+        plan,
+      );
+      if (
+        !fitsInDailyLoadBudget([anchor, ...picked], row.lm, plan, {
+          travelMinBefore: hopMin,
+        })
+      ) {
+        continue;
+      }
+    }
     picked.push(row.lm);
     exclude.add(row.lm.name);
   }

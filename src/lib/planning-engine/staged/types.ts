@@ -81,6 +81,8 @@ export type PlanningRules = {
     includeMiddayRest: boolean;
     activityDurationMin: number;
     restDurationMin: number;
+    /** Soft load budget (FAM-77) — gates additional stops by duration×intensity. */
+    maxLoadUnits: number;
   };
 
   napWindows: NapEntry[];
