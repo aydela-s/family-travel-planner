@@ -247,6 +247,7 @@ describe("FAM-7 — enrich title ↔ location match", () => {
     expect(extractLandmarkFromTitle("Picnic or sandwich lunch near Belmont Park")).toBe(
       "Belmont Park",
     );
+    expect(extractLandmarkFromTitle("Break at Belmont Park")).toBe("Belmont Park");
   });
 
   it("findLandmarkByName resolves extracted titles to catalog entries", () => {

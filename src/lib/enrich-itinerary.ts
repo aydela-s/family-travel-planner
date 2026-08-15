@@ -152,12 +152,16 @@ async function enrichDay(
     if (a.type === "activity") {
       // Grocery / strolls / breaks display as activities but are not paid attractions.
       if (isGroceryActivity(act) || isUnpaidTimelineActivity(act)) {
-        const nearMatch = act.title.match(/\bnear (.+)$/i);
-        const named = nearMatch?.[1] ? findLandmarkByName(city.landmarks, nearMatch[1]) : undefined;
+        // Prefer the landmark named in the title ("Break at Belmont Park") — do not
+        // inherit the previous paid stop's pin (Kate Sessions → Belmont bug).
+        const fromTitle = extractLandmarkFromTitle(act.title);
+        const named =
+          (fromTitle ? findLandmarkByName(city.landmarks, fromTitle) : undefined) ??
+          city.landmarks.find((l) => act.title.includes(l.name));
         const anchor =
           named ?? pickedLandmarks[pickedLandmarks.length - 1] ?? city.landmarks[0]!;
         act.location = {
-          name: named?.name ?? (nearMatch?.[1] ? nearMatch[1].trim() : anchor.name),
+          name: named?.name ?? (fromTitle?.trim() || `${anchor.name} area`),
           lat: named?.lat ?? anchor.lat,
           lng: named?.lng ?? anchor.lng,
         };

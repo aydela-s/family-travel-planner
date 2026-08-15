@@ -152,6 +152,12 @@ export function extractLandmarkFromTitle(title: string): string | null {
   const near = title.match(/\bnear\s+(.+)$/i);
   if (near) return near[1].trim();
 
+  // Soft stops: "Break at Belmont Park", "Quiet time at your hotel" (hotel is stay — ok to extract)
+  const atPlace = title.match(
+    /\b(?:break|stroll|quiet time|pack up(?:\s*&\s*unwind)?|calm family time)\s+at\s+(.+)$/i,
+  );
+  if (atPlace) return atPlace[1].trim();
+
   // Fallback: strip a leading "Something: " prefix from adjust actions.
   const colon = title.match(/^[^:]+:\s*(.+)$/);
   if (colon && colon[1].length > 3) return colon[1].trim();
