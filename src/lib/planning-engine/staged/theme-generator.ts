@@ -472,7 +472,7 @@ export function applyDailyThemes(
     .filter((i) => i.remaining > 0)
     .sort((a, b) => b.remaining - a.remaining);
 
-  let adjusted = [...days];
+  const adjusted = [...days];
 
   const dayCoversTag = (d: DayBlueprint, tag: LandmarkInterestTag): boolean => {
     if (d.role !== "full" && d.role !== "recovery") return false;

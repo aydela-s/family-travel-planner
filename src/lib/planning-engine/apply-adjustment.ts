@@ -139,7 +139,7 @@ function applyOutdoor(
 }
 
 function applyCookDinner(activities: RawActivity[]): AdjustApplyResult {
-  let result = cloneActivities(activities).filter((a) => !isGroceryActivity(a));
+  const result = cloneActivities(activities).filter((a) => !isGroceryActivity(a));
   const dIdx = dinnerIndex(result);
   if (dIdx < 0) {
     return { applied: false, message: "No dinner slot found", activities };
