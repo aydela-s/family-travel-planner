@@ -33,7 +33,7 @@ describe("accommodationPlanningTips — FAM-6", () => {
       1,
     );
     expect(tips.join(" ")).not.toMatch(/Airbnb/i);
-    expect(tips.join(" ")).toMatch(/cook breakfast at your stay/i);
+    expect(tips.join(" ")).toMatch(/grocery run early in the trip/i);
   });
 
   it("does not suggest cook-dinner nights on Treat Ourselves", () => {

@@ -49,6 +49,7 @@ function processRawActivities(
   plan: TripPlan,
   adjustment?: AdjustmentContext,
   landmarkCtx?: DayLandmarkContext,
+  day: number = 1,
 ): RawActivity[] {
   let fixed = activities.filter((a) => a.type !== "nap");
 
@@ -69,7 +70,7 @@ function processRawActivities(
     fixed = applyNapTiming(fixed, plan);
   }
 
-  fixed = resolveGroceryMealConflicts(fixed, plan);
+  fixed = resolveGroceryMealConflicts(fixed, plan, day);
 
   const travelGaps = landmarkCtx ? estimateTravelGapsForDay(fixed, landmarkCtx, plan) : [];
   let scheduled = rescheduleActivitiesWithMealAnchors(fixed, plan, travelGaps);
@@ -90,12 +91,13 @@ export function fixRawDayActivities(
   plan: TripPlan,
   adjustment?: AdjustmentContext,
   landmarkCtx?: DayLandmarkContext,
+  day: number = 1,
 ): RawActivity[] {
-  let result = processRawActivities(activities, plan, adjustment, landmarkCtx);
+  let result = processRawActivities(activities, plan, adjustment, landmarkCtx, day);
   const issues = validateRawDay(result, plan);
 
   if (issues.length > 0) {
-    result = processRawActivities(result, plan, adjustment, landmarkCtx);
+    result = processRawActivities(result, plan, adjustment, landmarkCtx, day);
   }
 
   return result;
@@ -116,6 +118,8 @@ export function fixRawItinerary(
         day.day === adjustDay && adjustNote
           ? getAdjustmentContext(adjustNote, day.day)
           : undefined,
+        undefined,
+        day.day,
       ),
     })),
   };

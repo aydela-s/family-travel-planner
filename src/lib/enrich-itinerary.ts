@@ -246,7 +246,7 @@ async function enrichDay(
   });
 
   const home = stayHomeLocation(plan);
-  const withGroceryStop = maybeAddAccommodationGroceryStop(activities, plan, city, home);
+  const withGroceryStop = maybeAddAccommodationGroceryStop(activities, plan, city, home, rawDay.day);
   const located = applyGroceryLocations(withGroceryStop, city, home).map((act) => {
     // Cook-at-home / naps must stay at the rental — never inherit supermarket pins.
     if (home && activityUsesStayHome(act)) {

@@ -104,7 +104,7 @@ function buildDayActivities(
     adjustNote,
     usedRestaurants,
   );
-  return fixRawDayActivities(activities, plan, adjustment, ctx);
+  return fixRawDayActivities(activities, plan, adjustment, ctx, day);
 }
 
 function applySurgicalAdjust(
@@ -252,7 +252,7 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
       const { activities, ctx } = buildScheduleFromBlueprint(dayBp, p, city);
       return {
         day: dayBp.dayIndex,
-        activities: fixRawDayActivities(activities, p, adjustment, ctx),
+        activities: fixRawDayActivities(activities, p, adjustment, ctx, dayBp.dayIndex),
       };
     });
     return { raw: { days }, blueprint: repaired };

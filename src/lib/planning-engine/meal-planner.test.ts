@@ -68,13 +68,13 @@ describe("breakfastLabel — FAM-26", () => {
 });
 
 describe("shouldCookDinnerAtHome — splurge vs kitchen", () => {
-  it("still alternates cook nights for balanced kitchen stays", () => {
+  it("cooks at home every night for balanced kitchen stays (FAM-74)", () => {
     const kitchen = plan({
       accommodationType: "airbnb_with_kitchen",
       budgetStyle: "balanced",
     });
     expect(shouldCookDinnerAtHome(kitchen, 1)).toBe(true);
-    expect(shouldCookDinnerAtHome(kitchen, 2)).toBe(false);
+    expect(shouldCookDinnerAtHome(kitchen, 2)).toBe(true);
   });
 
   it("never cooks at home on Treat Ourselves, even with a kitchen", () => {

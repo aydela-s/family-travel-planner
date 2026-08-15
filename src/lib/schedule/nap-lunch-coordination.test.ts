@@ -39,6 +39,46 @@ describe("nap + lunch coordination", () => {
     expect(meal.notes.toLowerCase()).toMatch(/nap/);
   });
 
+  it("schedules takeout/delivery lunch 1 hour before nap", () => {
+    const trip = plan({
+      children: [4],
+      naps: [{ startTime: "12:00 PM", endTime: "1:00 PM", type: "regular" }],
+    });
+    const scheduled = rescheduleActivitiesWithMealAnchors(
+      [
+        {
+          time: "09:00",
+          title: "Explore Balboa Park",
+          type: "activity" as const,
+          slotKind: "morning_activity" as const,
+        },
+        {
+          time: "12:00",
+          title: "Takeout or delivery lunch at your stay",
+          type: "meal" as const,
+          slotKind: "lunch" as const,
+        },
+        {
+          time: "12:00",
+          title: "Nap & Quiet Time",
+          type: "nap" as const,
+        },
+        {
+          time: "18:00",
+          title: "Dinner at Cucina Urbana",
+          type: "meal" as const,
+          slotKind: "dinner" as const,
+        },
+      ],
+      trip,
+      [20, 0, 20],
+    );
+
+    const lunch = scheduled.find((a) => /takeout or delivery lunch/i.test(a.title))!;
+    const nap = scheduled.find((a) => a.type === "nap")!;
+    expect(parseTimeToMinutes(lunch.time)).toBe(parseTimeToMinutes(nap.time) - 60);
+  });
+
   it("keeps nap end inside the typed window and rewrites the downtime note", () => {
     const trip = plan({
       children: [4],

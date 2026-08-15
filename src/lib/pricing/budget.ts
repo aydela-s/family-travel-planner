@@ -1,8 +1,13 @@
+import {
+  shouldAddTripStartGrocery,
+  shouldPlaceGroceryBeforeRegularNap,
+  TRIP_START_GROCERY_TITLE,
+  tripStartGroceryNotes,
+} from "@/lib/planning-engine/meal-planner";
 import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
 import { CityConfig } from "@/config/city-pricing";
 import { accommodationPlanningTips, estimateAccommodationFoodCosts } from "@/lib/pricing/accommodation";
 import { budgetStyleNote } from "@/lib/pricing/budget-style";
-import { hasCookDinnerAtHome } from "@/lib/schedule/meal-planning";
 import { BudgetStyle, TripPlan } from "@/types/trip-plan";
 import { ActivityLocation, ItineraryActivity } from "@/types/itinerary";
 
@@ -74,35 +79,32 @@ function sumActivityCosts(activities: ItineraryActivity[]): number {
   return activities.reduce((s, a) => s + (a.activityCost ?? 0), 0);
 }
 
-/** Insert a grocery stop before a cook-at-home dinner for kitchen accommodations. */
+/** Insert the one trip-start grocery run for kitchen accommodations (FAM-75). */
 export function maybeAddAccommodationGroceryStop(
   activities: ItineraryActivity[],
   plan: TripPlan,
   city: CityConfig,
   home?: ActivityLocation | null,
+  day: number = 1,
 ): ItineraryActivity[] {
-  if (plan.accommodationType !== "airbnb_with_kitchen") return activities;
+  if (!shouldAddTripStartGrocery(plan, day)) return activities;
   if (activities.some((a) => a.title.toLowerCase().includes("grocery"))) return activities;
 
-  const rawLike = activities.map(({ time, title, type, notes }) => ({ time, title, type, notes }));
-  if (!hasCookDinnerAtHome(rawLike)) return activities;
-
-  const returnIdx = activities.findIndex((a) =>
-    /\breturn to|back to (your )?(rental|accommodation|stay)\b/i.test(a.title),
-  );
+  const napIdx = shouldPlaceGroceryBeforeRegularNap(plan, day)
+    ? activities.findIndex((a) => a.type === "nap")
+    : -1;
   const dinnerIdx = activities.findIndex(
-    (a) => a.type === "meal" && /cook dinner|dinner at your rental/i.test(a.title),
+    (a) => a.type === "meal" && /cook dinner|dinner at your rental|\bdinner\b/i.test(a.title),
   );
   const insertAt =
-    returnIdx >= 0 ? returnIdx : dinnerIdx >= 0 ? dinnerIdx : Math.max(activities.length - 1, 0);
-
+    napIdx >= 0 ? napIdx : dinnerIdx >= 0 ? dinnerIdx : Math.max(activities.length - 1, 0);
   const anchorTime = activities[Math.max(0, insertAt - 1)]?.time ?? "17:00";
   const grocery: ItineraryActivity = {
     time: anchorTime,
-    title: "Grocery stop for dinner ingredients",
+    title: TRIP_START_GROCERY_TITLE,
     type: "activity",
     timeOfDay: "afternoon",
-    notes: "Pick up ingredients before heading back to cook dinner.",
+    notes: tripStartGroceryNotes(plan, day),
     activityCost: 0,
     location: groceryLocationNearRoute(activities, insertAt, city, home),
   };

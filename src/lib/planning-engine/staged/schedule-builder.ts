@@ -8,7 +8,11 @@ import {
   placementFromDayBlueprint,
 } from "@/lib/planning-engine/staged/fill-stops";
 import type { DayBlueprint, MealIntent, MealSlotKind } from "@/lib/planning-engine/staged/types";
-import { slotActivityType } from "@/lib/planning-engine/meal-planner";
+import {
+  slotActivityType,
+  TRIP_START_GROCERY_TITLE,
+  tripStartGroceryNotes,
+} from "@/lib/planning-engine/meal-planner";
 import { buildDaySkeleton } from "@/lib/planning-engine/skeleton-builder";
 import type {
   DayIntent,
@@ -123,9 +127,9 @@ function fillActivitySlot(
     case "grocery":
       return tagged({
         time: slot.defaultTime,
-        title: "Grocery stop for dinner ingredients",
+        title: TRIP_START_GROCERY_TITLE,
         type,
-        notes: "Pick up ingredients on the way back.",
+        notes: tripStartGroceryNotes(plan, day.dayIndex),
       });
     case "evening_rest": {
       const allYoungKids =

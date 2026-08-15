@@ -1,3 +1,10 @@
+import {
+  isKitchenSelfCatering,
+  shouldAddTripStartGrocery,
+  shouldPlaceGroceryBeforeRegularNap,
+  TRIP_START_GROCERY_TITLE,
+  tripStartGroceryNotes,
+} from "@/lib/planning-engine/meal-planner";
 import { LandmarkInterestTag, LandmarkIntensity } from "@/config/city-pricing";
 import { isOptionalActivity } from "@/lib/planning-engine/day-intent";
 import {
@@ -37,12 +44,16 @@ type RawActivity = {
   interestTags?: LandmarkInterestTag[];
 };
 
+/** Takeout/delivery lunch at the stay starts this many minutes before a regular nap. */
+export const TAKEOUT_BEFORE_NAP_MIN = 60;
+
 const GROCERY = /\bgrocery\b/i;
 const RESTAURANT =
   /\b(restaurant|sit-down|dinner in|lunch in|lunch at|dinner at|breakfast at|café|cafe)\b/i;
 const COOK_DINNER = /\bcook dinner|dinner at your rental|cook at your|cook at accommodation\b/i;
 const PICNIC = /\bpicnic\b/i;
 const RETURN_HOME = /\breturn to|back to (your )?(rental|accommodation|stay|hotel|home)\b/i;
+const TAKEOUT_AT_STAY = /\btakeout or delivery lunch at your stay\b/i;
 
 /** Minimum lunch length when a nap follows later the same morning. */
 export const MIN_LUNCH_DURATION_MIN = 40;
@@ -110,6 +121,21 @@ export function isGroceryActivity(a: RawActivity): boolean {
   // Title only — cook-at-home notes say "Grocery-based dinner" and must not match.
   if (COOK_DINNER.test(a.title)) return false;
   return GROCERY.test(a.title);
+}
+
+/** Daytime stock-up run near trip start — not an evening pre-dinner stop (FAM-75). */
+export function isTripStartGroceryActivity(
+  a: Pick<RawActivity, "title" | "notes">,
+): boolean {
+  if (!isGroceryActivity(a as RawActivity)) return false;
+  return (
+    a.title.includes(TRIP_START_GROCERY_TITLE) ||
+    /\bstock your rental|main grocery run\b/i.test(`${a.title} ${a.notes ?? ""}`)
+  );
+}
+
+function isEveningGroceryActivity(a: RawActivity): boolean {
+  return isGroceryActivity(a) && !isTripStartGroceryActivity(a);
 }
 
 function isLengthenablePackedActivity(a: RawActivity): boolean {
@@ -214,6 +240,11 @@ export function isLunchMeal(a: RawActivity): boolean {
   return hour >= 11 * 60 && hour < 16 * 60;
 }
 
+/** Stay-home takeout/delivery lunch that should precede a regular nap by 1 hour. */
+export function isTakeoutAtStayLunch(a: Pick<RawActivity, "title" | "type">): boolean {
+  return a.type === "meal" && TAKEOUT_AT_STAY.test(a.title);
+}
+
 /** Lunch slot in the day skeleton — not breakfast or dinner. */
 export function isDaytimeMeal(a: RawActivity): boolean {
   if (a.type !== "meal" || isDinnerMeal(a)) return false;
@@ -225,33 +256,65 @@ export function hasCookDinnerAtHome(activities: RawActivity[]): boolean {
   return activities.some((a) => a.type === "meal" && COOK_DINNER.test(`${a.title} ${a.notes ?? ""}`));
 }
 
-export function resolveGroceryMealConflicts(activities: RawActivity[], plan: TripPlan): RawActivity[] {
+/** Insert grocery on the way home: before regular nap if present, otherwise before dinner. */
+function insertIndexBeforeGoingHome(activities: RawActivity[], plan: TripPlan, day: number): number {
+  // Regular (stay-home) naps only — stroller naps keep grocery before dinner.
+  if (shouldPlaceGroceryBeforeRegularNap(plan, day)) {
+    const napIdx = activities.findIndex((a) => a.type === "nap");
+    if (napIdx >= 0) return napIdx;
+  }
+  const dinnerIdx = activities.findIndex(isDinnerMeal);
+  if (dinnerIdx >= 0) return dinnerIdx;
+  return Math.max(activities.length - 1, 0);
+}
+
+export function resolveGroceryMealConflicts(
+  activities: RawActivity[],
+  plan: TripPlan,
+  day: number = 1,
+): RawActivity[] {
   let result = [...activities];
   const cookingDinner = hasCookDinnerAtHome(result);
 
   if (cookingDinner) {
-    result = result.filter((a, i) => {
+    result = result.filter((a) => {
       if (!isGroceryActivity(a)) return true;
-      const hour = parseTimeToMinutes(a.time);
-      return hour >= 15 * 60;
+      if (isTripStartGroceryActivity(a)) return true;
+      return parseTimeToMinutes(a.time) >= 15 * 60;
     });
 
-    if (!result.some(isGroceryActivity)) {
-      const dinnerIdx = result.findIndex((a) => isDinnerMeal(a));
-      const returnIdx = result.findIndex(
-        (a, i) =>
-          i < (dinnerIdx >= 0 ? dinnerIdx : result.length) &&
-          (RETURN_HOME.test(a.title) || a.title.toLowerCase().includes("return")),
+    // Day-1 kitchen + nap-overlap: never leave takeout/delivery lunch before grocery.
+    if (shouldAddTripStartGrocery(plan, day)) {
+      result = result.filter(
+        (a) =>
+          !(
+            a.type === "meal" && TAKEOUT_AT_STAY.test(a.title)
+          ),
       );
-      const insertAt =
-        returnIdx >= 0 ? returnIdx : dinnerIdx >= 0 ? dinnerIdx : result.length - 1;
+    }
 
+    if (
+      shouldAddTripStartGrocery(plan, day) &&
+      !result.some(isTripStartGroceryActivity)
+    ) {
+      const insertAt = insertIndexBeforeGoingHome(result, plan, day);
       result.splice(insertAt, 0, {
         time: "17:00",
-        title: "Grocery stop for dinner ingredients",
+        title: TRIP_START_GROCERY_TITLE,
         type: "activity",
-        notes: "Pick up ingredients before heading back to cook dinner.",
+        notes: tripStartGroceryNotes(plan, day),
         slotKind: "grocery",
+      });
+    }
+
+    // Keep a single trip-start grocery immediately before regular nap or dinner.
+    const groceryIdx = result.findIndex(isTripStartGroceryActivity);
+    if (groceryIdx >= 0) {
+      const [grocery] = result.splice(groceryIdx, 1);
+      const insertAt = insertIndexBeforeGoingHome(result, plan, day);
+      result.splice(insertAt, 0, {
+        ...grocery!,
+        notes: tripStartGroceryNotes(plan, day),
       });
     }
   } else {
@@ -270,8 +333,8 @@ export function resolveGroceryMealConflicts(activities: RawActivity[], plan: Tri
     }
   }
 
-  if (plan.accommodationType === "airbnb_with_kitchen" && !cookingDinner) {
-    result = result.filter((a) => !isGroceryActivity(a) || parseTimeToMinutes(a.time) < 14 * 60);
+  if (isKitchenSelfCatering(plan) && !cookingDinner) {
+    result = result.filter((a) => !isEveningGroceryActivity(a));
   }
 
   return result;
@@ -519,6 +582,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
   );
 
   const dinnerItems = ordered.filter(isDinnerMeal);
+  // Trip-start grocery is also home-bound: place before nap or before dinner.
   const groceryItems = ordered.filter(isGroceryActivity);
   const daySequence = ordered.filter((a) => !isDinnerMeal(a) && !isGroceryActivity(a));
 
@@ -535,13 +599,16 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
   const dinnerDuration = defaultDurationMin("meal", plan);
   const latestDinnerStart = dinnerMax - dinnerDuration;
   const hasGrocery = groceryItems.length > 0;
-  // Reserve travel (and grocery) after the last daytime stop — used while placing
-  // required items (theme parks fill until dinner) and when placing optionals.
-  const reservedAfterLast = hasGrocery
-    ? GROCERY_DURATION_MIN +
-      defaultTravelMin(plan) +
-      Math.max(defaultTravelMin(plan), GROCERY_TO_DINNER_BUFFER_MIN)
-    : defaultTravelMin(plan);
+  const napRequiredIdx = napWindow ? required.findIndex((a) => a.type === "nap") : -1;
+  // Grocery before regular stay-home nap only — stroller naps do not create nap blocks,
+  // so grocery stays before dinner for stroller-only plans.
+  const groceryBeforeNap = hasGrocery && napRequiredIdx >= 0 && shouldIncludeNaps(plan);
+  const reservedAfterLast =
+    hasGrocery && !groceryBeforeNap
+      ? GROCERY_DURATION_MIN +
+        defaultTravelMin(plan) +
+        Math.max(defaultTravelMin(plan), GROCERY_TO_DINNER_BUFFER_MIN)
+      : defaultTravelMin(plan);
   const latestItemEnd = latestDinnerStart - reservedAfterLast;
 
   const result: (T & { endTime: string })[] = [];
@@ -549,9 +616,9 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
   let travelIdx = 0;
   let needsRecoveryRest = false;
   let regularNapSeen = 0;
+  let groceryPlaced = false;
 
   const nextTravel = () => travelAfterEach[travelIdx++] ?? defaultTravelMin(plan);
-  const napRequiredIdx = napWindow ? required.findIndex((a) => a.type === "nap") : -1;
   const lunchBeforeNap =
     napRequiredIdx > 0 && required.slice(0, napRequiredIdx).some((a) => isDaytimeMeal(a));
   const resolvedNapStart =
@@ -564,18 +631,36 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
         })
       : null;
 
+  const placeHomeboundGrocery = (travelIn: number) => {
+    if (groceryPlaced || groceryItems.length === 0) return travelIn;
+    const travel = travelIn;
+    const groceryStart = cursor + travel;
+    result.push({
+      ...groceryItems[0]!,
+      time: minutesToTime(groceryStart),
+      endTime: minutesToTime(groceryStart + GROCERY_DURATION_MIN),
+    });
+    cursor = groceryStart + GROCERY_DURATION_MIN;
+    groceryPlaced = true;
+    // After grocery, next stop is usually stay (nap/dinner) — small buffer, not another long hop.
+    return Math.min(defaultTravelMin(plan), GROCERY_TO_DINNER_BUFFER_MIN);
+  };
+
   for (let i = 0; i < required.length; i++) {
     const item = required[i];
-    const travelRaw = result.length > 0 ? nextTravel() : 0;
-    // Stay-home lunch → stay-home nap: no transit gap (was slipping 12:00 naps to 12:10).
-    const travel =
+    let travel = result.length > 0 ? nextTravel() : 0;
+    // Grocery on the way home before nap, then a short hop into the stay.
+    if (item.type === "nap" && groceryBeforeNap && !groceryPlaced) {
+      travel = placeHomeboundGrocery(travel);
+    } else if (
       item.type === "nap" &&
       result.length > 0 &&
-      /takeout or delivery lunch at your stay|cook dinner at your rental/i.test(
-        result[result.length - 1]!.title,
-      )
-        ? 0
-        : travelRaw;
+      (TAKEOUT_AT_STAY.test(result[result.length - 1]!.title) ||
+        /cook dinner at your rental/i.test(result[result.length - 1]!.title))
+    ) {
+      // Stay-home lunch → stay-home nap: no transit gap (was slipping 12:00 naps to 12:10).
+      travel = 0;
+    }
     const lunchIdx = required.findIndex((a, j) => j > i && isDaytimeMeal(a));
     let start: number;
     const thisNapWindow =
@@ -596,9 +681,12 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       const { maxMin: lunchMax, minMin } = lunchTimeWindow(plan);
       const lunchTravel = transferIntoLunch(result[result.length - 1], travel);
       const natural = cursor + lunchTravel;
-      // When nap follows, start lunch early enough for a full 40-minute meal —
-      // allow a bit of early flex before the age window when needed.
-      if (napRequiredIdx > i && resolvedNapStart != null) {
+      // Takeout/delivery at the stay: start exactly 1 hour before the nap.
+      if (isTakeoutAtStayLunch(item) && napRequiredIdx > i && resolvedNapStart != null) {
+        start = resolvedNapStart - TAKEOUT_BEFORE_NAP_MIN;
+      } else if (napRequiredIdx > i && resolvedNapStart != null) {
+        // When nap follows, start lunch early enough for a full 40-minute meal —
+        // allow a bit of early flex before the age window when needed.
         const gap = defaultTravelMin(plan);
         const floor = lunchFloorBeforeNap(plan);
         const latestLunchStart = resolvedNapStart - gap - MIN_LUNCH_DURATION_MIN;
@@ -662,12 +750,21 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       const gap = defaultTravelMin(plan);
       let mustEndBy = resolvedNapStart - gap;
       if (lunchIdx > i && lunchIdx < napRequiredIdx && !isDaytimeMeal(item)) {
-        const lunchFloor = lunchFloorBeforeNap(plan);
-        const { maxMin: lunchMax } = lunchTimeWindow(plan);
-        const latestLunchStart = resolvedNapStart - gap - MIN_LUNCH_DURATION_MIN;
-        const lunchStartCap = Math.max(lunchFloor, Math.min(lunchMax, latestLunchStart));
-        const lunchTransfer = transferIntoLunch(item, gap);
-        mustEndBy = Math.min(mustEndBy, lunchStartCap - lunchTransfer);
+        const lunchItem = required[lunchIdx]!;
+        if (isTakeoutAtStayLunch(lunchItem)) {
+          // Takeout starts 1 hour before nap at the stay — no travel gap into lunch.
+          mustEndBy = Math.min(
+            mustEndBy,
+            resolvedNapStart - TAKEOUT_BEFORE_NAP_MIN - transferIntoLunch(item, gap),
+          );
+        } else {
+          const lunchFloor = lunchFloorBeforeNap(plan);
+          const { maxMin: lunchMax } = lunchTimeWindow(plan);
+          const latestLunchStart = resolvedNapStart - gap - MIN_LUNCH_DURATION_MIN;
+          const lunchStartCap = Math.max(lunchFloor, Math.min(lunchMax, latestLunchStart));
+          const lunchTransfer = transferIntoLunch(item, gap);
+          mustEndBy = Math.min(mustEndBy, lunchStartCap - lunchTransfer);
+        }
       }
       if (isDaytimeMeal(item)) {
         const lunchFloor = lunchFloorBeforeNap(plan);
@@ -759,7 +856,8 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
 
     // If lunch still sits before a nap, re-clamp duration after any start push/trim.
     if (isDaytimeMeal(item) && napRequiredIdx > i && resolvedNapStart != null) {
-      const gap = defaultTravelMin(plan);
+      // Takeout at stay → nap: no transit; lunch may run until nap start.
+      const gap = isTakeoutAtStayLunch(item) ? 0 : defaultTravelMin(plan);
       const mustEndBy = resolvedNapStart - gap;
       if (start + duration > mustEndBy) {
         duration = Math.max(20, mustEndBy - start);
@@ -881,7 +979,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
 
   let endCursor = cursor + eveningTravel;
 
-  if (hasGrocery) {
+  if (hasGrocery && !groceryPlaced) {
     const travel = defaultTravelMin(plan);
     const groceryDinnerGap = Math.max(travel, GROCERY_TO_DINNER_BUFFER_MIN);
     let groceryStart = endCursor + travel;
@@ -895,6 +993,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       time: minutesToTime(groceryStart),
       endTime: minutesToTime(groceryStart + GROCERY_DURATION_MIN),
     });
+    groceryPlaced = true;
     // Use snapped grocery end so the dinner buffer survives time rounding.
     const groceryEnd = parseTimeToMinutes(result[result.length - 1].endTime);
     endCursor = groceryEnd + groceryDinnerGap;

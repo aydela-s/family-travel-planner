@@ -98,7 +98,7 @@ describe("schedule invariant matrix", () => {
     expect(validateDaySchedule(scheduled, plan)).toEqual([]);
   });
 
-  it("schedules cook-night grocery before dinner without overlap", () => {
+  it("schedules trip-start grocery before dinner without overlap", () => {
     const plan = basePlan({
       children: [5, 10],
       accommodationType: "airbnb_with_kitchen",

@@ -1,6 +1,8 @@
 import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import {
   requiresBreakfastSlot,
+  shouldAddTripStartGrocery,
+  shouldFoldLunchIntoDay1Grocery,
   shouldCookDinnerAtHome,
 } from "@/lib/planning-engine/meal-planner";
 import { dinnerDefaultTime, lunchDefaultTime } from "@/lib/planning-engine/meal-timing";
@@ -46,7 +48,10 @@ export function buildDaySkeleton(
   }
 
   slots.push(intent("morning_activity", morningActivityDefaultTime(plan)));
-  slots.push(intent("lunch", lunchDefaultTime(plan)));
+  // Day-1 kitchen + nap-overlap: lunch rides with grocery / nap delivery — no early takeout stop.
+  if (!shouldFoldLunchIntoDay1Grocery(plan, day)) {
+    slots.push(intent("lunch", lunchDefaultTime(plan)));
+  }
 
   // Packed days stay dense — skip the idle midday recharge between lunch and afternoon.
   if (!includeNapForDay(plan, adjustment) && intensity.style !== "packed") {
@@ -83,12 +88,12 @@ export function buildDaySkeleton(
     slots.push(intent("evening_rest", "16:45"));
   }
 
-  if (shouldCookDinnerAtHome(plan, day, adjustment)) {
+  // Day-1 grocery on the way home — before dinner (scheduler pulls it before nap when present).
+  if (shouldAddTripStartGrocery(plan, day)) {
     slots.push(intent("grocery", "17:00"));
-    slots.push(intent("dinner", dinnerDefaultTime(plan)));
-  } else {
-    slots.push(intent("dinner", dinnerDefaultTime(plan)));
   }
+
+  slots.push(intent("dinner", dinnerDefaultTime(plan)));
 
   return slots;
 }

@@ -10,6 +10,7 @@ import {
   requiresBreakfastSlot,
   shouldAutoScheduleRestaurantDinner,
   shouldCookDinnerAtHome,
+  shouldFoldLunchIntoDay1Grocery,
   usesNamedRestaurant,
 } from "@/lib/planning-engine/meal-planner";
 import {
@@ -45,7 +46,9 @@ function shouldPreferOnSiteCafe(plan: TripPlan, meal: MealSlotKind): boolean {
   if (parseDietaryTags(plan.dietaryRestrictions).length > 0) return false;
   if (usesNamedRestaurant(plan, meal)) return false;
   if (meal === "dinner" && plan.budgetStyle === "save") return false;
-  if (meal === "lunch" && plan.accommodationType === "airbnb_with_kitchen") return false;
+  if (meal === "lunch" && plan.accommodationType === "airbnb_with_kitchen" && plan.budgetStyle === "save") {
+    return false;
+  }
   return true;
 }
 
@@ -68,6 +71,10 @@ function planSlotMeal(
 
   if (slot === "dinner" && plan.accommodationType === "staying_with_family_or_friends") {
     return { slot, mode: "cook_at_home", nearLandmarkName: near?.name };
+  }
+
+  if (slot === "lunch" && shouldFoldLunchIntoDay1Grocery(plan, day.dayIndex)) {
+    return null;
   }
 
   if (slot === "lunch" && napOverlapsLunchWindow(plan)) {
@@ -126,6 +133,7 @@ function planSlotMeal(
     return { slot, mode: "bakery_casual", nearLandmarkName: near?.name };
   }
   if (slot === "lunch") {
+    // Kitchen + save packs from the rental; other kitchen budgets eat lunch out upstream.
     return { slot, mode: "picnic", nearLandmarkName: near?.name };
   }
   return { slot, mode: "bakery_casual", nearLandmarkName: near?.name };

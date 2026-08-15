@@ -10,6 +10,46 @@ import {
 } from "@/lib/planning-engine/restaurant-picker";
 import { getNapWindow, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 
+/** Rental with a kitchen — breakfasts and dinners at stay, lunch out (FAM-74). */
+export function isKitchenSelfCatering(plan: Pick<TripPlan, "accommodationType">): boolean {
+  return plan.accommodationType === "airbnb_with_kitchen";
+}
+
+/** One main grocery run near the start of a self-catering trip (FAM-75). */
+export function shouldAddTripStartGrocery(
+  plan: Pick<TripPlan, "accommodationType" | "budgetStyle">,
+  day: number,
+): boolean {
+  if (!isKitchenSelfCatering(plan)) return false;
+  if (plan.budgetStyle === "splurge") return false;
+  return day === 1;
+}
+
+export const TRIP_START_GROCERY_TITLE = "Grocery shop to stock your rental";
+export const TRIP_START_GROCERY_NOTES =
+  "Main grocery run on the way home — stock breakfasts and dinners for the stay.";
+export const TRIP_START_GROCERY_WITH_LUNCH_NOTES =
+  "Stock the rental on the way home — grab lunch here, or order delivery.";
+
+/**
+ * Day-1 kitchen + regular nap overlapping lunch: do not schedule takeout before
+ * grocery. Lunch is covered by the grocery run or delivery during nap (FAM-75).
+ */
+export function shouldFoldLunchIntoDay1Grocery(plan: TripPlan, day: number): boolean {
+  return shouldAddTripStartGrocery(plan, day) && napOverlapsLunchWindow(plan);
+}
+
+/** Place day-1 grocery before a stay-home regular nap — never before a stroller-only window. */
+export function shouldPlaceGroceryBeforeRegularNap(plan: TripPlan, day: number): boolean {
+  return shouldAddTripStartGrocery(plan, day) && shouldIncludeNaps(plan);
+}
+
+export function tripStartGroceryNotes(plan: TripPlan, day: number): string {
+  return shouldFoldLunchIntoDay1Grocery(plan, day)
+    ? TRIP_START_GROCERY_WITH_LUNCH_NOTES
+    : TRIP_START_GROCERY_NOTES;
+}
+
 /** P0 #5–6: breakfast slot only when accommodation does not cover it */
 export function requiresBreakfastSlot(plan: TripPlan): boolean {
   switch (plan.accommodationType) {
@@ -24,18 +64,18 @@ export function requiresBreakfastSlot(plan: TripPlan): boolean {
   }
 }
 
-/** Alternate cook-at-home and eat-out nights for rentals with a kitchen */
+/** Cook dinner at the rental every night for kitchen stays (FAM-74). */
 export function shouldCookDinnerAtHome(
   plan: TripPlan,
-  day: number,
+  _day: number,
   adjustment?: AdjustmentContext,
 ): boolean {
-  if (plan.accommodationType !== "airbnb_with_kitchen") return false;
+  if (!isKitchenSelfCatering(plan)) return false;
   // Treat Ourselves: restaurant dinners every night — no cook / grocery nights.
   if (plan.budgetStyle === "splurge") return false;
   if (adjustment?.forceEatOut) return false;
   if (adjustment?.forceCookDinner) return true;
-  return day % 2 === 1;
+  return true;
 }
 
 /** P0 #8: do not auto-schedule restaurant dinner when staying with hosts */
@@ -89,6 +129,10 @@ export function usesNamedRestaurant(
   plan: TripPlan,
   meal: "breakfast" | "lunch" | "dinner",
 ): boolean {
+  // Kitchen + Balanced/Splurge: lunch out. Save keeps picnic from the rental (FAM-74).
+  if (isKitchenSelfCatering(plan) && meal === "lunch" && plan.budgetStyle !== "save") {
+    return true;
+  }
   if (plan.budgetStyle === "splurge") return true;
   if (plan.budgetStyle === "save") return meal === "dinner";
   const noDiet = parseDietaryTags(plan.dietaryRestrictions).length === 0;
@@ -213,13 +257,6 @@ export function lunchLabel(
     };
   }
 
-  if (plan.accommodationType === "airbnb_with_kitchen") {
-    return {
-      title: `Picnic lunch near ${spot}`,
-      notes: "Pack lunch from your rental or pick up groceries on the way.",
-    };
-  }
-
   if (restaurant && usesNamedRestaurant(plan, "lunch")) {
     const hostExtra =
       plan.accommodationType === "staying_with_family_or_friends"
@@ -228,6 +265,23 @@ export function lunchLabel(
     return {
       title: `Lunch at ${restaurant.name}`,
       notes: namedMealNotes(plan, "lunch", restaurant, hostExtra),
+    };
+  }
+
+  if (isKitchenSelfCatering(plan)) {
+    // Save: pack/picnic from the rental. Balanced/splurge: lunch is the meal out.
+    if (plan.budgetStyle === "save") {
+      return {
+        title: `Picnic lunch near ${spot}`,
+        notes: "Pack lunch from your rental — save restaurant spend for special treats.",
+      };
+    }
+    if (plan.budgetStyle === "splurge") {
+      return restaurantMealLabel("splurge", spot, "lunch");
+    }
+    return {
+      title: `Lunch in the ${spot} area`,
+      notes: "Eat out near your activities — breakfast and dinner stay at your rental.",
     };
   }
 
@@ -271,7 +325,7 @@ export function dinnerLabel(
   if (shouldCookDinnerAtHome(plan, day, adjustment)) {
     return {
       title: "Cook dinner at your rental",
-      notes: "Home-cooked dinner from ingredients picked up earlier.",
+      notes: "Home-cooked dinner using groceries from your trip-start shop.",
     };
   }
   if (plan.accommodationType === "staying_with_family_or_friends") {
@@ -282,24 +336,16 @@ export function dinnerLabel(
   }
 
   if (restaurant && usesNamedRestaurant(plan, "dinner")) {
-    const kitchenNightOff =
-      plan.accommodationType === "airbnb_with_kitchen"
-        ? "Night off from cooking — enjoy a local restaurant as a family."
-        : plan.budgetStyle === "balanced"
-          ? "Share plates if you like — one sit-down meal for the day."
-          : undefined;
+    const extra =
+      plan.budgetStyle === "balanced"
+        ? "Share plates if you like — one sit-down meal for the day."
+        : undefined;
     return {
       title: `Dinner at ${restaurant.name}`,
-      notes: namedMealNotes(plan, "dinner", restaurant, kitchenNightOff),
+      notes: namedMealNotes(plan, "dinner", restaurant, extra),
     };
   }
 
-  if (plan.accommodationType === "airbnb_with_kitchen") {
-    return {
-      title: `Dinner out near ${spot}`,
-      notes: "Night off from cooking — enjoy a local restaurant as a family.",
-    };
-  }
   return restaurantMealLabel(plan.budgetStyle, spot, "dinner");
 }
 

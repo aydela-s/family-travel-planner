@@ -148,15 +148,8 @@ function applyCookDinner(activities: RawActivity[]): AdjustApplyResult {
     ...result[dIdx],
     title: "Cook dinner at your rental",
     type: "meal",
-    notes: "Grocery-based dinner at your accommodation.",
+    notes: "Home-cooked dinner using groceries from your trip-start shop.",
   };
-  const grocery: RawActivity = {
-    time: "17:00",
-    title: "Grocery stop for dinner ingredients",
-    type: "activity",
-    notes: "Pick up ingredients on your way back to cook dinner.",
-  };
-  result = [...result.slice(0, dIdx), grocery, ...result.slice(dIdx)];
   return { applied: true, activities: result };
 }
 

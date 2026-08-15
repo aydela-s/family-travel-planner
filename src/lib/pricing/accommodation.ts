@@ -48,9 +48,9 @@ const PROFILES: Record<AccommodationType, AccommodationFoodProfile> = {
     preferCooking: true,
     preferRestaurants: false,
     planningTips: [
-      "Stock up at a grocery store and cook breakfast at your stay.",
-      "Pack a picnic lunch — easy with a kitchen for prep and storage.",
-      "Cook dinner at your stay some nights to balance restaurant spend.",
+      "Do one grocery run early in the trip on the way home — then nap or cook at your stay.",
+      "On a save budget, pack picnic lunches from the rental; eat out for lunch on balanced trips.",
+      "Cook dinner at your stay to balance restaurant spend on lunches.",
     ],
   },
   airbnb_no_kitchen: {

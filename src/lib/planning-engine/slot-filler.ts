@@ -24,6 +24,8 @@ import {
   napOverlapsLunchWindow,
   onSiteCafeLabel,
   slotActivityType,
+  TRIP_START_GROCERY_TITLE,
+  tripStartGroceryNotes,
   usesNamedRestaurant,
 } from "@/lib/planning-engine/meal-planner";
 import {
@@ -60,7 +62,10 @@ function shouldPreferOnSiteCafe(plan: TripPlan, meal: OnSiteMeal): boolean {
   if (parseDietaryTags(plan.dietaryRestrictions).length > 0) return false;
   if (usesNamedRestaurant(plan, meal)) return false;
   if (meal === "dinner" && plan.budgetStyle === "save") return false;
-  if (meal === "lunch" && plan.accommodationType === "airbnb_with_kitchen") return false;
+  // Kitchen + save packs lunch from the rental — skip on-site café.
+  if (meal === "lunch" && plan.accommodationType === "airbnb_with_kitchen" && plan.budgetStyle === "save") {
+    return false;
+  }
   return true;
 }
 
@@ -295,9 +300,9 @@ function fillSlot(
     case "grocery":
       return tagged({
         time: slot.defaultTime,
-        title: "Grocery stop for dinner ingredients",
+        title: TRIP_START_GROCERY_TITLE,
         type,
-        notes: "Pick up ingredients on the way back.",
+        notes: tripStartGroceryNotes(plan, day),
       });
     case "evening_rest": {
       // All-young-kid trips: stay-based downtime — don't invent another walking landmark.
