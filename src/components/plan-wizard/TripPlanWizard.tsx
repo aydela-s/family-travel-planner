@@ -15,8 +15,11 @@ import { GenerateItineraryOptions } from "@/types/generate";
 import { initialTripPlan, TripPlan, type StepProps } from "@/types/trip-plan";
 import { getDatesValidationError } from "@/lib/planning-engine/date-validation";
 import {
+  findAdjacentWizardStep,
   findFirstIncompleteWizardStep,
   isWizardStepComplete,
+  visibleWizardStepCount,
+  visibleWizardStepPosition,
   WIZARD_STEP_IDS,
   WIZARD_STEP_TITLES,
   type WizardStepTitle,
@@ -48,13 +51,14 @@ const ItineraryDisplay = dynamic(() => import("@/components/ItineraryDisplay"), 
 
 type StepLoader = () => Promise<{ default: ComponentType<StepProps> }>;
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 11;
 
 /** Explicit loaders — Destination is eager; others load on demand into a cache. */
 const STEP_LOADERS: Array<StepLoader | null> = [
   null,
   () => import("./steps/DatesStep"),
   () => import("./steps/TravelersStep"),
+  () => import("./steps/PlanningInvolvementStep"),
   () => import("./steps/FoodPreferencesStep"),
   () => import("./steps/TransportationStep"),
   () => import("./steps/TravelStyleStep"),
@@ -66,6 +70,7 @@ const STEP_LOADERS: Array<StepLoader | null> = [
 
 const stepComponentCache: Array<ComponentType<StepProps> | null> = [
   DestinationStep,
+  null,
   null,
   null,
   null,
@@ -110,7 +115,8 @@ function prefetchWizardAhead(fromIndex: number) {
   void ensureStepComponent(fromIndex + 1);
   void ensureStepComponent(fromIndex + 2);
 
-  if (fromIndex >= 2 && fromIndex <= 3) {
+  // Stay is index 4 after Planning Style was inserted.
+  if (fromIndex >= 3 && fromIndex <= 4) {
     void import("@/lib/planning-engine/resolve-stay");
   }
   if (fromIndex >= TOTAL_STEPS - 2) {
@@ -152,6 +158,8 @@ export default function TripPlanWizard() {
     useState<ComponentType<StepProps>>(() => DestinationStep);
 
   const currentTitle = WIZARD_STEP_TITLES[stepIndex]!;
+  const visibleTotal = visibleWizardStepCount(formData);
+  const visiblePosition = visibleWizardStepPosition(formData, stepIndex);
   const isFirstStep = stepIndex === 0;
   const isLastStep = stepIndex === TOTAL_STEPS - 1;
   const continueBusy = isAdvancing || isStepBusy;
@@ -281,7 +289,8 @@ export default function TripPlanWizard() {
     advancingRef.current = true;
     setIsAdvancing(true);
     try {
-      await goToStep(stepIndex - 1, "back");
+      const prev = findAdjacentWizardStep(stepIndex, "back", formData);
+      await goToStep(prev, "back");
       setError("");
     } finally {
       advancingRef.current = false;
@@ -337,8 +346,9 @@ export default function TripPlanWizard() {
       }
 
       markPlannerStarted();
-      // Load next step first, then swap — avoids a blank dynamic() flash.
-      await goToStep(fromIndex + 1, "forward");
+      // Load next applicable step first, then swap — avoids a blank dynamic() flash.
+      const next = findAdjacentWizardStep(fromIndex, "forward", formData);
+      await goToStep(next, "forward");
       setError("");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
@@ -552,8 +562,8 @@ export default function TripPlanWizard() {
   return (
     <>
       <WizardShell
-        stepIndex={stepIndex}
-        totalSteps={TOTAL_STEPS}
+        stepIndex={visiblePosition - 1}
+        totalSteps={visibleTotal}
         stepTitle={currentTitle}
         footer={
           <>

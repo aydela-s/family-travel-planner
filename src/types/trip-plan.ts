@@ -2,6 +2,9 @@ export type TravelStyle = "relaxed" | "balanced" | "packed";
 
 export type BudgetStyle = "save" | "balanced" | "splurge";
 
+/** How much detail the user wants in the plan wizard (FAM-73). */
+export type PlanningInvolvementMode = "minimal" | "detailed";
+
 export type WalkingLimit = "low" | "medium" | "high";
 
 export type TransportationType =
@@ -60,6 +63,13 @@ export type TripPlan = {
   naps: NapEntry[] | null;
   budgetStyle: BudgetStyle | "";
   interests: string[];
+  /**
+   * Wizard involvement (FAM-73).
+   * - `""` — not chosen yet
+   * - `minimal` — skip preference steps; sensible defaults applied
+   * - `detailed` — full wizard
+   */
+  planningInvolvementMode: PlanningInvolvementMode | "";
 };
 
 export const initialTripPlan: TripPlan = {
@@ -84,6 +94,7 @@ export const initialTripPlan: TripPlan = {
   naps: [{ startTime: "12:00 PM", endTime: "2:00 PM", type: "regular" }],
   budgetStyle: "",
   interests: [],
+  planningInvolvementMode: "",
 };
 
 export type StepProps = {
