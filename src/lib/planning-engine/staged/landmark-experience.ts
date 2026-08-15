@@ -110,7 +110,7 @@ export function dayAlreadyHasHeavyLandmark(others: Landmark[]): boolean {
 
 export function exceedsBudgetStyleTicket(
   landmark: Landmark,
-  budgetStyle: BudgetStyle | undefined,
+  budgetStyle: BudgetStyle | "" | undefined,
 ): boolean {
   if (landmark.adultPrice <= 0) return false;
   const style = budgetStyle || "balanced";
@@ -121,7 +121,7 @@ export function exceedsBudgetStyleTicket(
 
 export function fitsBudgetStyle(
   landmark: Landmark,
-  budgetStyle: BudgetStyle | undefined,
+  budgetStyle: BudgetStyle | "" | undefined,
 ): boolean {
   return !exceedsBudgetStyleTicket(landmark, budgetStyle);
 }

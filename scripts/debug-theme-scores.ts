@@ -21,6 +21,7 @@ const plan: TripPlan = {
   stayLat: 32.7157,
   stayLng: -117.1611,
   naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
+  dietaryRestrictions: "",
   budgetStyle: "balanced",
   interests: [
     "Playgrounds & Indoor Play",
