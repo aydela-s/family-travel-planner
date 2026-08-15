@@ -51,6 +51,7 @@ function place(overrides: Partial<TopActivity> & Pick<TopActivity, "id" | "name"
     types: ["tourist_attraction"],
     primaryType: "tourist_attraction",
     websiteUri: null,
+    hoursByWeekday: null,
     ...overrides,
   };
 }

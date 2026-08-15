@@ -11,10 +11,15 @@ import {
   type FamilyPlaceKind,
 } from "@/lib/maps/family-friendly-places";
 import {
+  hoursByWeekdayFromRegularOpeningHours,
+  type PlacesRegularOpeningHours,
+} from "@/lib/maps/places-hours";
+import {
   isDestinationShoppingPlace,
   isShoppingSearchCategory,
   shoppingPlaceScoreBoost,
 } from "@/lib/maps/shopping-places";
+import type { HoursByWeekday } from "@/config/city-pricing";
 
 export type TopActivity = {
   id: string;
@@ -33,6 +38,11 @@ export type TopActivity = {
   primaryType: string | null;
   /** Official website when Places returns one — shopping quality gate. */
   websiteUri: string | null;
+  /**
+   * Weekday hours from Text Search `regularOpeningHours` (FAM-66).
+   * Null/undefined when Places omitted hours — fall back to tag defaults.
+   */
+  hoursByWeekday: HoursByWeekday | null;
 };
 
 /** Raw place shape from Places API (New) searchText (field-masked). */
@@ -48,6 +58,7 @@ export type PlacesSearchTextPlace = {
   types?: string[];
   primaryType?: string;
   websiteUri?: string;
+  regularOpeningHours?: PlacesRegularOpeningHours;
 };
 
 export const MIN_RATING = 4.3;
@@ -174,6 +185,7 @@ export function rankTopActivitiesFromPlaces(
         types,
         primaryType: p.primaryType ?? null,
         websiteUri,
+        hoursByWeekday: hoursByWeekdayFromRegularOpeningHours(p.regularOpeningHours) ?? null,
         score: base + shopBoost,
       };
     })
@@ -253,6 +265,8 @@ export async function getTopActivities(
         "places.types",
         "places.primaryType",
         "places.websiteUri",
+        // Same SKU band as rating/websiteUri — avoids per-POI Details fan-out (FAM-66).
+        "places.regularOpeningHours",
       ].join(","),
     },
     body: JSON.stringify(body),

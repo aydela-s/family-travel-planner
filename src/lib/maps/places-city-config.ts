@@ -29,6 +29,10 @@ import {
   getOrFetchTopActivities,
   type GetOrFetchOptions,
 } from "@/lib/maps/top-activities-cache";
+import {
+  mergeHoursByWeekdayPreferExisting,
+  typicalOpeningHoursFromWeekday,
+} from "@/lib/maps/places-hours";
 import { INTEREST_LABEL_TO_TAGS } from "@/lib/schedule/interest-map";
 import type { BudgetStyle, TripPlan } from "@/types/trip-plan";
 
@@ -400,12 +404,16 @@ export function landmarkFromTopActivity(
   }
   const raw = interestTags.length > 0 ? interestTags : (["parks"] as LandmarkInterestTag[]);
   const tags = refineInterestTagsForPlaceName(place.name, raw);
+  const hoursByWeekday = place.hoursByWeekday ?? undefined;
+  const placesTypical = typicalOpeningHoursFromWeekday(hoursByWeekday);
   return {
     name: place.name,
     lat: place.latitude,
     lng: place.longitude,
     adultPrice: adultPriceForPlace(place.name, tags, place.priceLevel),
-    openingHours: openingHoursForTags(tags),
+    // Prefer Places weekday-derived typical hours when Text Search returned a schedule.
+    openingHours: placesTypical ?? openingHoursForTags(tags),
+    ...(hoursByWeekday ? { hoursByWeekday } : {}),
     intensity: intensityForTags(tags),
     ageTags: ageTagsForPlaceName(place.name, tags, place.types ?? []),
     interestTags: tags,
@@ -435,12 +443,18 @@ export function landmarksFromPlacesResults(
       const merged = refineInterestTagsForPlaceName(existing.name, [
         ...new Set([...existing.interestTags, ...landmark.interestTags]),
       ]);
+      const hoursByWeekday = mergeHoursByWeekdayPreferExisting(
+        existing.hoursByWeekday,
+        landmark.hoursByWeekday,
+      );
+      const placesTypical = typicalOpeningHoursFromWeekday(hoursByWeekday);
       byName.set(key, {
         ...existing,
         interestTags: merged,
         intensity: intensityForTags(merged),
         indoor: indoorForTags(merged),
-        openingHours: openingHoursForTags(merged),
+        openingHours: placesTypical ?? openingHoursForTags(merged),
+        ...(hoursByWeekday ? { hoursByWeekday } : {}),
       });
     }
   }
@@ -518,6 +532,7 @@ export async function buildCityConfigFromPlaces(
 
   const landmarkRows = settled.filter((row) => row.category !== PLACES_RESTAURANT_CATEGORY);
   const restaurantRow = settled.find((row) => row.category === PLACES_RESTAURANT_CATEGORY);
+  // Hours come from Text Search `regularOpeningHours` on each TopActivity — no Details fan-out.
   const landmarks = landmarksFromPlacesResults(landmarkRows);
   const restaurants = restaurantsFromPlacesResults(restaurantRow?.places ?? []);
   const minLandmarks = options.minLandmarks ?? MIN_PLACES_LANDMARKS;

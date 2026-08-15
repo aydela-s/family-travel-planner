@@ -195,10 +195,50 @@ describe("getTopActivities", () => {
     expect((init as RequestInit).headers).toMatchObject({
       "X-Goog-Api-Key": "test-key",
     });
+    const fieldMask = String(
+      ((init as RequestInit).headers as Record<string, string>)["X-Goog-FieldMask"],
+    );
+    expect(fieldMask).toContain("places.regularOpeningHours");
     expect(JSON.parse(String((init as RequestInit).body))).toEqual({
       textQuery: "zoos in San Diego",
     });
     expect(places.map((p) => p.id)).toEqual(["zoo-a", "zoo-b"]);
+  });
+
+  it("maps Text Search regularOpeningHours without Place Details calls (FAM-66)", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        places: [
+          {
+            id: "museum-a",
+            displayName: { text: "City Museum" },
+            rating: 4.6,
+            userRatingCount: 2000,
+            types: ["museum"],
+            location: { latitude: 1, longitude: 2 },
+            regularOpeningHours: {
+              periods: [
+                {
+                  open: { day: 1, hour: 9, minute: 0 },
+                  close: { day: 1, hour: 17, minute: 0 },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    });
+
+    const places = await getTopActivities("Boise", "museums", {
+      env: { GOOGLE_PLACES_API_KEY: "test-key" },
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(String(fetchImpl.mock.calls[0]![0])).toContain("places:searchText");
+    expect(places[0]!.hoursByWeekday?.[1]).toEqual({ open: "09:00", close: "17:00" });
+    expect(places[0]!.hoursByWeekday?.[2]).toBeNull();
   });
 
   it("sends locationBias when a destination center is provided", async () => {
