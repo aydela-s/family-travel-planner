@@ -39,9 +39,9 @@ export type PlanChipKey =
 
 /** Wizard step index for fields edited in the wizard (not inline). */
 export const PLAN_CHIP_WIZARD_STEP: Partial<Record<PlanChipKey, number>> = {
-  stay: 4,
-  naps: 7,
-  interests: 9,
+  stay: 3,
+  naps: 6,
+  interests: 8,
 };
 
 const READ_ONLY_KEYS = new Set<PlanChipKey>([
