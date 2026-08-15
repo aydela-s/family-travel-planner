@@ -89,6 +89,8 @@ export const initialTripPlan: TripPlan = {
 export type StepProps = {
   formData: TripPlan;
   updateFormData: (updates: Partial<TripPlan>) => void;
+  /** Optional: step is waiting on an async confirm (e.g. Places details). */
+  setStepBusy?: (busy: boolean) => void;
 };
 
 /** Infer walking tolerance from travel pace when the user no longer picks it separately */

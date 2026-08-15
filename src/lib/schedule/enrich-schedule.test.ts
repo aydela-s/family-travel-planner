@@ -184,7 +184,7 @@ describe("enrich scheduling — Phase B", () => {
     }
   });
 
-  it("does not bill afternoon/evening strolls as paid attractions", async () => {
+  it("does not insert quiet-time or stroll slots between afternoon and dinner", async () => {
     const { enrichItinerary } = await import("@/lib/enrich-itinerary");
     const plan: TripPlan = {
       ...airbnbCookPlan(),
@@ -194,12 +194,13 @@ describe("enrich scheduling — Phase B", () => {
     };
     const { raw, plan: working } = planTrip(plan);
     const itinerary = await enrichItinerary(raw, working);
-    const strolls = itinerary.days.flatMap((d) =>
-      d.activities.filter((a) => /\bstroll\b/i.test(a.title) || a.slotKind === "evening_rest"),
+    const quietSlots = itinerary.days.flatMap((d) =>
+      d.activities.filter(
+        (a) =>
+          a.slotKind === "evening_rest" ||
+          /\b(quiet time|afternoon stroll|evening stroll)\b/i.test(a.title),
+      ),
     );
-    expect(strolls.length).toBeGreaterThan(0);
-    for (const s of strolls) {
-      expect(s.activityCost ?? 0).toBe(0);
-    }
+    expect(quietSlots).toHaveLength(0);
   });
 });

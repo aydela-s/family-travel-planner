@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { resolveDestinationBias } from "@/lib/destination-bias";
+import { coordsForDestinationPick } from "@/lib/destination-bias";
 
 type Suggestion = { label: string; placeId: string };
 
@@ -15,28 +15,34 @@ export type DestinationSelection = {
 /**
  * City autocomplete from Google Places `(cities)` + local popular fallback.
  * Typing updates the field; only picking a suggestion commits a resolved center.
+ *
+ * Known cities resolve instantly from local coords; Place Details only refines
+ * (or fills in) in the background so the Continue button rarely waits.
  */
 export default function DestinationAutocomplete({
   value,
   onChange,
   onSelect,
+  onResolvingChange,
 }: {
   value: string;
   /** Fired while typing — clears a previous Places selection on the plan. */
   onChange: (destination: string) => void;
   /** Fired when the user picks a suggestion (coords from Details or popular bias). */
   onSelect: (selection: DestinationSelection) => void;
+  /** Fired only while waiting on Place Details for an unknown city (button busy). */
+  onResolvingChange?: (resolving: boolean) => void;
 }) {
   const [query, setQuery] = useState(value);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [resolving, setResolving] = useState(false);
   const [fetchError, setFetchError] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const requestSeq = useRef(0);
   /** When set, query matches a picked suggestion — don't re-fetch or show empty state. */
   const pickedLabelRef = useRef<string | null>(null);
+  const selectSeq = useRef(0);
 
   useEffect(() => {
     setQuery(value);
@@ -100,7 +106,7 @@ export default function DestinationAutocomplete({
       } finally {
         if (seq === requestSeq.current) setLoading(false);
       }
-    }, 280);
+    }, 180);
 
     return () => {
       clearTimeout(timer);
@@ -109,6 +115,7 @@ export default function DestinationAutocomplete({
   }, [query]);
 
   async function selectSuggestion(s: Suggestion) {
+    const seq = ++selectSeq.current;
     pickedLabelRef.current = s.label;
     requestSeq.current += 1;
     setQuery(s.label);
@@ -116,58 +123,61 @@ export default function DestinationAutocomplete({
     setFetchError(false);
     setLoading(false);
     setOpen(false);
-    setResolving(true);
 
-    let lat: number | null = null;
-    let lng: number | null = null;
-    let label = s.label;
-    let placeId = s.placeId;
-
-    try {
-      const res = await fetch(
-        `/api/places/details?placeId=${encodeURIComponent(s.placeId)}`,
-      );
-      if (res.ok) {
-        const data = (await res.json()) as {
-          address?: string;
-          placeId?: string;
-          lat?: number;
-          lng?: number;
-        };
-        if (typeof data.lat === "number" && typeof data.lng === "number") {
-          lat = data.lat;
-          lng = data.lng;
-        }
-        if (data.address?.trim()) label = data.address.trim();
-        if (data.placeId) placeId = data.placeId;
-      }
-    } catch {
-      // fall through to popular bias
-    }
-
-    if (lat == null || lng == null) {
-      const bias = resolveDestinationBias(label);
-      if (typeof bias.lat === "number" && typeof bias.lng === "number") {
-        lat = bias.lat;
-        lng = bias.lng;
-      }
-    }
-
-    setResolving(false);
-
-    if (lat == null || lng == null) {
-      pickedLabelRef.current = null;
-      setFetchError(true);
-      setOpen(true);
+    const instant = coordsForDestinationPick(s.label, s.placeId);
+    if (instant) {
+      // Commit immediately — Continue can proceed; refine coords in background.
+      onSelect({
+        destination: s.label,
+        placeId: s.placeId,
+        lat: instant.lat,
+        lng: instant.lng,
+      });
+      onResolvingChange?.(false);
+      void refineWithPlaceDetails(s, seq);
       return;
     }
 
-    pickedLabelRef.current = label;
-    setQuery(label);
-    onSelect({ destination: label, placeId, lat, lng });
+    // Unknown city: need Place Details before Continue is valid.
+    onResolvingChange?.(true);
+    const details = await fetchPlaceDetails(s.placeId);
+    if (seq !== selectSeq.current) return;
+
+    if (details) {
+      const label = details.address || s.label;
+      pickedLabelRef.current = label;
+      setQuery(label);
+      onSelect({
+        destination: label,
+        placeId: details.placeId || s.placeId,
+        lat: details.lat,
+        lng: details.lng,
+      });
+      onResolvingChange?.(false);
+      return;
+    }
+
+    onResolvingChange?.(false);
+    pickedLabelRef.current = null;
+    setFetchError(true);
+    setOpen(true);
   }
 
-  const showPanel = open && query.length >= 2 && !loading && !resolving;
+  async function refineWithPlaceDetails(s: Suggestion, seq: number) {
+    const details = await fetchPlaceDetails(s.placeId);
+    if (seq !== selectSeq.current || !details) return;
+    const label = details.address || s.label;
+    pickedLabelRef.current = label;
+    setQuery(label);
+    onSelect({
+      destination: label,
+      placeId: details.placeId || s.placeId,
+      lat: details.lat,
+      lng: details.lng,
+    });
+  }
+
+  const showPanel = open && query.length >= 2 && !loading;
   const showEmptyState =
     showPanel && suggestions.length === 0 && pickedLabelRef.current !== query;
 
@@ -193,9 +203,9 @@ export default function DestinationAutocomplete({
         aria-autocomplete="list"
         aria-expanded={showPanel && (suggestions.length > 0 || showEmptyState)}
       />
-      {(loading || resolving) && (
+      {loading && (
         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">
-          {resolving ? "Confirming…" : "Searching..."}
+          Searching…
         </span>
       )}
       {showPanel && suggestions.length > 0 && (
@@ -222,4 +232,27 @@ export default function DestinationAutocomplete({
       )}
     </div>
   );
+}
+
+async function fetchPlaceDetails(
+  placeId: string,
+): Promise<{ address?: string; placeId?: string; lat: number; lng: number } | null> {
+  // Local catalog ids are not Google place ids — skip the network round-trip.
+  if (!placeId.startsWith("ChIJ") && !placeId.includes("/") && placeId.length < 20) {
+    return null;
+  }
+  try {
+    const res = await fetch(`/api/places/details?placeId=${encodeURIComponent(placeId)}`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      address?: string;
+      placeId?: string;
+      lat?: number;
+      lng?: number;
+    };
+    if (typeof data.lat !== "number" || typeof data.lng !== "number") return null;
+    return { address: data.address, placeId: data.placeId, lat: data.lat, lng: data.lng };
+  } catch {
+    return null;
+  }
 }

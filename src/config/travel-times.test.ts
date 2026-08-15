@@ -117,12 +117,45 @@ describe("taxi fare for walkable hops", () => {
     expect(dir.cost).toBe(0);
     expect(dir.provider).toBe("Walk");
   });
+
+  it("does not bill taxi between picnic-near and explore at the same venue", async () => {
+    const { buildRouteSegments } = await import("@/lib/maps/route-segments");
+    const trip = plan({ transportationType: "taxis" });
+    const result = await buildRouteSegments(
+      [
+        {
+          time: "12:00",
+          title: "Picnic near Kids Empire Dallas Hillcrest",
+          type: "meal",
+          location: {
+            name: "Kids Empire Dallas Hillcrest area",
+            lat: 32.84,
+            lng: -96.78,
+          },
+        },
+        {
+          time: "14:00",
+          title: "Family time at Kids Empire Dallas Hillcrest",
+          type: "activity",
+          location: {
+            name: "Kids Empire Dallas Hillcrest",
+            lat: 32.84,
+            lng: -96.78,
+          },
+        },
+      ],
+      city,
+      trip,
+    );
+    expect(result.segmentCosts[0]).toBe(0);
+    expect(result.routeSegments[0]?.provider).toBe("Walk");
+  });
 });
 
 describe("taxi same-day support stays inside the time budget", () => {
   const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
 
-  it("pairs Belmont Park with a hop inside the taxi soft-max window", () => {
+  it("keeps theme parks exclusive (no same-day companion hop)", () => {
     const trip = plan({ transportationType: "taxis" });
     const belmont = city.landmarks.find((l) => l.name === "Belmont Park")!;
     const themed = applyDailyThemes(buildTripStrategy(trip, { city }), trip, city);
@@ -130,27 +163,26 @@ describe("taxi same-day support stays inside the time budget", () => {
       ...themed.days[1]!,
       role: "full" as const,
       theme: {
-        id: "entertainment" as const,
-        label: "Entertainment",
-        primaryTags: ["entertainment" as const],
-        secondaryTags: ["theme-parks" as const],
-        preferredExperienceTypes: ["entertainment" as const, "theme-parks" as const],
+        id: "theme_park" as const,
+        label: "Theme park",
+        primaryTags: ["theme-parks" as const],
+        secondaryTags: ["entertainment" as const],
+        preferredExperienceTypes: ["theme-parks" as const, "entertainment" as const],
       },
-      constraints: [],
+      constraints: [
+        { type: "require_half_day_window" as const },
+        { type: "max_activities" as const, n: 1 },
+      ],
       dayBudgetIntent: "paid" as const,
       support: [],
       meals: [],
     };
     const support = selectSupportForDay(city, trip, day, belmont, {
       ledgerNames: new Set(
-        city.landmarks.map((l) => l.name).filter((n) => n !== belmont.name && n !== "Mission Beach Boardwalk"),
+        city.landmarks.map((l) => l.name).filter((n) => n !== belmont.name),
       ),
       alreadyToday: [belmont],
     });
-    const budget = travelTimeBudget(trip);
-    for (const stop of support) {
-      const hop = estimateDurationMin(belmont, stop, trip);
-      expect(hop).toBeLessThanOrEqual(Math.round(budget.softMaxMin * 1.25));
-    }
+    expect(support).toHaveLength(0);
   });
 });

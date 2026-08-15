@@ -12,6 +12,7 @@ import {
   isThemeParkExperience,
   LOW_FRICTION_STAY_KM,
   pairingAllowedForDay,
+  sharesDayActivityCategory,
 } from "@/lib/planning-engine/staged/landmark-experience";
 import type {
   DayBlueprint,
@@ -87,6 +88,14 @@ function validateDay(
         repairHint: "regenerate_anchor",
       });
     }
+    if (isThemeParkExperience(anchor)) {
+      out.push({
+        code: "travel_day_theme_park",
+        message: `${day.role} day cannot use theme park "${anchor.name}" — keep it easy near stay.`,
+        day: day.dayIndex,
+        repairHint: "regenerate_anchor",
+      });
+    }
   }
 
   if (day.role === "full" && !anchorMatchesTheme(day, anchor)) {
@@ -121,6 +130,28 @@ function validateDay(
     });
   }
 
+  if (isThemeParkExperience(anchor) && supportLandmarks.length > 0) {
+    out.push({
+      code: "theme_park_not_exclusive",
+      message: `Theme park day "${anchor.name}" must be the only activity — drop "${supportLandmarks.map((l) => l.name).join(", ")}".`,
+      day: day.dayIndex,
+      repairHint: "regenerate_support",
+    });
+  }
+
+  for (let i = 0; i < dayStops.length; i++) {
+    for (let j = i + 1; j < dayStops.length; j++) {
+      if (sharesDayActivityCategory(dayStops[i]!, dayStops[j]!)) {
+        out.push({
+          code: "duplicate_day_category",
+          message: `Day ${day.dayIndex} repeats the same activity category with "${dayStops[i]!.name}" and "${dayStops[j]!.name}".`,
+          day: day.dayIndex,
+          repairHint: "regenerate_support",
+        });
+      }
+    }
+  }
+
   for (const stop of dayStops) {
     if (exceedsBudgetStyleTicket(stop, plan.budgetStyle)) {
       out.push({
@@ -134,13 +165,14 @@ function validateDay(
 
   for (const support of supportLandmarks) {
     if (!pairingAllowedForDay(anchor, support)) {
-      const themeParkDay =
-        isThemeParkExperience(anchor) || isThemeParkExperience(support);
       out.push({
-        code: themeParkDay ? "theme_park_needs_chill_companion" : "incompatible_day_pairing",
-        message: themeParkDay
-          ? `Theme park day cannot pair "${anchor.name}" with "${support.name}" — use a chill outdoor stop instead.`
-          : `Day ${day.dayIndex} pairs incompatible stops "${anchor.name}" and "${support.name}".`,
+        code: isThemeParkExperience(anchor) || isThemeParkExperience(support)
+          ? "theme_park_not_exclusive"
+          : "incompatible_day_pairing",
+        message:
+          isThemeParkExperience(anchor) || isThemeParkExperience(support)
+            ? `Theme park day cannot pair "${anchor.name}" with "${support.name}".`
+            : `Day ${day.dayIndex} pairs incompatible stops "${anchor.name}" and "${support.name}".`,
         day: day.dayIndex,
         repairHint: "regenerate_support",
       });

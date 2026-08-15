@@ -240,9 +240,11 @@ export function themeGoalsAndConstraints(
   }
 
   if (theme.id === "theme_park") {
+    // Long afternoon window after nap, but no companion stop — parks are the whole day.
     goals.push({ type: "half_day_anchor" });
     constraints.push({ type: "require_half_day_window" });
     constraints.push({ type: "prefer_paid_anchor" });
+    constraints.push({ type: "max_activities", n: 1 });
   }
 
   if (theme.id === "recovery" || theme.id === "nature" || theme.id === "nature_parks" || theme.id === "scenic") {

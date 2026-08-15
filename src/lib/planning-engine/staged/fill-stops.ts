@@ -13,6 +13,7 @@ import {
   isIndoorPlayExperience,
   isOutdoorPlayground,
   isShorelineBeachExperience,
+  isThemeParkExperience,
   isYoungChildOnlyLandmark,
 } from "@/lib/planning-engine/staged/landmark-experience";
 import type { DayBlueprint, TripBlueprint } from "@/lib/planning-engine/staged/types";
@@ -184,9 +185,11 @@ export function commitStopsToBlueprint(
       alreadyToday: [anchor],
     });
 
-    // Ensure at least one age-appropriate element on full days
+    // Ensure at least one age-appropriate element on full days (never on theme-park days)
     if (
       day.role === "full" &&
+      !isThemeParkExperience(anchor) &&
+      day.theme.id !== "theme_park" &&
       !dayHasAgeAppropriateElement(plan, [anchor, ...support])
     ) {
       const filler = selectSoftFiller(
@@ -196,6 +199,7 @@ export function commitStopsToBlueprint(
         anchor,
         ledgerNames,
         supportVisitWindow(plan, day),
+        [anchor, ...support],
       );
       if (filler && landmarkAgeScore(filler, profile) > 0) {
         support = [filler, ...support].slice(0, Math.max(1, day.capacity.maxSupportStops));
@@ -206,6 +210,8 @@ export function commitStopsToBlueprint(
     if (
       profile.isMixedAges &&
       day.role === "full" &&
+      !isThemeParkExperience(anchor) &&
+      day.theme.id !== "theme_park" &&
       isYoungChildOnlyLandmark(anchor) &&
       !dayHasOlderAppeal([anchor, ...support])
     ) {
@@ -216,6 +222,7 @@ export function commitStopsToBlueprint(
         anchor,
         ledgerNames,
         supportVisitWindow(plan, day),
+        [anchor, ...support],
       );
       if (filler && dayHasOlderAppeal([filler])) {
         support = [filler, ...support].slice(0, Math.max(1, day.capacity.maxSupportStops));
@@ -295,14 +302,30 @@ export function placementFromDayBlueprint(
   let extra: Landmark | undefined;
 
   if (halfDay) {
-    morning =
-      support[0] ??
-      selectSoftFiller(city, plan, day, anchor, ledgerNames, supportVisitWindow(plan, day)) ??
-      anchor;
-    afternoon = anchor;
-    extra = undefined;
-    dropSlotKinds.push("extra_activity");
-    if (morning.name === afternoon.name) dropSlotKinds.push("morning_activity");
+    // Theme parks (and other exclusive half-day heroes): no morning companion.
+    if (isThemeParkExperience(anchor) || day.theme.id === "theme_park") {
+      morning = anchor;
+      afternoon = anchor;
+      extra = undefined;
+      dropSlotKinds.push("extra_activity", "morning_activity");
+    } else {
+      morning =
+        support[0] ??
+        selectSoftFiller(
+          city,
+          plan,
+          day,
+          anchor,
+          ledgerNames,
+          supportVisitWindow(plan, day),
+          [anchor, ...support],
+        ) ??
+        anchor;
+      afternoon = anchor;
+      extra = undefined;
+      dropSlotKinds.push("extra_activity");
+      if (morning.name === afternoon.name) dropSlotKinds.push("morning_activity");
+    }
   } else if (maxAct <= 1 || day.role === "departure") {
     morning = anchor;
     afternoon = anchor;
@@ -310,7 +333,15 @@ export function placementFromDayBlueprint(
   } else {
     morning =
       support[0] ??
-      selectSoftFiller(city, plan, day, anchor, ledgerNames, supportVisitWindow(plan, day)) ??
+      selectSoftFiller(
+        city,
+        plan,
+        day,
+        anchor,
+        ledgerNames,
+        supportVisitWindow(plan, day),
+        [anchor, ...support],
+      ) ??
       anchor;
     afternoon = anchor;
     extra = support[1];
@@ -327,15 +358,36 @@ export function placementFromDayBlueprint(
     }
   }
 
+  const dinnerNear =
+    shouldIncludeNaps(plan) && !isThemeParkExperience(afternoon)
+      ? stayLandmarkForMeals(plan) ?? afternoon
+      : afternoon;
+
   return {
     ctx: {
       morning,
       afternoon,
       lunch: halfDay ? afternoon : morning,
-      dinner: afternoon,
+      dinner: dinnerNear,
       extra,
       dayOffset: 0,
     },
     dropSlotKinds: [...new Set(dropSlotKinds)],
+  };
+}
+
+/** Synthetic landmark so dinner / restaurant picks can score near the stay. */
+function stayLandmarkForMeals(plan: TripPlan): Landmark | null {
+  if (typeof plan.stayLat !== "number" || typeof plan.stayLng !== "number") return null;
+  return {
+    name: (plan.stayAddress ?? "").trim() || "Your stay",
+    lat: plan.stayLat,
+    lng: plan.stayLng,
+    adultPrice: 0,
+    intensity: "low",
+    ageTags: ["toddler", "child", "tween", "teen"],
+    interestTags: [],
+    indoor: true,
+    openingHours: { open: "00:00", close: "23:59" },
   };
 }

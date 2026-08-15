@@ -15,7 +15,6 @@ import { selectSupportForDay } from "@/lib/planning-engine/staged/support-select
 import {
   exceedsBudgetStyleTicket,
   isHeavyDayLandmark,
-  pairingAllowedForDay,
   sharesDayActivityCategory,
 } from "@/lib/planning-engine/staged/landmark-experience";
 import { activityTitlesByDay } from "@/lib/planning-engine/staged/fingerprint";
@@ -178,7 +177,7 @@ describe("commitStopsToBlueprint", () => {
           openingHours: { open: "09:00", close: "18:00" },
           intensity: "high" as const,
           ageTags: ["toddler", "child"] as const,
-          interestTags: ["indoor-play", "playgrounds"] as const,
+          interestTags: ["indoor-play"] as const,
           indoor: true,
         },
         {
@@ -229,6 +228,76 @@ describe("commitStopsToBlueprint", () => {
       1,
     );
     expect(new Set(fullAnchors).size).toBe(fullAnchors.length);
+
+    // Travel days must not soft-reuse paid soft-play when a free park exists.
+    for (const day of committed.days.filter((d) => d.role === "arrival" || d.role === "departure")) {
+      expect(day.anchor?.landmarkName).not.toBe("Kids Empire Dallas Hillcrest");
+    }
+  });
+
+  it("does not pair Fritz-style adventure with another indoor play center", () => {
+    const tinyCity = {
+      ...city,
+      id: "places:dallas-play",
+      name: "Dallas",
+      landmarks: [
+        {
+          name: "Fritz's Adventure - The Colony",
+          lat: 33.08,
+          lng: -96.88,
+          adultPrice: 40,
+          intensity: "high" as const,
+          ageTags: ["toddler", "child"] as const,
+          interestTags: ["entertainment"] as const,
+          indoor: true,
+        },
+        {
+          name: "DINO KIDZ - Castle Hills",
+          lat: 33.0,
+          lng: -96.9,
+          adultPrice: 25,
+          intensity: "high" as const,
+          ageTags: ["toddler", "child"] as const,
+          interestTags: ["indoor-play"] as const,
+          indoor: true,
+        },
+        {
+          name: "Klyde Warren Park",
+          lat: 32.79,
+          lng: -96.8,
+          adultPrice: 0,
+          intensity: "low" as const,
+          ageTags: ["toddler", "child", "tween", "teen"] as const,
+          interestTags: ["parks"] as const,
+          indoor: false,
+        },
+        {
+          name: "Bachman Lake Park",
+          lat: 32.86,
+          lng: -96.87,
+          adultPrice: 0,
+          intensity: "low" as const,
+          ageTags: ["toddler", "child", "tween", "teen"] as const,
+          interestTags: ["parks", "nature"] as const,
+          indoor: false,
+        },
+      ],
+    };
+    const plan = sdPlan({
+      destination: "Dallas, TX",
+      interests: ["Playgrounds & Indoor Play", "Parks & Gardens"],
+      children: [4, 6],
+    });
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city: tinyCity }), plan, tinyCity);
+    const committed = commitStopsToBlueprint(themed, plan, tinyCity);
+    for (const day of committed.days) {
+      const stops = [day.anchor, ...day.support]
+        .filter(Boolean)
+        .map((s) => tinyCity.landmarks.find((l) => l.name === s!.landmarkName)!)
+        .filter(Boolean);
+      const indoorCount = stops.filter((l) => isIndoorPlayExperience(l)).length;
+      expect(indoorCount).toBeLessThanOrEqual(1);
+    }
   });
 
   it("keeps departure within low-friction stay distance even when near POIs are ledger-used", () => {
@@ -369,7 +438,59 @@ describe("planTrip staged engine", () => {
     }
   });
 
-  it("selects chill support for Belmont Park, not Children's Museum", () => {
+  it("never schedules two indoor-play stops on the same day", () => {
+    const plan = sdPlan({
+      interests: ["Playgrounds & Indoor Play", "Beaches & Waterfronts", "Parks & Gardens"],
+    });
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
+    const committed = commitStopsToBlueprint(themed, plan, city);
+    for (const day of committed.days) {
+      const stops = [day.anchor!, ...day.support]
+        .map((s) => city.landmarks.find((l) => l.name === s.landmarkName))
+        .filter((l): l is NonNullable<typeof l> => Boolean(l));
+      const indoorCount = stops.filter((l) => isIndoorPlayExperience(l)).length;
+      expect(indoorCount).toBeLessThanOrEqual(1);
+      for (let i = 0; i < stops.length; i++) {
+        for (let j = i + 1; j < stops.length; j++) {
+          expect(sharesDayActivityCategory(stops[i]!, stops[j]!)).toBe(false);
+        }
+      }
+    }
+  });
+
+  it("on nap days, morning support stays near home when the anchor is farther", () => {
+    const plan = sdPlan({
+      naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
+      children: [3, 6],
+    });
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
+    const committed = commitStopsToBlueprint(themed, plan, city);
+    for (const day of committed.days) {
+      if (day.role !== "full" || day.support.length === 0 || !day.anchor) continue;
+      const support = city.landmarks.find((l) => l.name === day.support[0]!.landmarkName)!;
+      const km = haversineKm(support.lat, support.lng, plan.stayLat!, plan.stayLng!);
+      expect(km).toBeLessThanOrEqual(LOW_FRICTION_STAY_KM);
+    }
+  });
+
+  it("never uses a theme park on the departure day", () => {
+    const plan = sdPlan({
+      interests: [
+        "Theme Parks",
+        "Playgrounds & Indoor Play",
+        "Beaches & Waterfronts",
+        "Parks & Gardens",
+      ],
+    });
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
+    const committed = commitStopsToBlueprint(themed, plan, city);
+    const departure = committed.days.find((d) => d.role === "departure")!;
+    const anchor = city.landmarks.find((l) => l.name === departure.anchor!.landmarkName)!;
+    expect(anchor.interestTags).not.toContain("theme-parks");
+    expect(departure.support).toHaveLength(0);
+  });
+
+  it("keeps theme parks exclusive — no companion stop with Belmont Park", () => {
     const plan = sdPlan({
       interests: [
         "Shows & Entertainment",
@@ -384,18 +505,20 @@ describe("planTrip staged engine", () => {
       ...themed.days[1]!,
       role: "full" as const,
       theme: {
-        id: "entertainment" as const,
-        label: "Entertainment",
-        primaryTags: ["entertainment" as const],
-        secondaryTags: ["theme-parks" as const],
-        preferredExperienceTypes: ["entertainment" as const, "theme-parks" as const],
+        id: "theme_park" as const,
+        label: "Theme park",
+        primaryTags: ["theme-parks" as const],
+        secondaryTags: ["entertainment" as const],
+        preferredExperienceTypes: ["theme-parks" as const, "entertainment" as const],
       },
       constraints: [
         {
           type: "anchor_primary_tags" as const,
-          tags: ["entertainment" as const],
+          tags: ["theme-parks" as const],
           mode: "any" as const,
         },
+        { type: "require_half_day_window" as const },
+        { type: "max_activities" as const, n: 1 },
       ],
       dayBudgetIntent: "paid" as const,
       support: [],
@@ -409,9 +532,6 @@ describe("planTrip staged engine", () => {
       alreadyToday: [belmont],
     });
 
-    for (const stop of support) {
-      expect(pairingAllowedForDay(belmont, stop)).toBe(true);
-      expect(stop.name).not.toMatch(/Children's Museum/i);
-    }
+    expect(support).toHaveLength(0);
   });
 });

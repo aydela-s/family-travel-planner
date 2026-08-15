@@ -65,6 +65,39 @@ export function resolveDestinationBias(destination: string): DestinationBias {
   return { cityName };
 }
 
+/**
+ * Instant coords for a destination pick (local catalog / popular bias).
+ * Avoids waiting on Place Details for well-known cities like Dallas.
+ */
+export function coordsForDestinationPick(
+  label: string,
+  placeId?: string,
+): { lat: number; lng: number } | null {
+  if (placeId) {
+    const byId = POPULAR_CITIES.find((c) => c.id === placeId);
+    if (
+      byId &&
+      typeof byId.lat === "number" &&
+      typeof byId.lng === "number" &&
+      Number.isFinite(byId.lat) &&
+      Number.isFinite(byId.lng)
+    ) {
+      return { lat: byId.lat, lng: byId.lng };
+    }
+  }
+
+  const bias = resolveDestinationBias(label);
+  if (
+    typeof bias.lat === "number" &&
+    typeof bias.lng === "number" &&
+    Number.isFinite(bias.lat) &&
+    Number.isFinite(bias.lng)
+  ) {
+    return { lat: bias.lat, lng: bias.lng };
+  }
+  return null;
+}
+
 /** Soft-rank stay suggestions that mention the destination city first. */
 export function rankStaySuggestionsByDestination<T extends { label: string }>(
   suggestions: T[],

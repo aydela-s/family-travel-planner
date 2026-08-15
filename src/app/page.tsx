@@ -1,5 +1,6 @@
-import Link from "next/link";
 import BackToTopButton from "@/components/BackToTopButton";
+import PlanMyTripLink from "@/components/PlanMyTripLink";
+import PrefetchPlan from "@/components/PrefetchPlan";
 import { TripNestlyLogo } from "@/components/TripNestlyLogo";
 import { BRAND } from "@/config/brand";
 
@@ -35,9 +36,6 @@ const WHY_TRIPNESTLY = [
     body: "Save, balanced, or splurge changes the kinds of activities and meals we pick — not a fake dollar target.",
   },
 ] as const;
-
-const ctaClassName =
-  "inline-flex items-center justify-center rounded-2xl bg-accent px-8 py-3.5 text-base font-semibold text-white shadow-soft transition hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 const tileClassName =
   "flex h-full flex-col rounded-3xl border border-border bg-surface p-6 text-left shadow-[var(--shadow-card)] sm:p-7";
@@ -98,12 +96,7 @@ export default function Home() {
           Personalized itineraries built around your kids, your pace, and your budget.
         </p>
 
-        <Link
-          href="/plan"
-          className={`animate-fade-in mt-8 ${ctaClassName} [animation-delay:320ms]`}
-        >
-          Plan my trip
-        </Link>
+        <PlanMyTripLink className="animate-fade-in mt-8 [animation-delay:320ms]" />
 
         <p className="animate-fade-in mt-4 max-w-md text-sm leading-relaxed text-muted sm:text-base [animation-delay:400ms]">
           No more hours researching activities, meals, and schedules. Get a
@@ -194,13 +187,12 @@ export default function Home() {
           </ul>
 
           <div className="mt-14 flex justify-center">
-            <Link href="/plan" className={ctaClassName}>
-              Plan my trip
-            </Link>
+            <PlanMyTripLink />
           </div>
         </div>
       </section>
 
+      <PrefetchPlan />
       <BackToTopButton />
     </main>
   );

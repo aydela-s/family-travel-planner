@@ -135,12 +135,18 @@ function fillActivitySlot(
       const allYoungKids =
         plan.children.length > 0 && plan.children.every((age) => age <= 7);
       if (allYoungKids) {
+        const stayLabel =
+          plan.accommodationType === "staying_with_family_or_friends"
+            ? "your hosts"
+            : plan.accommodationType.startsWith("airbnb")
+              ? "your rental"
+              : "your hotel";
         return tagged({
           time: slot.defaultTime,
           title:
             day.dayIndex === totalDays
-              ? "Pack up & unwind at your hotel"
-              : "Quiet time at your hotel",
+              ? `Pack up & unwind at ${stayLabel}`
+              : `Quiet time at ${stayLabel}`,
           type,
           notes: "Rest at your stay before dinner — better than another walk with little ones.",
         });
@@ -198,6 +204,11 @@ export function buildScheduleFromBlueprint(
     ctx.afternoon.interestTags.includes("theme-parks")
   ) {
     slots = slots.filter((s) => s.kind !== "extra_activity");
+  }
+
+  // Never schedule "Break at X" right before "Family time at X".
+  if (slots.some((s) => s.kind === "afternoon_activity" || s.kind === "calm_activity")) {
+    slots = slots.filter((s) => s.kind !== "midday_rest");
   }
 
   // Single-activity days (departure): keep the hero morning/afternoon slot from placement drops

@@ -25,10 +25,27 @@ import type {
   TripBlueprint,
 } from "@/lib/planning-engine/staged/types";
 import type { TripPlan } from "@/types/trip-plan";
+import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
+import { isThemeParkExperience } from "@/lib/planning-engine/staged/landmark-experience";
 
 function findLandmark(city: CityConfig, name: string | undefined): Landmark | null {
   if (!name) return null;
   return city.landmarks.find((l) => l.name === name) ?? null;
+}
+
+function stayLandmark(plan: TripPlan): Landmark | null {
+  if (typeof plan.stayLat !== "number" || typeof plan.stayLng !== "number") return null;
+  return {
+    name: (plan.stayAddress ?? "").trim() || "Your stay",
+    lat: plan.stayLat,
+    lng: plan.stayLng,
+    adultPrice: 0,
+    intensity: "low",
+    ageTags: ["toddler", "child", "tween", "teen"],
+    interestTags: [],
+    indoor: true,
+    openingHours: { open: "00:00", close: "23:59" },
+  };
 }
 
 function landmarkWithOnSiteMeal(
@@ -67,7 +84,18 @@ function planSlotMeal(
 ): MealIntent | null {
   if (slot === "breakfast" && !requiresBreakfastSlot(plan)) return null;
 
-  const near = slot === "breakfast" ? (support[0] ?? anchor) : anchor;
+  // With naps the family returns home midday — dinner near stay unless the day
+  // is a theme-park exclusive (family stays at the park into the evening).
+  const dinnerNearStay =
+    slot === "dinner" &&
+    shouldIncludeNaps(plan) &&
+    !(anchor && isThemeParkExperience(anchor));
+  const near =
+    slot === "breakfast"
+      ? (support[0] ?? anchor)
+      : dinnerNearStay
+        ? stayLandmark(plan)
+        : anchor;
 
   if (slot === "dinner" && plan.accommodationType === "staying_with_family_or_friends") {
     return { slot, mode: "cook_at_home", nearLandmarkName: near?.name };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  coordsForDestinationPick,
   rankStaySuggestionsByDestination,
   resolveDestinationBias,
 } from "@/lib/destination-bias";
@@ -39,5 +40,22 @@ describe("destination bias — stay autocomplete", () => {
     expect(ranked[0]?.label).toMatch(/Dallas/i);
     expect(ranked[1]?.label).toMatch(/Dallas/i);
     expect(ranked[2]?.label).toMatch(/Oklahoma/i);
+  });
+});
+
+describe("coordsForDestinationPick", () => {
+  it("resolves Dallas instantly from the local catalog id", () => {
+    const coords = coordsForDestinationPick("Dallas, USA", "dallas");
+    expect(coords).toEqual({ lat: 32.7767, lng: -96.797 });
+  });
+
+  it("resolves from a Google-style label via popular bias without waiting on Details", () => {
+    const coords = coordsForDestinationPick("Dallas, TX, USA", "ChIJS5dFe_cZTIYRj2dH9qSb7Lk");
+    expect(coords?.lat).toBeCloseTo(32.7767, 2);
+    expect(coords?.lng).toBeCloseTo(-96.797, 2);
+  });
+
+  it("returns null for an unknown city with no catalog match", () => {
+    expect(coordsForDestinationPick("Xyzzyville, Nowhere", "ChIJUnknown")).toBeNull();
   });
 });

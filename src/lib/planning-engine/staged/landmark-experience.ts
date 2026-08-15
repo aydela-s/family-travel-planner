@@ -21,18 +21,22 @@ export function isShorelineBeachExperience(landmark: Landmark): boolean {
   return false;
 }
 
-/** Outdoor playground (not indoor soft play). */
-export function isOutdoorPlayground(landmark: Landmark): boolean {
-  if (!landmark.interestTags.includes("playgrounds")) return false;
-  if (landmark.interestTags.includes("indoor-play")) return false;
-  if (landmark.indoor) return false;
-  return true;
-}
+const INDOOR_PLAY_NAME =
+  /\b(kids\s*empire|soft\s*play|dino\s*kidz|fritz'?s?\s*adventure|adventure\s*park|urban\s*air|sky\s*zone|bounce\s*house|trampolin|indoor\s*play|play\s*cafe)\b/i;
 
-/** Indoor play / trampoline / bounce / soft-play. */
+/** Indoor play / trampoline / bounce / soft-play / indoor adventure centers. */
 export function isIndoorPlayExperience(landmark: Landmark): boolean {
   if (landmark.interestTags.includes("indoor-play")) return true;
+  if (INDOOR_PLAY_NAME.test(landmark.name)) return true;
   return Boolean(landmark.indoor && landmark.interestTags.includes("playgrounds"));
+}
+
+/** Outdoor playground (not indoor soft play). */
+export function isOutdoorPlayground(landmark: Landmark): boolean {
+  if (isIndoorPlayExperience(landmark)) return false;
+  if (!landmark.interestTags.includes("playgrounds")) return false;
+  if (landmark.indoor) return false;
+  return true;
 }
 
 /** Waterfront / shoreline experiences — at most one per day alongside other water tags. */
@@ -58,6 +62,14 @@ export function dayActivityCategories(landmark: Landmark): Set<string> {
   for (const tag of DAY_EXCLUSIVE_ACTIVITY_TAGS) {
     if (landmark.interestTags.includes(tag)) cats.add(tag);
   }
+  // Derive exclusivity from experience helpers so name-based venues (Fritz's, DINO KIDZ)
+  // still conflict even when Places tags are messy.
+  if (isIndoorPlayExperience(landmark)) {
+    cats.add("indoor-play");
+    cats.delete("playgrounds");
+  }
+  if (isOutdoorPlayground(landmark)) cats.add("playgrounds");
+  if (isThemeParkExperience(landmark)) cats.add("theme-parks");
   if (isWaterfrontExperience(landmark)) cats.add("waterfront");
   return cats;
 }
@@ -155,10 +167,15 @@ export function isChillDayCompanion(landmark: Landmark): boolean {
   );
 }
 
-/** Whether two stops belong on the same day (theme parks need a chill partner). */
+/**
+ * Whether two stops belong on the same day.
+ * Theme parks are exclusive (exhausting with little kids) — no second activity.
+ */
 export function pairingAllowedForDay(a: Landmark, b: Landmark): boolean {
   if (sharesHeavyDayLoad(a, b)) return false;
-  if (isThemeParkExperience(a) && !isChillDayCompanion(b)) return false;
-  if (isThemeParkExperience(b) && !isChillDayCompanion(a)) return false;
+  if (isThemeParkExperience(a) || isThemeParkExperience(b)) return false;
+  // Two soft-play / indoor adventure centers is too much for one day.
+  if (isIndoorPlayExperience(a) && isIndoorPlayExperience(b)) return false;
+  if (sharesDayActivityCategory(a, b)) return false;
   return true;
 }

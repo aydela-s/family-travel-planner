@@ -37,19 +37,47 @@ describe("heavy day load", () => {
   });
 });
 
-describe("theme park chill companions", () => {
+describe("theme park exclusivity", () => {
   const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
 
-  it("rejects Children's Museum as a Belmont Park day partner", () => {
+  it("does not allow any companion stop with Belmont Park", () => {
     const belmont = city.landmarks.find((l) => l.name === "Belmont Park")!;
     const museum = city.landmarks.find((l) => l.name === "The New Children's Museum")!;
     const boardwalk = city.landmarks.find((l) => l.name === "Mission Beach Boardwalk")!;
 
     expect(isThemeParkExperience(belmont)).toBe(true);
-    expect(isChillDayCompanion(museum)).toBe(false);
-    expect(pairingAllowedForDay(belmont, museum)).toBe(false);
     expect(isChillDayCompanion(boardwalk)).toBe(true);
-    expect(pairingAllowedForDay(belmont, boardwalk)).toBe(true);
+    expect(pairingAllowedForDay(belmont, museum)).toBe(false);
+    expect(pairingAllowedForDay(belmont, boardwalk)).toBe(false);
+  });
+});
+
+describe("indoor play exclusivity", () => {
+  it("blocks two indoor adventure / soft-play centers on the same day", () => {
+    const fritz = {
+      name: "Fritz's Adventure - The Colony",
+      lat: 33.08,
+      lng: -96.88,
+      adultPrice: 40,
+      indoor: true,
+      intensity: "high" as const,
+      interestTags: ["entertainment"] as const,
+      ageTags: ["toddler", "child"] as const,
+    };
+    const dino = {
+      name: "DINO KIDZ - Castle Hills",
+      lat: 33.0,
+      lng: -96.9,
+      adultPrice: 25,
+      indoor: true,
+      intensity: "high" as const,
+      interestTags: ["indoor-play"] as const,
+      ageTags: ["toddler", "child"] as const,
+    };
+
+    expect(pairingAllowedForDay(fritz, dino)).toBe(false);
+    expect(dayActivityCategories(fritz).has("indoor-play")).toBe(true);
+    expect(dayActivityCategories(fritz).has("playgrounds")).toBe(false);
   });
 });
 

@@ -97,8 +97,8 @@ body {
 
 @keyframes step-forward {
   from {
-    opacity: 0;
-    transform: translateX(20px);
+    opacity: 0.96;
+    transform: translateX(12px);
   }
   to {
     opacity: 1;
@@ -108,8 +108,8 @@ body {
 
 @keyframes step-back {
   from {
-    opacity: 0;
-    transform: translateX(-20px);
+    opacity: 0.96;
+    transform: translateX(-12px);
   }
   to {
     opacity: 1;

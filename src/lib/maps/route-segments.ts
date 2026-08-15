@@ -23,15 +23,25 @@ export async function buildRouteSegments(
   let totalKm = 0;
 
   for (let i = 0; i < locActivities.length - 1; i++) {
-    const from = locActivities[i].location!;
-    const to = locActivities[i + 1].location!;
-    const dir = await getDirections(
-      city,
-      from,
-      to,
-      plan.transportationType,
-      i % city.taxiProviders.length,
-    );
+    const from = locActivities[i]!.location!;
+    const to = locActivities[i + 1]!.location!;
+    // Picnic / break / explore at the same venue must not bill a separate Uber.
+    const sameVenue = sameVenueName(from.name, to.name);
+    const dir = sameVenue
+      ? {
+          distanceKm: 0,
+          durationMin: 0,
+          cost: 0,
+          provider: "Walk",
+          source: "estimated" as const,
+        }
+      : await getDirections(
+          city,
+          from,
+          to,
+          plan.transportationType,
+          i % city.taxiProviders.length,
+        );
     totalKm += dir.distanceKm;
     segmentCosts.push(plan.transportationType === "taxis" ? dir.cost : 0);
     segmentDurations.push(dir.durationMin);
@@ -46,4 +56,17 @@ export async function buildRouteSegments(
   }
 
   return { routeSegments, totalKm, segmentCosts, segmentDurations };
+}
+
+function sameVenueName(a: string, b: string): boolean {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/\b(area|café|cafe|near)\b/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const left = norm(a);
+  const right = norm(b);
+  if (!left || !right) return false;
+  return left === right || left.includes(right) || right.includes(left);
 }

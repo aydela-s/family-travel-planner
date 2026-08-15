@@ -115,7 +115,7 @@ const CITY_OR_GARDEN_PARK_NAME =
   /\b(park|garden|arboretum|greenbelt|plaza|commons)\b/i;
 
 const INDOOR_PLAY_NAME =
-  /\b(kids\s*empire|soft\s*play|bounce\s*house|trampolin|indoor\s*play|play\s*cafe|urban\s*air|sky\s*zone|peekn?\s*play)\b/i;
+  /\b(kids\s*empire|soft\s*play|bounce\s*house|trampolin|indoor\s*play|play\s*cafe|urban\s*air|sky\s*zone|peekn?\s*play|dino\s*kidz|fritz'?s?\s*adventure|adventure\s*park|kids?\s*gym)\b/i;
 
 const LOOK_DONT_TOUCH_MUSEUM_NAME =
   /\b(sculpture|art\s+museum|gallery|samurai|history\s+museum|nasher|barbier|mueller)\b/i;
@@ -131,9 +131,8 @@ export function refineInterestTagsForPlaceName(
 
   if (next.includes("theme-parks") && !REAL_THEME_PARK_NAME.test(name)) {
     if (INDOOR_PLAY_NAME.test(name)) {
-      next = next.filter((t) => t !== "theme-parks");
+      next = next.filter((t) => t !== "theme-parks" && t !== "playgrounds");
       if (!next.includes("indoor-play")) next.push("indoor-play");
-      if (!next.includes("playgrounds")) next.push("playgrounds");
     } else if (CITY_OR_GARDEN_PARK_NAME.test(name)) {
       next = next.filter((t) => t !== "theme-parks");
       if (!next.includes("parks")) next.push("parks");
@@ -142,6 +141,12 @@ export function refineInterestTagsForPlaceName(
       next = next.filter((t) => t !== "theme-parks");
       if (next.length === 0) next.push("parks");
     }
+  }
+
+  // Soft-play / indoor adventure centers are indoor-play only — never outdoor playground days.
+  if (INDOOR_PLAY_NAME.test(name)) {
+    if (!next.includes("indoor-play")) next.push("indoor-play");
+    next = next.filter((t) => t !== "theme-parks" && t !== "playgrounds");
   }
 
   // Art / history museums must not satisfy "Interactive Museums".
@@ -219,6 +224,25 @@ function openingHoursForTags(tags: LandmarkInterestTag[]): LandmarkOpeningHours 
 
 const DEFAULT_AGE_TAGS: LandmarkAgeTag[] = ["toddler", "child", "tween", "teen"];
 
+const ARCADE_OR_TEEN_VENUE =
+  /\b(arcade|bowling|laser\s*tag|escape\s*room|vr\s*experience|go[\s-]?kart|axe\s*throw)\b/i;
+
+/** Age bands implied by the venue name when Places doesn't provide them. */
+export function ageTagsForPlaceName(
+  name: string,
+  tags: LandmarkInterestTag[],
+): LandmarkAgeTag[] {
+  // Arcades / bowling / laser tag are a poor fit for toddlers and young preschoolers.
+  if (ARCADE_OR_TEEN_VENUE.test(name)) return ["tween", "teen"];
+  if (tags.includes("indoor-play") || INDOOR_PLAY_NAME.test(name)) {
+    return ["toddler", "child"];
+  }
+  if (tags.includes("theme-parks") || REAL_THEME_PARK_NAME.test(name)) {
+    return ["toddler", "child", "tween", "teen"];
+  }
+  return DEFAULT_AGE_TAGS;
+}
+
 export function landmarkFromTopActivity(
   place: TopActivity,
   interestTags: LandmarkInterestTag[],
@@ -235,7 +259,7 @@ export function landmarkFromTopActivity(
     adultPrice: adultPriceForPlace(place.name, tags, place.priceLevel),
     openingHours: openingHoursForTags(tags),
     intensity: intensityForTags(tags),
-    ageTags: DEFAULT_AGE_TAGS,
+    ageTags: ageTagsForPlaceName(place.name, tags),
     interestTags: tags,
     indoor: indoorForTags(tags),
     placeId: place.id,

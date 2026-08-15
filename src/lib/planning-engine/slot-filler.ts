@@ -309,9 +309,15 @@ function fillSlot(
       const allYoungKids =
         plan.children.length > 0 && plan.children.every((age) => age <= 7);
       if (allYoungKids) {
+        const stayLabel =
+          plan.accommodationType === "staying_with_family_or_friends"
+            ? "your hosts"
+            : plan.accommodationType.startsWith("airbnb")
+              ? "your rental"
+              : "your hotel";
         return tagged({
           time: slot.defaultTime,
-          title: day === totalDays ? "Pack up & unwind at your hotel" : "Quiet time at your hotel",
+          title: day === totalDays ? `Pack up & unwind at ${stayLabel}` : `Quiet time at ${stayLabel}`,
           type,
           notes: "Rest at your stay before dinner — better than another walk with little ones.",
         });

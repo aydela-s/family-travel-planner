@@ -1,5 +1,10 @@
 import { CityConfig } from "@/config/city-pricing";
 
+/**
+ * Taxi/Uber estimate.
+ * US defaults target ~$1 per minute of driving all-in (base + light distance + time),
+ * matching how families roughly think about Uber rather than stacking high per-km rates.
+ */
 export function calculateRideCost(
   city: CityConfig,
   distanceKm: number,

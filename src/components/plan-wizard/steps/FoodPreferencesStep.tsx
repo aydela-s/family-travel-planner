@@ -84,6 +84,8 @@ export default function FoodPreferencesStep({ formData, updateFormData }: StepPr
           <StayAddressField
             value={formData.stayAddress ?? ""}
             destination={formData.destination}
+            destinationLat={formData.destinationLat}
+            destinationLng={formData.destinationLng}
             disabled={stayUnknown}
             onChange={(stayAddress) =>
               updateFormData({

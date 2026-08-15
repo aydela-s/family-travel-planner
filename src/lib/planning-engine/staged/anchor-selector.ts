@@ -10,6 +10,7 @@ import {
 } from "@/lib/maps/travel-estimate";
 import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
 import { isLandmarkOpenForVisit, type VisitWindow } from "@/lib/schedule/landmark-hours";
+import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import {
   exceedsBudgetStyleTicket,
   fitsBudgetStyle,
@@ -19,7 +20,6 @@ import {
   isIndoorPlayExperience,
   isOutdoorPlayground,
   isShorelineBeachExperience,
-  isChillDayCompanion,
   isThemeParkExperience,
   LOW_FRICTION_PREFERRED_KM,
   LOW_FRICTION_STAY_KM,
@@ -165,7 +165,16 @@ export function filterAnchorCandidates(
   }
   if (day.theme.id === "playgrounds") {
     const outdoor = pool.filter(isOutdoorPlayground);
-    if (outdoor.length > 0) pool = outdoor;
+    if (outdoor.length > 0) {
+      pool = outdoor;
+    } else {
+      // Never fill a Playground Day with soft-play / indoor adventure centers.
+      const parks = pool.filter(
+        (l) => l.interestTags.includes("parks") && !isIndoorPlayExperience(l),
+      );
+      if (parks.length > 0) pool = parks;
+      else pool = pool.filter((l) => !isIndoorPlayExperience(l));
+    }
   }
 
   // Preferred experience types (soft pre-filter when enough options)
@@ -182,6 +191,18 @@ export function filterAnchorCandidates(
 
   // Arrival/departure: prefer free flexible outdoor near stay when options exist
   if (day.role === "arrival" || day.role === "departure") {
+    // Easy exit / travel days never use theme parks or soft-play centers.
+    pool = pool.filter(
+      (l) =>
+        !isThemeParkExperience(l) &&
+        !l.interestTags.includes("theme-parks") &&
+        !isIndoorPlayExperience(l),
+    );
+    // Never soft-reuse a stop already used earlier in the trip while unused options remain.
+    if (unused.length > 0) {
+      const unusedOnly = pool.filter((l) => !ledgerNames.has(l.name));
+      if (unusedOnly.length > 0) pool = unusedOnly;
+    }
     const { maxKm, maxMin, preferredMin } = farLimits(day, plan);
     const isNear = (l: Landmark) => {
       const mins = stayTravelMin(l, plan);
@@ -194,18 +215,26 @@ export function filterAnchorCandidates(
     // rather than falling through to far unused POIs (e.g. Torrey Pines).
     let nearPool = unused.filter(isNear);
     const unusedFree = nearPool.filter(
-      (l) => l.adultPrice <= 0 && !l.interestTags.includes("theme-parks"),
+      (l) =>
+        l.adultPrice <= 0 &&
+        !l.interestTags.includes("theme-parks") &&
+        !isIndoorPlayExperience(l),
     );
     if (unusedFree.length > 0) {
       nearPool = unusedFree;
     } else {
       const reusedFree = city.landmarks.filter(
         (l) =>
-          isNear(l) && l.adultPrice <= 0 && !l.interestTags.includes("theme-parks"),
+          isNear(l) &&
+          l.adultPrice <= 0 &&
+          !l.interestTags.includes("theme-parks") &&
+          !isIndoorPlayExperience(l),
       );
       if (reusedFree.length > 0) nearPool = reusedFree;
       else if (nearPool.length === 0) {
-        nearPool = city.landmarks.filter(isNear);
+        nearPool = city.landmarks.filter(
+          (l) => isNear(l) && !isIndoorPlayExperience(l) && !isThemeParkExperience(l),
+        );
       }
     }
     if (nearPool.length > 0) pool = nearPool;
@@ -505,6 +534,7 @@ function lowFrictionFallback(
       }
       if (l.adultPrice > 0) return false;
       if (l.interestTags.includes("theme-parks")) return false;
+      if (isIndoorPlayExperience(l)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -548,18 +578,23 @@ export function selectAnchorForDay(
       if (near) return near;
     }
     const prior = opts.priorFullDayAnchors ?? new Set<string>();
-    const unusedAny = city.landmarks.filter((l) => !opts.ledgerNames.has(l.name));
-    const notPriorAnchor = city.landmarks.filter((l) => !prior.has(l.name));
+    const travelDay = day.role === "arrival" || day.role === "departure";
+    const eligible = (l: Landmark) =>
+      !travelDay || (!isIndoorPlayExperience(l) && !isThemeParkExperience(l));
+    const unusedAny = city.landmarks.filter(
+      (l) => !opts.ledgerNames.has(l.name) && eligible(l),
+    );
+    const notPriorAnchor = city.landmarks.filter((l) => !prior.has(l.name) && eligible(l));
     const pool =
       unusedAny.length > 0
         ? unusedAny
         : notPriorAnchor.length > 0
           ? notPriorAnchor
-          : day.role === "arrival" || day.role === "departure"
-            ? city.landmarks
+          : travelDay
+            ? city.landmarks.filter(eligible)
             : notPriorAnchor;
     if (pool.length === 0) {
-      return city.landmarks[0]!;
+      return city.landmarks.find(eligible) ?? city.landmarks[0]!;
     }
     const ranked = [...pool]
       .map((lm) => ({
@@ -588,39 +623,53 @@ export function selectSoftFiller(
   anchor: Landmark,
   ledgerNames: Set<string>,
   visitWindow?: VisitWindow,
+  alreadyToday: Landmark[] = [],
 ): Landmark | null {
+  if (isThemeParkExperience(anchor) || day.theme.id === "theme_park") return null;
+  const today = alreadyToday.length > 0 ? alreadyToday : [anchor];
   const radius = clusterRadiusKm(plan);
   const budget = travelTimeBudget(plan);
-  const exclude = new Set([...ledgerNames, anchor.name]);
+  const dayBudget = travelDayBudget(plan);
+  const exclude = new Set([...ledgerNames, anchor.name, ...today.map((l) => l.name)]);
   let pool = city.landmarks.filter(
     (l) =>
       !exclude.has(l.name) &&
       l.intensity !== "high" &&
       !l.interestTags.includes("theme-parks") &&
-      !sharesAnyDayActivityCategory(l, [anchor]) &&
+      !sharesAnyDayActivityCategory(l, today) &&
       pairingAllowedForDay(anchor, l) &&
-      fitsBudgetStyle(l, plan.budgetStyle) &&
-      estimateDurationMin(anchor, l, plan) <= Math.round(budget.softMaxMin * 1.25),
+      today.every((t) => pairingAllowedForDay(t, l)) &&
+      fitsBudgetStyle(l, plan.budgetStyle),
   );
-  if (pool.length === 0) {
-    pool = city.landmarks.filter(
-      (l) =>
-        !exclude.has(l.name) &&
-        l.intensity !== "high" &&
-        !l.interestTags.includes("theme-parks") &&
-        !sharesAnyDayActivityCategory(l, [anchor]) &&
-        pairingAllowedForDay(anchor, l) &&
-        fitsBudgetStyle(l, plan.budgetStyle) &&
-        haversineKm(l.lat, l.lng, anchor.lat, anchor.lng) <= radius,
+
+  if (shouldIncludeNaps(plan)) {
+    const nearStay = pool.filter((l) => {
+      const mins = stayTravelMin(l, plan);
+      if (mins != null) return mins <= dayBudget.softMaxMin;
+      const km = stayKm(l, plan);
+      return km == null || km <= LOW_FRICTION_STAY_KM;
+    });
+    if (nearStay.length > 0) pool = nearStay;
+  } else {
+    pool = pool.filter(
+      (l) => estimateDurationMin(anchor, l, plan) <= Math.round(budget.softMaxMin * 1.25),
     );
+    if (pool.length === 0) {
+      pool = city.landmarks.filter(
+        (l) =>
+          !exclude.has(l.name) &&
+          l.intensity !== "high" &&
+          !l.interestTags.includes("theme-parks") &&
+          !sharesAnyDayActivityCategory(l, today) &&
+          pairingAllowedForDay(anchor, l) &&
+          fitsBudgetStyle(l, plan.budgetStyle) &&
+          haversineKm(l.lat, l.lng, anchor.lat, anchor.lng) <= radius,
+      );
+    }
   }
   if (visitWindow) {
     const open = pool.filter((l) => isLandmarkOpenForVisit(l, visitWindow));
     if (open.length > 0) pool = open;
-  }
-  if (isThemeParkExperience(anchor)) {
-    const chill = pool.filter((l) => isChillDayCompanion(l));
-    if (chill.length > 0) pool = chill;
   }
   const outdoor = pool.filter((l) =>
     l.interestTags.some((t) => ["parks", "beaches", "nature", "playgrounds"].includes(t)),

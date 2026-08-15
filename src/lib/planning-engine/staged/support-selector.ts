@@ -14,7 +14,6 @@ import {
   dayAlreadyHasHeavyLandmark,
   exceedsBudgetStyleTicket,
   fitsBudgetStyle,
-  isChillDayCompanion,
   isHeavyDayLandmark,
   isOutdoorPlayground,
   isThemeParkExperience,
@@ -26,6 +25,7 @@ import {
   sharesHeavyDayLoad,
 } from "@/lib/planning-engine/staged/landmark-experience";
 import type { DayBlueprint } from "@/lib/planning-engine/staged/types";
+import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import type { TripPlan } from "@/types/trip-plan";
 
 export type SelectSupportOptions = {
@@ -35,8 +35,12 @@ export type SelectSupportOptions = {
   alreadyToday: Landmark[];
 };
 
-function maxSupport(day: DayBlueprint): number {
+function maxSupport(day: DayBlueprint, anchor?: Landmark): number {
   if (day.role === "departure" || day.role === "recovery") return 0;
+  if (day.theme.id === "theme_park") return 0;
+  if (anchor && isThemeParkExperience(anchor)) return 0;
+  const capped = day.constraints.find((c) => c.type === "max_activities");
+  if (capped && capped.type === "max_activities" && capped.n <= 1) return 0;
   if (day.constraints.some((c) => c.type === "require_half_day_window")) {
     return Math.min(1, day.capacity.maxSupportStops);
   }
@@ -128,11 +132,28 @@ export function scoreSupportCandidate(
   if (sharesHeavyDayLoad(landmark, anchor)) score -= 120;
   if (exceedsBudgetStyleTicket(landmark, plan.budgetStyle)) score -= 80;
 
-  if (isThemeParkExperience(anchor)) {
-    if (isChillDayCompanion(landmark)) score += 40;
-    else score -= 120;
-  } else if (isThemeParkExperience(landmark)) {
-    score -= 120;
+  // Theme parks are exclusive — never score companions.
+  if (isThemeParkExperience(anchor) || isThemeParkExperience(landmark)) {
+    score -= 200;
+  }
+
+  // Nap days return home midday: prefer the morning stop near stay so only
+  // one activity (usually the afternoon anchor) can be the longer hop.
+  if (shouldIncludeNaps(plan) && day.role !== "arrival") {
+    const fromStay = stayTravelMin(landmark, plan);
+    const dayBudget = travelDayBudget(plan);
+    if (fromStay != null) {
+      if (fromStay <= dayBudget.preferredMin) score += 48;
+      else if (fromStay <= dayBudget.softMaxMin) score += 12;
+      else score -= 55;
+    } else {
+      const fromStayKm = stayKm(landmark, plan);
+      if (fromStayKm != null) {
+        if (fromStayKm <= LOW_FRICTION_PREFERRED_KM) score += 48;
+        else if (fromStayKm <= LOW_FRICTION_STAY_KM) score += 12;
+        else score -= 55;
+      }
+    }
   }
 
   // Beach day support: playground / boardwalk / nearby park complement the shoreline anchor
@@ -154,7 +175,7 @@ export function selectSupportForDay(
   anchor: Landmark,
   opts: SelectSupportOptions,
 ): Landmark[] {
-  const n = maxSupport(day);
+  const n = maxSupport(day, anchor);
   if (n <= 0) return [];
 
   const radius = clusterRadiusKm(plan);
@@ -168,6 +189,7 @@ export function selectSupportForDay(
 
   // Never stack the same experience category twice on one day (e.g. beach + waterfront playground).
   pool = pool.filter((l) => !sharesDayActivityCategory(l, anchor));
+  pool = pool.filter((l) => !sharesAnyDayActivityCategory(l, opts.alreadyToday));
   pool = pool.filter((l) => pairingAllowedForDay(anchor, l));
   pool = pool.filter((l) => fitsBudgetStyle(l, plan.budgetStyle));
 
@@ -206,6 +228,16 @@ export function selectSupportForDay(
         if (lightWider.length > 0) pool = lightWider;
       }
     }
+  } else if (shouldIncludeNaps(plan)) {
+    // Nap hub: morning support stays near home; afternoon anchor may be the far hop.
+    const dayBudget = travelDayBudget(plan);
+    const nearStay = pool.filter((l) => {
+      const mins = stayTravelMin(l, plan);
+      if (mins != null) return mins <= dayBudget.softMaxMin;
+      const km = stayKm(l, plan);
+      return km == null || km <= LOW_FRICTION_STAY_KM;
+    });
+    if (nearStay.length > 0) pool = nearStay;
   } else {
     const budget = travelTimeBudget(plan);
     const nearby = pool.filter(

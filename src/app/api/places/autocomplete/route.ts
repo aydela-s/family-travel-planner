@@ -43,23 +43,41 @@ export async function GET(request: Request) {
 
   if (apiKey) {
     try {
-      const input =
-        isAddress && bias?.cityName ? enrichQuery(query, bias.cityName) : query;
+      const hasBiasCoords =
+        typeof lat === "number" &&
+        !Number.isNaN(lat) &&
+        typeof lng === "number" &&
+        !Number.isNaN(lng);
 
+      // Stay search: use the typed query + location bias. Appending ", Dallas" to
+      // short prefixes ("Ma", "Ho") makes Places return nothing — bias is enough.
       googleSuggestions = await autocompletePlacesNew({
-        input,
+        input: query,
         apiKey,
         includedPrimaryTypes: isAddress ? undefined : ["(cities)"],
         includedRegionCodes:
           isAddress && bias?.country ? [bias.country] : undefined,
-        locationBias:
-          typeof lat === "number" &&
-          !Number.isNaN(lat) &&
-          typeof lng === "number" &&
-          !Number.isNaN(lng)
-            ? { lat, lng, radiusMeters: STAY_BIAS_RADIUS_M }
-            : undefined,
+        locationBias: hasBiasCoords
+          ? { lat: lat as number, lng: lng as number, radiusMeters: STAY_BIAS_RADIUS_M }
+          : undefined,
       });
+
+      // If still empty for a clearer hotel/address string, retry with city in the query.
+      if (
+        isAddress &&
+        googleSuggestions.length === 0 &&
+        bias?.cityName &&
+        query.length >= 3
+      ) {
+        googleSuggestions = await autocompletePlacesNew({
+          input: enrichQuery(query, bias.cityName),
+          apiKey,
+          includedRegionCodes: bias.country ? [bias.country] : undefined,
+          locationBias: hasBiasCoords
+            ? { lat: lat as number, lng: lng as number, radiusMeters: STAY_BIAS_RADIUS_M }
+            : undefined,
+        });
+      }
 
       if (isAddress && bias?.cityName) {
         googleSuggestions = rankStaySuggestionsByDestination(

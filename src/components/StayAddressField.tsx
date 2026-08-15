@@ -17,6 +17,8 @@ export default function StayAddressField({
   onChange,
   onSelect,
   destination = "",
+  destinationLat = null,
+  destinationLng = null,
   disabled = false,
 }: {
   value: string;
@@ -24,6 +26,8 @@ export default function StayAddressField({
   /** Fired when the user picks a suggestion (includes coords when details resolve). */
   onSelect?: (selection: StayPlaceSelection) => void;
   destination?: string;
+  destinationLat?: number | null;
+  destinationLng?: number | null;
   disabled?: boolean;
 }) {
   const [query, setQuery] = useState(value);
@@ -35,6 +39,8 @@ export default function StayAddressField({
   const requestSeq = useRef(0);
   /** When set, query matches a committed pick — don't re-fetch or reopen the list. */
   const pickedLabelRef = useRef<string | null>(null);
+
+  const destinationCity = destination.split(",")[0]?.trim() || "";
 
   useEffect(() => {
     setQuery(value);
@@ -81,6 +87,10 @@ export default function StayAddressField({
         if (destination.trim()) {
           params.set("destination", destination.trim());
         }
+        if (typeof destinationLat === "number" && typeof destinationLng === "number") {
+          params.set("lat", String(destinationLat));
+          params.set("lng", String(destinationLng));
+        }
         const res = await fetch(`/api/places/autocomplete?${params}`, {
           signal: controller.signal,
         });
@@ -104,13 +114,13 @@ export default function StayAddressField({
       } finally {
         if (seq === requestSeq.current) setLoading(false);
       }
-    }, 280);
+    }, 180);
 
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, destination, disabled]);
+  }, [query, destination, destinationLat, destinationLng, disabled]);
 
   async function selectSuggestion(s: Suggestion) {
     pickedLabelRef.current = s.label;
@@ -165,6 +175,12 @@ export default function StayAddressField({
   const showPanel =
     !disabled && open && query.length >= 2 && !loading && pickedLabelRef.current !== query;
 
+  const emptyHint = fetchError
+    ? "Suggestions aren’t loading right now — type your hotel or address and continue."
+    : query.trim().length < 3
+      ? "Keep typing your hotel name or street address."
+      : "No suggestions yet — keep typing, or enter the stay as you know it.";
+
   return (
     <div ref={wrapperRef} className={`relative ${disabled ? "opacity-50" : ""}`}>
       <input
@@ -191,7 +207,7 @@ export default function StayAddressField({
       />
       {loading && !disabled && (
         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">
-          Searching...
+          Searching…
         </span>
       )}
       {showPanel && suggestions.length > 0 && (
@@ -211,16 +227,12 @@ export default function StayAddressField({
       )}
       {showPanel && suggestions.length === 0 && (
         <div className="absolute z-20 mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm leading-relaxed text-muted shadow-[var(--shadow-card)]">
-          {fetchError
-            ? "Couldn’t load stay suggestions — you can still type a hotel or address."
-            : destination.trim()
-              ? `No matches near ${destination.split(",")[0]?.trim() || "your destination"} — you can still type a hotel or address.`
-              : "No matches — you can still type a hotel or address."}
+          {emptyHint}
         </div>
       )}
       <p className="mt-2 text-xs text-muted">
-        {destination.trim()
-          ? `Suggestions prefer places near ${destination.split(",")[0]?.trim()}.`
+        {destinationCity
+          ? `We’ll prefer places near ${destinationCity}.`
           : "Example: Marriott Downtown or 123 Main Street"}
       </p>
     </div>

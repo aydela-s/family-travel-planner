@@ -221,11 +221,12 @@ async function enrichDay(
         if (titleLandmark.placeId) act.placeId = titleLandmark.placeId;
       } else {
         // Prefer anchoring meals near an already-picked activity, not a fresh random landmark.
+        // Use the same coords — a tiny offset was billing fake taxi hops (~0.4km+).
         const anchor = pickedLandmarks[pickedLandmarks.length - 1] ?? city.landmarks[0]!;
         act.location = {
           name: `${anchor.name} area`,
-          lat: anchor.lat + 0.004,
-          lng: anchor.lng - 0.004,
+          lat: anchor.lat,
+          lng: anchor.lng,
         };
         if (anchor.placeId) act.placeId = anchor.placeId;
       }

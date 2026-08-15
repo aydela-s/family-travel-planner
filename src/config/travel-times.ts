@@ -17,7 +17,7 @@ export const TRAVEL_TIME_BY_MODE: Record<TransportationType, TravelTimeBudget> =
 };
 
 /** Consecutive stops closer than this are treated as walkable — no taxi fare. */
-export const WALKABLE_TAXI_KM = 0.4;
+export const WALKABLE_TAXI_KM = 1.2;
 
 /** Google Directions `mode` for a trip transportation type. */
 export type DirectionsTravelMode = "walking" | "driving" | "transit";

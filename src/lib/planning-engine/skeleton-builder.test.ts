@@ -47,42 +47,44 @@ describe("buildDayIntents — Phase 1 skeleton alignment", () => {
     expect(intents.find((i) => i.kind === "morning_activity")?.defaultTime).toBe("08:30");
   });
 
-  it("balanced day includes a soft evening stroll before dinner", () => {
+  it("balanced day has afternoon activity then dinner with no quiet-time slot", () => {
     const kinds = slotKinds(basePlan({ travelStyle: "balanced" }));
-    expect(kinds).toContain("evening_rest");
     expect(kinds).toContain("afternoon_activity");
     expect(kinds).toContain("dinner");
-  });
-
-  it("skips evening stroll for young kids when a nap already fills the afternoon", () => {
-    const kinds = slotKinds(
-      basePlan({
-        travelStyle: "balanced",
-        children: [3, 5],
-        naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
-      }),
-    );
-    expect(kinds).toContain("afternoon_activity");
     expect(kinds).not.toContain("evening_rest");
   });
 
-  it("packed day has three pre-dinner activities, no evening stroll, and no midday rest", () => {
+  it("packed day has three pre-dinner activities, no evening rest, and no midday rest", () => {
     const kinds = slotKinds(basePlan({ travelStyle: "packed" }));
     expect(kinds.filter((k) => k === "morning_activity" || k === "afternoon_activity" || k === "extra_activity")).toHaveLength(3);
     expect(kinds).not.toContain("evening_rest");
     expect(kinds).not.toContain("midday_rest");
   });
 
-  it("balanced day keeps a midday rest when naps are off", () => {
+  it("balanced day skips midday rest when an afternoon activity follows", () => {
     const kinds = slotKinds(basePlan({ travelStyle: "balanced", naps: [] }));
-    expect(kinds).toContain("midday_rest");
+    expect(kinds).toContain("afternoon_activity");
+    expect(kinds).not.toContain("midday_rest");
   });
 
-  it("relaxed day has calm activity and a soft evening stroll", () => {
+  it("never schedules quiet time regardless of accommodation", () => {
+    for (const accommodationType of [
+      "hotel_breakfast_included",
+      "hotel_no_breakfast",
+      "staying_with_family_or_friends",
+      "airbnb_full_kitchen",
+    ] as const) {
+      const kinds = slotKinds(basePlan({ travelStyle: "balanced", accommodationType }));
+      expect(kinds).not.toContain("evening_rest");
+      expect(kinds).toContain("dinner");
+    }
+  });
+
+  it("relaxed day has calm activity and no evening quiet-time slot", () => {
     const kinds = slotKinds(basePlan({ travelStyle: "relaxed" }));
     expect(kinds).toContain("calm_activity");
     expect(kinds).not.toContain("afternoon_rest");
     expect(kinds).not.toContain("afternoon_activity");
-    expect(kinds).toContain("evening_rest");
+    expect(kinds).not.toContain("evening_rest");
   });
 });

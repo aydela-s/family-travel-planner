@@ -94,6 +94,19 @@ describe("places → CityConfig mapping (FAM-59)", () => {
     expect(landmarks[0]!.interestTags.sort()).toEqual(["museums", "zoos"].sort());
   });
 
+  it("marks arcades as tween/teen only and indoor play as toddler/child", () => {
+    const arcade = landmarkFromTopActivity(
+      place({ id: "arcade", name: "Dallas Arcade Palace" }),
+      ["entertainment"],
+    );
+    const softPlay = landmarkFromTopActivity(
+      place({ id: "play", name: "Kids Empire Dallas Hillcrest" }),
+      ["indoor-play", "playgrounds"],
+    );
+    expect(arcade?.ageTags).toEqual(["tween", "teen"]);
+    expect(softPlay?.ageTags).toEqual(["toddler", "child"]);
+  });
+
   it("does not tag city parks or soft play as theme parks", () => {
     const fromThemeSearch = landmarksFromPlacesResults([
       {
@@ -115,7 +128,33 @@ describe("places → CityConfig mapping (FAM-59)", () => {
     expect(byName["Klyde Warren Park"]).not.toContain("theme-parks");
     expect(byName["Kids Empire Dallas Hillcrest"]).toContain("indoor-play");
     expect(byName["Kids Empire Dallas Hillcrest"]).not.toContain("theme-parks");
+    expect(byName["Kids Empire Dallas Hillcrest"]).not.toContain("playgrounds");
     expect(byName["Six Flags Over Texas"]).toContain("theme-parks");
+  });
+
+  it("tags Fritz's Adventure / DINO KIDZ as indoor-play, not playgrounds or theme parks", () => {
+    const landmarks = landmarksFromPlacesResults([
+      {
+        category: "Playgrounds & Indoor Play",
+        places: [
+          place({
+            id: "1",
+            name: "Fritz's Adventure - The Colony",
+            latitude: 33.08,
+            longitude: -96.88,
+          }),
+          place({
+            id: "2",
+            name: "DINO KIDZ - Castle Hills",
+            latitude: 33.0,
+            longitude: -96.9,
+          }),
+        ],
+      },
+    ]);
+    const byName = Object.fromEntries(landmarks.map((l) => [l.name, l.interestTags]));
+    expect(byName["Fritz's Adventure - The Colony"]).toEqual(["indoor-play"]);
+    expect(byName["DINO KIDZ - Castle Hills"]).toEqual(["indoor-play"]);
   });
 
   it("keeps art museums out of interactive and beaches free", () => {

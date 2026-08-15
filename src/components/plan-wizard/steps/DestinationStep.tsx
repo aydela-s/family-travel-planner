@@ -2,7 +2,11 @@ import { StepProps } from "@/types/trip-plan";
 import DestinationAutocomplete from "@/components/DestinationAutocomplete";
 import { StepIntro } from "../shared";
 
-export default function DestinationStep({ formData, updateFormData }: StepProps) {
+export default function DestinationStep({
+  formData,
+  updateFormData,
+  setStepBusy,
+}: StepProps) {
   return (
     <div className="space-y-6">
       <StepIntro
@@ -33,6 +37,7 @@ export default function DestinationStep({ formData, updateFormData }: StepProps)
               destinationLng: selection.lng,
             })
           }
+          onResolvingChange={setStepBusy}
         />
       </div>
     </div>

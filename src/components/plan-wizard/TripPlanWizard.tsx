@@ -1,18 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ComponentType, type KeyboardEvent } from "react";
 import BackToTopButton from "@/components/BackToTopButton";
 import { useFeedbackVisibility } from "@/components/FeedbackVisibility";
 import { shouldAllowFeedbackLauncher } from "@/lib/feedback-visibility";
-import ItineraryDisplay from "@/components/ItineraryDisplay";
 import LoadingScreen from "@/components/LoadingScreen";
 import { TripNestlyLogo } from "@/components/TripNestlyLogo";
 import { BRAND } from "@/config/brand";
 import { Itinerary } from "@/types/itinerary";
 import { GenerateItineraryOptions } from "@/types/generate";
-import { initialTripPlan, TripPlan } from "@/types/trip-plan";
+import { initialTripPlan, TripPlan, type StepProps } from "@/types/trip-plan";
 import { getDatesValidationError } from "@/lib/planning-engine/date-validation";
 import {
   findFirstIncompleteWizardStep,
@@ -20,19 +20,10 @@ import {
   WIZARD_STEP_TITLES,
   type WizardStepTitle,
 } from "@/lib/plan-wizard/step-gate";
-import { resolveStayFromText } from "@/lib/planning-engine/resolve-stay";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import StepTransition from "./StepTransition";
-import ActivityInterestsStep from "./steps/ActivityInterestsStep";
-import BudgetStyleStep from "./steps/BudgetStyleStep";
-import DatesStep from "./steps/DatesStep";
 import DestinationStep from "./steps/DestinationStep";
-import FoodPreferencesStep from "./steps/FoodPreferencesStep";
-import NapScheduleStep from "./steps/NapScheduleStep";
-import SummaryStep from "./steps/SummaryStep";
-import TransportationStep from "./steps/TransportationStep";
-import TravelersStep from "./steps/TravelersStep";
-import TravelStyleStep from "./steps/TravelStyleStep";
+import { WizardShell } from "./WizardShell";
 import {
   btnCtaClassName,
   btnGhostClassName,
@@ -40,27 +31,83 @@ import {
   btnSecondaryClassName,
 } from "./shared";
 
+/** Keep PDF/export off the first wizard paint. */
+const ItineraryDisplay = dynamic(() => import("@/components/ItineraryDisplay"), {
+  ssr: false,
+  loading: () => <LoadingScreen message="Building your itinerary…" />,
+});
+
+type StepLoader = () => Promise<{ default: ComponentType<StepProps> }>;
+
 const TOTAL_STEPS = 10;
 
-const steps = [
-  { title: "Destination" as const, component: DestinationStep },
-  { title: "Dates" as const, component: DatesStep },
-  { title: "Travelers" as const, component: TravelersStep },
-  { title: "Stay" as const, component: FoodPreferencesStep },
-  { title: "Getting Around" as const, component: TransportationStep },
-  { title: "Travel Style" as const, component: TravelStyleStep },
-  { title: "Naps & Food" as const, component: NapScheduleStep },
-  { title: "Budget" as const, component: BudgetStyleStep },
-  { title: "Interests" as const, component: ActivityInterestsStep },
-  { title: "Summary" as const, component: SummaryStep },
-] as const;
+/** Explicit loaders — Destination is eager; others load on demand into a cache. */
+const STEP_LOADERS: Array<StepLoader | null> = [
+  null,
+  () => import("./steps/DatesStep"),
+  () => import("./steps/TravelersStep"),
+  () => import("./steps/FoodPreferencesStep"),
+  () => import("./steps/TransportationStep"),
+  () => import("./steps/TravelStyleStep"),
+  () => import("./steps/NapScheduleStep"),
+  () => import("./steps/BudgetStyleStep"),
+  () => import("./steps/ActivityInterestsStep"),
+  () => import("./steps/SummaryStep"),
+];
 
-// Compile-time guard: wizard UI order must match the gate used for skip prevention.
-WIZARD_STEP_TITLES.forEach((title, i) => {
-  if (steps[i]?.title !== title) {
-    throw new Error(`Wizard step order mismatch at ${i}: expected ${title}`);
+const stepComponentCache: Array<ComponentType<StepProps> | null> = [
+  DestinationStep,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+];
+
+const stepLoadPromises: Array<Promise<ComponentType<StepProps>> | null> = STEP_LOADERS.map(
+  () => null,
+);
+
+/** Resolve a step component before navigating — never paint an empty lazy placeholder. */
+function ensureStepComponent(index: number): Promise<ComponentType<StepProps>> {
+  if (index < 0 || index >= TOTAL_STEPS) {
+    return Promise.resolve(DestinationStep);
   }
-});
+  const cached = stepComponentCache[index];
+  if (cached) return Promise.resolve(cached);
+
+  const existing = stepLoadPromises[index];
+  if (existing) return existing;
+
+  const loader = STEP_LOADERS[index];
+  if (!loader) {
+    return Promise.resolve(DestinationStep);
+  }
+
+  const promise = loader().then((mod) => {
+    stepComponentCache[index] = mod.default;
+    return mod.default;
+  });
+  stepLoadPromises[index] = promise;
+  return promise;
+}
+
+/** Prefetch upcoming step chunks (and nearby deps) while the user is still typing. */
+function prefetchWizardAhead(fromIndex: number) {
+  void ensureStepComponent(fromIndex + 1);
+  void ensureStepComponent(fromIndex + 2);
+
+  if (fromIndex >= 2 && fromIndex <= 3) {
+    void import("@/lib/planning-engine/resolve-stay");
+  }
+  if (fromIndex >= TOTAL_STEPS - 2) {
+    void import("@/components/ItineraryDisplay");
+  }
+}
 
 type GenerateParams = GenerateItineraryOptions & {
   planOverride?: Partial<TripPlan>;
@@ -84,14 +131,52 @@ export default function TripPlanWizard() {
   const [isDemo, setIsDemo] = useState(false);
   const [useDemoNext, setUseDemoNext] = useState(false);
   const [isAdvancing, setIsAdvancing] = useState(false);
+  /** Places confirm / other in-step async work (destination pick, etc.). */
+  const [isStepBusy, setIsStepBusy] = useState(false);
   /** Blocks double Continue / Enter while Stay geocode (or any advance) is in flight. */
   const advancingRef = useRef(false);
+  /** Always a real step component — never a blank dynamic() loading shell. */
+  const [StepComponent, setStepComponent] =
+    useState<ComponentType<StepProps>>(() => DestinationStep);
 
-  const currentStep = steps[stepIndex];
-  const StepComponent = currentStep.component;
+  const currentTitle = WIZARD_STEP_TITLES[stepIndex]!;
   const isFirstStep = stepIndex === 0;
   const isLastStep = stepIndex === TOTAL_STEPS - 1;
-  const progress = ((stepIndex + 1) / TOTAL_STEPS) * 100;
+  const continueBusy = isAdvancing || isStepBusy;
+
+  async function goToStep(nextIndex: number, direction: "forward" | "back") {
+    const component = await ensureStepComponent(nextIndex);
+    setStepComponent(() => component);
+    setStepDirection(direction);
+    setStepIndex(nextIndex);
+  }
+
+  useEffect(() => {
+    setIsStepBusy(false);
+  }, [stepIndex]);
+
+  // While the user fills this step, warm the next one(s) so Continue feels instant.
+  useEffect(() => {
+    if (itinerary || isLoading) return;
+    let cancelled = false;
+    const run = () => {
+      if (!cancelled) prefetchWizardAhead(stepIndex);
+    };
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(run);
+    } else {
+      timeoutId = setTimeout(run, 1);
+    }
+    return () => {
+      cancelled = true;
+      if (idleId != null && typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
+  }, [stepIndex, itinerary, isLoading]);
 
   // Feedback launcher: only on the itinerary/planner view — never during wizard steps (FAM-79).
   useEffect(() => {
@@ -104,9 +189,10 @@ export default function TripPlanWizard() {
     if (itinerary || isLoading) return;
     const incomplete = findFirstIncompleteWizardStep(formData);
     if (incomplete === null || incomplete >= stepIndex) return;
-    setStepDirection("back");
-    setStepIndex(incomplete);
-    setError("Almost there — just fill in what's missing and we'll keep going.");
+    void (async () => {
+      await goToStep(incomplete, "back");
+      setError("Almost there — just fill in what's missing and we'll keep going.");
+    })();
   }, [formData, stepIndex, itinerary, isLoading]);
 
   useEffect(() => {
@@ -145,14 +231,23 @@ export default function TripPlanWizard() {
     setError("");
   }
 
-  function goBack() {
+  async function goBack() {
     if (isFirstStep || advancingRef.current) return;
-    setStepDirection("back");
-    setStepIndex((index) => index - 1);
-    setError("");
+    advancingRef.current = true;
+    setIsAdvancing(true);
+    try {
+      await goToStep(stepIndex - 1, "back");
+      setError("");
+    } finally {
+      advancingRef.current = false;
+      setIsAdvancing(false);
+    }
   }
 
-  function getStepError(plan: TripPlan, title: WizardStepTitle = steps[stepIndex].title): string | null {
+  function getStepError(
+    plan: TripPlan,
+    title: WizardStepTitle = WIZARD_STEP_TITLES[stepIndex]!,
+  ): string | null {
     if (title === "Destination" && !isWizardStepComplete(plan, title)) {
       return "Pick a city from the suggestions so we can plan in the right place.";
     }
@@ -178,7 +273,7 @@ export default function TripPlanWizard() {
     if (advancingRef.current || isLastStep) return;
 
     const fromIndex = stepIndex;
-    const stepError = getStepError(formData, steps[fromIndex].title);
+    const stepError = getStepError(formData, WIZARD_STEP_TITLES[fromIndex]!);
     if (stepError) {
       setError(stepError);
       return;
@@ -187,17 +282,17 @@ export default function TripPlanWizard() {
     advancingRef.current = true;
     setIsAdvancing(true);
     try {
-      if (steps[fromIndex].title === "Stay") {
+      if (WIZARD_STEP_TITLES[fromIndex] === "Stay") {
         setError("");
+        const { resolveStayFromText } = await import("@/lib/planning-engine/resolve-stay");
         const resolved = await resolveStayFromText(formData);
         if (resolved) {
           setFormData((current) => ({ ...current, ...resolved }));
         }
       }
 
-      // Absolute next index — never stack +1 from concurrent Continue clicks.
-      setStepDirection("forward");
-      setStepIndex(fromIndex + 1);
+      // Load next step first, then swap — avoids a blank dynamic() flash.
+      await goToStep(fromIndex + 1, "forward");
       setError("");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
@@ -215,6 +310,7 @@ export default function TripPlanWizard() {
     setError("");
 
     try {
+      const { resolveStayFromText } = await import("@/lib/planning-engine/resolve-stay");
       const resolved = await resolveStayFromText(plan);
       if (resolved) {
         plan = { ...plan, ...resolved };
@@ -280,12 +376,13 @@ export default function TripPlanWizard() {
   function handleGenerate(demo = false) {
     const incomplete = findFirstIncompleteWizardStep(formData);
     if (incomplete !== null) {
-      setStepDirection("back");
-      setStepIndex(incomplete);
-      setError(
-        getStepError(formData, steps[incomplete].title) ??
-          "Almost there — just fill in what's missing and we'll keep going.",
-      );
+      void (async () => {
+        await goToStep(incomplete, "back");
+        setError(
+          getStepError(formData, WIZARD_STEP_TITLES[incomplete]!) ??
+            "Almost there — just fill in what's missing and we'll keep going.",
+        );
+      })();
       return;
     }
     setUseDemoNext(demo);
@@ -295,6 +392,7 @@ export default function TripPlanWizard() {
   function resetWizard() {
     setItinerary(null);
     setIsDemo(false);
+    setStepComponent(() => DestinationStep);
     setStepIndex(0);
     setStepDirection("forward");
     setFormData(initialTripPlan);
@@ -311,20 +409,21 @@ export default function TripPlanWizard() {
     });
   }
 
-  function editPlanInWizard(stepIndex: number, updates?: Partial<TripPlan>) {
+  function editPlanInWizard(nextStepIndex: number, updates?: Partial<TripPlan>) {
     if (updates) {
       setFormData((current) => ({ ...current, ...updates }));
     }
     setItinerary(null);
     setIsDemo(false);
-    setStepDirection("back");
-    setStepIndex(stepIndex);
-    setError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    void (async () => {
+      await goToStep(nextStepIndex, "back");
+      setError("");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    })();
   }
 
   function handleStepKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "Enter" || isLoading || isAdvancing) return;
+    if (e.key !== "Enter" || isLoading || continueBusy) return;
     const target = e.target as HTMLElement;
     // Let textareas take literal newlines, and let a focused button handle its own Enter activation.
     if (target.tagName === "TEXTAREA" || target.tagName === "BUTTON") return;
@@ -400,95 +499,75 @@ export default function TripPlanWizard() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-4 py-8 sm:px-6 sm:py-12">
-      <div className="mx-auto max-w-2xl">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2.5 text-primary transition hover:opacity-80"
-        >
-          <TripNestlyLogo variant="mark" className="h-10 w-auto shrink-0" />
-          <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
-        </Link>
-
-        <div
-          className="mt-6 rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10"
-          onKeyDown={handleStepKeyDown}
-        >
-          <div className="mb-8">
-            <div className="flex items-center justify-between text-sm text-muted">
-              <span className="font-medium">
-                {stepIndex + 1} of {TOTAL_STEPS}
-              </span>
-              <span className="font-semibold text-accent">{currentStep.title}</span>
-            </div>
-            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-border/60">
-              <div
-                className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            {stepIndex === 0 && (
-              <p className="mt-3 text-sm leading-relaxed text-muted">
-                Let&apos;s plan something your whole family will love.
+    <>
+      <WizardShell
+        stepIndex={stepIndex}
+        totalSteps={TOTAL_STEPS}
+        stepTitle={currentTitle}
+        footer={
+          <>
+            {error && (
+              <p className="mt-6 rounded-2xl border border-error/20 bg-error-muted px-4 py-3.5 text-sm leading-relaxed text-error">
+                {error}
               </p>
             )}
-          </div>
 
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              {!isFirstStep && (
+                <button
+                  type="button"
+                  onClick={() => void goBack()}
+                  disabled={isLoading || continueBusy}
+                  className={`order-2 sm:order-1 sm:flex-1 ${btnSecondaryClassName}`}
+                >
+                  Back
+                </button>
+              )}
+
+              {isLastStep ? (
+                <div className="order-1 flex w-full flex-col gap-3 sm:order-2 sm:flex-1">
+                  <button
+                    type="button"
+                    onClick={() => handleGenerate(false)}
+                    disabled={isLoading || continueBusy}
+                    className={`w-full ${btnCtaClassName}`}
+                  >
+                    Generate itinerary
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleGenerate(true)}
+                    disabled={isLoading || continueBusy}
+                    className={`w-full ${btnGhostClassName}`}
+                  >
+                    Try demo (free, no API key)
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void goNext()}
+                  disabled={continueBusy}
+                  className={`order-1 w-full sm:flex-1 ${btnPrimaryClassName}`}
+                >
+                  {continueBusy ? "One moment…" : "Sounds good →"}
+                </button>
+              )}
+            </div>
+          </>
+        }
+      >
+        <div onKeyDown={handleStepKeyDown}>
           <StepTransition stepKey={stepIndex} direction={stepDirection}>
-            <StepComponent formData={formData} updateFormData={updateFormData} />
+            <StepComponent
+              formData={formData}
+              updateFormData={updateFormData}
+              setStepBusy={setIsStepBusy}
+            />
           </StepTransition>
-
-          {error && (
-            <p className="mt-6 rounded-2xl border border-error/20 bg-error-muted px-4 py-3.5 text-sm leading-relaxed text-error">
-              {error}
-            </p>
-          )}
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            {!isFirstStep && (
-              <button
-                type="button"
-                onClick={goBack}
-                disabled={isLoading || isAdvancing}
-                className={`order-2 sm:order-1 sm:flex-1 ${btnSecondaryClassName}`}
-              >
-                Back
-              </button>
-            )}
-
-            {isLastStep ? (
-              <div className="order-1 flex w-full flex-col gap-3 sm:order-2 sm:flex-1">
-                <button
-                  type="button"
-                  onClick={() => handleGenerate(false)}
-                  disabled={isLoading || isAdvancing}
-                  className={`w-full ${btnCtaClassName}`}
-                >
-                  Generate itinerary
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleGenerate(true)}
-                  disabled={isLoading || isAdvancing}
-                  className={`w-full ${btnGhostClassName}`}
-                >
-                  Try demo (free, no API key)
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void goNext()}
-                disabled={isAdvancing}
-                className={`order-1 w-full sm:flex-1 ${btnPrimaryClassName}`}
-              >
-                {isAdvancing ? "One moment…" : "Sounds good →"}
-              </button>
-            )}
-          </div>
         </div>
-      </div>
+      </WizardShell>
       <BackToTopButton />
-    </main>
+    </>
   );
 }

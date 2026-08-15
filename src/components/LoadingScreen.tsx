@@ -32,7 +32,9 @@ export default function LoadingScreen({ message }: { message?: string }) {
         {displayMessage}
       </p>
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted">
-        Building a plan your whole family can actually enjoy...
+        {message
+          ? "Hang tight — this won’t take long."
+          : "Building a plan your whole family can actually enjoy..."}
       </p>
 
       <div className="mt-8 flex gap-2">
