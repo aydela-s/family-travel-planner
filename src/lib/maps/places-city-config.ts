@@ -13,18 +13,29 @@ import {
   LandmarkInterestTag,
   LandmarkOpeningHours,
 } from "@/config/city-pricing";
+import type { CityRestaurant } from "@/config/city-restaurants";
 import { detectCity, detectCityFromPlan } from "@/lib/city-detect";
+import {
+  DEFAULT_PLACES_RADIUS_METERS,
+  type PlacesLocationBias,
+  type TopActivity,
+} from "@/lib/maps/get-top-activities";
+import {
+  coordsMatchDefaultCity,
+  resolveDestinationCenter,
+} from "@/lib/maps/resolve-destination-center";
 import {
   getOrFetchTopActivities,
   type GetOrFetchOptions,
 } from "@/lib/maps/top-activities-cache";
-import type { TopActivity } from "@/lib/maps/get-top-activities";
 import { INTEREST_LABEL_TO_TAGS } from "@/lib/schedule/interest-map";
-import { TripPlan } from "@/types/trip-plan";
+import type { BudgetStyle, TripPlan } from "@/types/trip-plan";
 
 /** Soft floor — below this we keep DEFAULT_CITY fakes. */
 export const MIN_PLACES_LANDMARKS = 4;
 const MAX_CATEGORIES = 8;
+export const PLACES_RESTAURANT_CATEGORY = "family restaurants";
+const MAX_PLACES_RESTAURANTS = 12;
 
 const INDOOR_TAGS = new Set<LandmarkInterestTag>([
   "museums",
@@ -202,6 +213,19 @@ export function adultPriceFromPriceLevel(priceLevel: string | null): number {
   }
 }
 
+export function budgetStylesFromPriceLevel(priceLevel: string | null): BudgetStyle[] {
+  switch (priceLevel) {
+    case "PRICE_LEVEL_FREE":
+    case "PRICE_LEVEL_INEXPENSIVE":
+      return ["save", "balanced"];
+    case "PRICE_LEVEL_EXPENSIVE":
+    case "PRICE_LEVEL_VERY_EXPENSIVE":
+      return ["balanced", "splurge"];
+    default:
+      return ["save", "balanced", "splurge"];
+  }
+}
+
 function intensityForTags(tags: LandmarkInterestTag[]): LandmarkIntensity {
   if (tags.some((t) => HIGH_INTENSITY_TAGS.has(t))) return "high";
   if (tags.every((t) => LOW_INTENSITY_TAGS.has(t))) return "low";
@@ -299,6 +323,42 @@ export function landmarksFromPlacesResults(
   return [...byName.values()];
 }
 
+export function restaurantFromTopActivity(place: TopActivity): CityRestaurant | null {
+  if (typeof place.latitude !== "number" || typeof place.longitude !== "number") {
+    return null;
+  }
+  return {
+    name: place.name,
+    lat: place.latitude,
+    lng: place.longitude,
+    meals: ["lunch", "dinner"],
+    ageTags: ["toddler", "child", "tween", "teen"],
+    dietary: [],
+    budgetStyles: budgetStylesFromPriceLevel(place.priceLevel),
+    familyNote: "Nearby restaurant from Google Places.",
+    rating: place.rating,
+    placeId: place.id,
+  };
+}
+
+export function restaurantsFromPlacesResults(places: TopActivity[]): CityRestaurant[] {
+  const byName = new Map<string, CityRestaurant>();
+  for (const place of places) {
+    const restaurant = restaurantFromTopActivity(place);
+    if (!restaurant) continue;
+    const key = restaurant.name.toLowerCase();
+    if (!byName.has(key)) byName.set(key, restaurant);
+  }
+  return [...byName.values()].slice(0, MAX_PLACES_RESTAURANTS);
+}
+
+function locationBiasFromCity(lat: number, lng: number): PlacesLocationBias | undefined {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || coordsMatchDefaultCity(lat, lng)) {
+    return undefined;
+  }
+  return { lat, lng, radiusMeters: DEFAULT_PLACES_RADIUS_METERS };
+}
+
 export type BuildPlacesCityOptions = GetOrFetchOptions & {
   minLandmarks?: number;
 };
@@ -313,10 +373,15 @@ export async function buildCityConfigFromPlaces(
   options: BuildPlacesCityOptions = {},
 ): Promise<CityConfig | null> {
   const categories = placesSearchCategoriesFromInterests(interests);
+  const detected = detectCity(destination);
+  const location =
+    options.location ?? locationBiasFromCity(detected.lat, detected.lng);
+  const searchOptions = { ...options, location };
+
   const settled = await Promise.all(
-    categories.map(async (category) => {
+    [...categories, PLACES_RESTAURANT_CATEGORY].map(async (category) => {
       try {
-        const result = await getOrFetchTopActivities(destination, category, options);
+        const result = await getOrFetchTopActivities(destination, category, searchOptions);
         return { category, places: result.places };
       } catch {
         return { category, places: [] as TopActivity[] };
@@ -324,13 +389,15 @@ export async function buildCityConfigFromPlaces(
     }),
   );
 
-  const landmarks = landmarksFromPlacesResults(settled);
+  const landmarkRows = settled.filter((row) => row.category !== PLACES_RESTAURANT_CATEGORY);
+  const restaurantRow = settled.find((row) => row.category === PLACES_RESTAURANT_CATEGORY);
+  const landmarks = landmarksFromPlacesResults(landmarkRows);
+  const restaurants = restaurantsFromPlacesResults(restaurantRow?.places ?? []);
   const minLandmarks = options.minLandmarks ?? MIN_PLACES_LANDMARKS;
   if (landmarks.length < minLandmarks) {
     return null;
   }
 
-  const detected = detectCity(destination);
   const shortName = destination.split(",")[0]?.trim() || destination.trim() || DEFAULT_CITY.name;
 
   return {
@@ -338,9 +405,10 @@ export async function buildCityConfigFromPlaces(
     id: `places:${shortName.toLowerCase().replace(/\s+/g, "-")}`,
     name: shortName,
     // Prefer known destination center (Places pick / popular); not first zoo pin.
-    lat: detected.lat,
-    lng: detected.lng,
+    lat: location?.lat ?? detected.lat,
+    lng: location?.lng ?? detected.lng,
     landmarks,
+    restaurants,
   };
 }
 
@@ -348,33 +416,33 @@ export async function buildCityConfigFromPlaces(
  * Curated cities unchanged; non-curated try Places, else DEFAULT_CITY clone.
  */
 export async function resolvePlanningCity(
-  plan: Pick<TripPlan, "destination" | "interests" | "destinationLat" | "destinationLng">,
+  plan: Pick<
+    TripPlan,
+    "destination" | "interests" | "destinationLat" | "destinationLng" | "destinationPlaceId"
+  >,
   options: BuildPlacesCityOptions = {},
 ): Promise<CityConfig> {
   const detected = detectCityFromPlan(plan);
   if (isCuratedCity(detected)) {
     return detected;
   }
-  const fromPlaces = await buildCityConfigFromPlaces(
-    plan.destination,
-    plan.interests,
-    options,
-  );
+
+  const center = await resolveDestinationCenter(plan, options);
+  const location = locationBiasFromCity(center.lat, center.lng);
+  const fromPlaces = await buildCityConfigFromPlaces(plan.destination, plan.interests, {
+    ...options,
+    location,
+  });
   if (fromPlaces) {
-    // Keep Places-resolved destination center when the wizard already pinned one.
-    if (
-      typeof plan.destinationLat === "number" &&
-      typeof plan.destinationLng === "number" &&
-      Number.isFinite(plan.destinationLat) &&
-      Number.isFinite(plan.destinationLng)
-    ) {
-      return {
-        ...fromPlaces,
-        lat: plan.destinationLat,
-        lng: plan.destinationLng,
-      };
-    }
-    return fromPlaces;
+    return {
+      ...fromPlaces,
+      lat: center.lat,
+      lng: center.lng,
+    };
   }
-  return detected;
+  return {
+    ...detected,
+    lat: center.lat,
+    lng: center.lng,
+  };
 }

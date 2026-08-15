@@ -1,3 +1,5 @@
+import type { CityRestaurant } from "@/config/city-restaurants";
+
 export type TaxiProvider = "uber" | "lyft" | "bolt" | "gett";
 
 export type LandmarkAgeTag = "toddler" | "child" | "tween" | "teen";
@@ -106,6 +108,8 @@ export type CityConfig = {
     dinner: number;
   };
   landmarks: Landmark[];
+  /** Places-backed restaurant pool for non-curated cities (FAM-58). */
+  restaurants?: CityRestaurant[];
 };
 
 export const PRICING_DISCLAIMER =

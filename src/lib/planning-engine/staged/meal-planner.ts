@@ -1,6 +1,6 @@
 import type { CityConfig, Landmark } from "@/config/city-pricing";
 import type { CityRestaurant } from "@/config/city-restaurants";
-import { restaurantsForCityId } from "@/config/city-restaurants";
+import { restaurantsForCity } from "@/config/city-restaurants";
 import {
   breakfastLabel,
   dinnerLabel,
@@ -70,7 +70,7 @@ function shouldPreferOnSiteCafe(plan: TripPlan, meal: MealSlotKind): boolean {
 }
 
 function cityHasRestaurant(city: CityConfig, name: string): boolean {
-  return restaurantsForCityId(city.id).some((r) => r.name === name);
+  return restaurantsForCity(city).some((r) => r.name === name);
 }
 
 function planSlotMeal(

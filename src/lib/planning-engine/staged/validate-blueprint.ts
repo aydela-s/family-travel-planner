@@ -1,5 +1,5 @@
 import type { CityConfig, Landmark } from "@/config/city-pricing";
-import { restaurantsForCityId } from "@/config/city-restaurants";
+import { restaurantsForCity } from "@/config/city-restaurants";
 import { haversineKm } from "@/lib/maps/directions";
 import { stayTravelMin } from "@/lib/maps/travel-estimate";
 import { travelDayBudget } from "@/config/travel-times";
@@ -32,7 +32,7 @@ function stayKm(landmark: Landmark, plan: TripPlan): number | null {
 }
 
 function cityHasRestaurant(city: CityConfig, name: string): boolean {
-  return restaurantsForCityId(city.id).some((r) => r.name === name);
+  return restaurantsForCity(city).some((r) => r.name === name);
 }
 
 function anchorMatchesTheme(day: DayBlueprint, anchor: Landmark): boolean {

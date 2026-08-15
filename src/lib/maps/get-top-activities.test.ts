@@ -3,7 +3,6 @@ import {
   activityScore,
   getTopActivities,
   PlacesApiError,
-  PlacesApiKeyMissingError,
   rankTopActivitiesFromPlaces,
   type PlacesSearchTextPlace,
 } from "@/lib/maps/get-top-activities";
@@ -64,10 +63,8 @@ describe("getTopActivities", () => {
     vi.restoreAllMocks();
   });
 
-  it("throws when no API key is configured", async () => {
-    await expect(
-      getTopActivities("San Diego", "zoos", { env: {} }),
-    ).rejects.toBeInstanceOf(PlacesApiKeyMissingError);
+  it("returns empty when no API key is configured", async () => {
+    await expect(getTopActivities("San Diego", "zoos", { env: {} })).resolves.toEqual([]);
   });
 
   it("calls Places searchText and maps the response", async () => {
@@ -92,6 +89,27 @@ describe("getTopActivities", () => {
       textQuery: "zoos in San Diego",
     });
     expect(places.map((p) => p.id)).toEqual(["zoo-a", "zoo-b"]);
+  });
+
+  it("sends locationBias when a destination center is provided", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ places: [] }),
+    });
+    await getTopActivities("Dallas, TX", "zoos", {
+      env: { GOOGLE_PLACES_API_KEY: "k" },
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      location: { lat: 32.7767, lng: -96.797, radiusMeters: 35_000 },
+    });
+    expect(JSON.parse(String((fetchImpl.mock.calls[0]![1] as RequestInit).body))).toEqual({
+      textQuery: "zoos in Dallas, TX",
+      locationBias: {
+        circle: {
+          center: { latitude: 32.7767, longitude: -96.797 },
+          radius: 35_000,
+        },
+      },
+    });
   });
 
   it("falls back to GOOGLE_MAPS_API_KEY", async () => {
@@ -169,5 +187,33 @@ describe("getOrFetchTopActivities cache (FAM-61)", () => {
 
     expect(second.cached).toBe(false);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("coalesces concurrent lookups for the same city and category", async () => {
+    let resolveFetch: ((value: unknown) => void) | undefined;
+    const fetchImpl = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const opts = {
+      env: { GOOGLE_PLACES_API_KEY: "k" },
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    };
+
+    const first = getOrFetchTopActivities("Boise", "parks", opts);
+    const second = getOrFetchTopActivities("boise", "Parks", opts);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+
+    resolveFetch?.({
+      ok: true,
+      json: async () => ({ places: samplePlaces }),
+    });
+
+    const [a, b] = await Promise.all([first, second]);
+    expect(a.cached).toBe(false);
+    expect(b.places).toEqual(a.places);
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 });

@@ -3,7 +3,7 @@ import {
   CityRestaurant,
   RestaurantDietary,
   RestaurantMeal,
-  restaurantsForCityId,
+  restaurantsForCity,
 } from "@/config/city-restaurants";
 import { haversineKm } from "@/lib/maps/directions";
 import { FamilyAgeProfile, getFamilyAgeProfile } from "@/lib/schedule/family-profile";
@@ -224,7 +224,7 @@ export function qualifyingRestaurantsForMeal(
   meal: RestaurantMeal,
 ): CityRestaurant[] {
   const dietary = parseDietaryTags(plan.dietaryRestrictions);
-  return restaurantsForCityId(city.id).filter(
+  return restaurantsForCity(city).filter(
     (r) => r.meals.includes(meal) && matchesDietaryNeeds(r, dietary),
   );
 }
@@ -237,7 +237,7 @@ export function dietaryOptionRestaurantsForMeal(
 ): CityRestaurant[] {
   const dietary = parseDietaryTags(plan.dietaryRestrictions);
   if (dietary.length === 0) return [];
-  return restaurantsForCityId(city.id).filter(
+  return restaurantsForCity(city).filter(
     (r) => r.meals.includes(meal) && matchesDietaryOptions(r, dietary),
   );
 }
@@ -277,8 +277,8 @@ export function findRestaurantByName(city: CityConfig, name: string): CityRestau
   const needle = name.trim().toLowerCase();
   if (!needle) return null;
   return (
-    restaurantsForCityId(city.id).find((r) => r.name.toLowerCase() === needle) ??
-    restaurantsForCityId(city.id).find((r) => needle.includes(r.name.toLowerCase())) ??
+    restaurantsForCity(city).find((r) => r.name.toLowerCase() === needle) ??
+    restaurantsForCity(city).find((r) => needle.includes(r.name.toLowerCase())) ??
     null
   );
 }

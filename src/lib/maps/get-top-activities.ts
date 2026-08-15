@@ -97,11 +97,21 @@ export function rankTopActivitiesFromPlaces(
     .slice(0, maxResults);
 }
 
+export const DEFAULT_PLACES_RADIUS_METERS = 35_000;
+
+export type PlacesLocationBias = {
+  lat: number;
+  lng: number;
+  radiusMeters?: number;
+};
+
 export type GetTopActivitiesOptions = {
   maxResults?: number;
   /** Injected for tests. */
   fetchImpl?: typeof fetch;
   env?: Partial<NodeJS.ProcessEnv>;
+  /** City center + radius so Text Search stays near the destination (FAM-57/58). */
+  location?: PlacesLocationBias;
 };
 
 export async function getTopActivities(
@@ -111,7 +121,7 @@ export async function getTopActivities(
 ): Promise<TopActivity[]> {
   const apiKey = resolvePlacesApiKey(options.env ?? process.env);
   if (!apiKey) {
-    throw new PlacesApiKeyMissingError();
+    return [];
   }
 
   const dest = destination.trim();
@@ -123,6 +133,23 @@ export async function getTopActivities(
   const maxResults = options.maxResults ?? MAX_RESULTS;
   const fetchImpl = options.fetchImpl ?? fetch;
   const query = `${cat} in ${dest}`;
+
+  const body: Record<string, unknown> = { textQuery: query };
+  if (
+    options.location &&
+    Number.isFinite(options.location.lat) &&
+    Number.isFinite(options.location.lng)
+  ) {
+    body.locationBias = {
+      circle: {
+        center: {
+          latitude: options.location.lat,
+          longitude: options.location.lng,
+        },
+        radius: options.location.radiusMeters ?? DEFAULT_PLACES_RADIUS_METERS,
+      },
+    };
+  }
 
   const response = await fetchImpl("https://places.googleapis.com/v1/places:searchText", {
     method: "POST",
@@ -140,9 +167,7 @@ export async function getTopActivities(
         "places.photos",
       ].join(","),
     },
-    body: JSON.stringify({
-      textQuery: query,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

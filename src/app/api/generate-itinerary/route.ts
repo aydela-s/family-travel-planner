@@ -5,6 +5,7 @@ import { shouldEnrichItineraryWithAi } from "@/lib/ai/config";
 import { enrichItinerary, isDemoMode } from "@/lib/enrich-itinerary";
 import { isValidTripPlan, normalizeRawItinerary } from "@/lib/itinerary";
 import { resolvePlanningCity } from "@/lib/maps/places-city-config";
+import { applyDestinationCenter } from "@/lib/maps/resolve-destination-center";
 import { planTrip } from "@/lib/planning-engine";
 import { AdjustActionId } from "@/lib/planning-engine/adjust-types";
 import { resolveStayOntoPlan } from "@/lib/planning-engine/resolve-stay";
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
     if (!plan.accommodationType) {
       plan.accommodationType = "";
     }
+    plan = await applyDestinationCenter(plan);
     plan = await resolveStayOntoPlan(plan);
 
     const useDemo = body.demo === true || isDemoMode();

@@ -681,3 +681,12 @@ export function restaurantsForCityId(cityId: string): CityRestaurant[] {
   if (cityId === "default" || cityId.startsWith("places:")) return [];
   return CITY_RESTAURANTS[cityId] ?? [];
 }
+
+/** Prefer a Places-attached pool; otherwise the curated catalog by city id. */
+export function restaurantsForCity(city: {
+  id: string;
+  restaurants?: CityRestaurant[];
+}): CityRestaurant[] {
+  if (city.restaurants && city.restaurants.length > 0) return city.restaurants;
+  return restaurantsForCityId(city.id);
+}

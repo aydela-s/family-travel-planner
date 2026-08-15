@@ -93,10 +93,22 @@ npm run test
 | AI_GATEWAY_MODEL      | Optional model id (default `openai/gpt-4o-mini`)                        |
 | AI_ENRICH_TIPS        | Set `false` to disable tip enrichment while keeping the gateway key     |
 | OPENAI_API_KEY        | Legacy fallback auth for AI Gateway locally                             |
-| GOOGLE_MAPS_API_KEY   | Places autocomplete, directions, and maps                               |
+| GOOGLE_MAPS_API_KEY   | Static Maps, Directions, and fallback for Places if the Places key is unset |
+| GOOGLE_PLACES_API_KEY | Places API (New): Autocomplete, Details, Text Search. Falls back to `GOOGLE_MAPS_API_KEY` |
 | RESEND_API_KEY        | Send product feedback email (FAM-49)                                    |
 | FEEDBACK_TO_EMAIL     | Inbox that receives feedback                                            |
 | FEEDBACK_FROM_EMAIL   | Optional From header (default: `TripNestly Feedback <onboarding@resend.dev>` for local testing) |
+
+### Google Maps / Places setup
+
+1. Create or open a Google Cloud project and enable billing.
+2. Enable **Places API (New)**, **Maps Static API**, **Directions API**, and optionally **Geocoding API** (stay-address fallback).
+3. Create an API key and restrict it (APIs + HTTP referrers / IPs for production).
+4. Put the key in `.env.local` as `GOOGLE_PLACES_API_KEY` and/or `GOOGLE_MAPS_API_KEY`.
+5. Add the same values in Vercel → Project → Settings → Environment Variables (Production and Preview).
+6. Restart `npm run dev` or redeploy. Destination autocomplete should return Google cities; stay suggestions should bias to the chosen city; day maps should render when Static Maps is enabled.
+
+Places Text Search is billed per request. Results are cached in memory for 24 hours per destination + category + city center (FAM-61). Concurrent lookups for the same key are coalesced, and in-flight Places calls are capped so one plan cannot fan out unbounded requests. Soft-launch / friends-and-family traffic should rarely re-hit Google for the same city.
 
 ### Testing feedback on localhost
 

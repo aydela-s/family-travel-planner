@@ -9,8 +9,10 @@ import {
   landmarkFromTopActivity,
   landmarksFromPlacesResults,
   placesSearchCategoriesFromInterests,
+  restaurantFromTopActivity,
   resolvePlanningCity,
 } from "@/lib/maps/places-city-config";
+import { clearDestinationCenterCache } from "@/lib/maps/resolve-destination-center";
 import { clearTopActivitiesCache } from "@/lib/maps/top-activities-cache";
 import type { TopActivity } from "@/lib/maps/get-top-activities";
 import { TripPlan } from "@/types/trip-plan";
@@ -76,6 +78,21 @@ describe("places → CityConfig mapping (FAM-59)", () => {
       placeId: "places/zoo",
       rating: 4.6,
       adultPrice: adultPriceFromPriceLevel("PRICE_LEVEL_MODERATE"),
+    });
+  });
+
+  it("maps TopActivity into a CityRestaurant (FAM-58)", () => {
+    const restaurant = restaurantFromTopActivity(
+      place({ id: "places/bbq", name: "Pecan Lodge", priceLevel: "PRICE_LEVEL_MODERATE" }),
+    );
+    expect(restaurant).toMatchObject({
+      name: "Pecan Lodge",
+      lat: 32.78,
+      lng: -96.8,
+      meals: ["lunch", "dinner"],
+      placeId: "places/bbq",
+      rating: 4.6,
+      budgetStyles: ["save", "balanced", "splurge"],
     });
   });
 
@@ -196,6 +213,7 @@ describe("places → CityConfig mapping (FAM-59)", () => {
 describe("resolvePlanningCity curated vs Places (FAM-59)", () => {
   afterEach(() => {
     clearTopActivitiesCache();
+    clearDestinationCenterCache();
     vi.restoreAllMocks();
   });
 
@@ -257,6 +275,12 @@ describe("resolvePlanningCity curated vs Places (FAM-59)", () => {
       expect.arrayContaining(["Dallas Zoo", "Perot Museum"]),
     );
     expect(city!.landmarks.every((l) => l.name !== "City Center Park")).toBe(true);
+    expect(city!.restaurants?.some((r) => r.name === "Dallas Zoo")).toBe(true);
+    const body = JSON.parse(String((fetchImpl.mock.calls[0]![1] as RequestInit).body)) as {
+      locationBias?: { circle?: { center?: { latitude?: number; longitude?: number } } };
+    };
+    expect(body.locationBias?.circle?.center?.latitude).toBeCloseTo(32.7767, 2);
+    expect(body.locationBias?.circle?.center?.longitude).toBeCloseTo(-96.797, 2);
   });
 
   it("falls back when Places returns too few landmarks", async () => {

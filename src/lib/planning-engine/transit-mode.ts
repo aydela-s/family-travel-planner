@@ -1,6 +1,6 @@
 import { CityConfig } from "@/config/city-pricing";
 import { PUBLIC_TRANSIT_CLUSTER_KM } from "@/config/cluster-distances";
-import { restaurantsForCityId } from "@/config/city-restaurants";
+import { restaurantsForCity } from "@/config/city-restaurants";
 import { haversineKm } from "@/lib/maps/directions";
 import { RawItinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
@@ -46,7 +46,7 @@ function placeCoordsFromTitle(title: string, city: CityConfig): Coord | null {
       return { lat: landmark.lat, lng: landmark.lng };
     }
   }
-  for (const restaurant of restaurantsForCityId(city.id)) {
+  for (const restaurant of restaurantsForCity(city)) {
     if (needle.includes(restaurant.name.toLowerCase())) {
       return { lat: restaurant.lat, lng: restaurant.lng };
     }
