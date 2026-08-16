@@ -151,6 +151,13 @@ export type MealIntent = {
   restaurantName?: string;
   nearLandmarkName?: string;
   notes?: string;
+  /**
+   * How well the pick matches the family's dietary needs. "options"/"unverified"
+   * means the copy must tell the user to check the current menu.
+   */
+  dietaryFit?: "strong" | "options" | "unverified" | "none";
+  /** Extra km this meal adds to the day's route — validated for backtracking. */
+  detourKm?: number;
 };
 
 export type DayBlueprint = {

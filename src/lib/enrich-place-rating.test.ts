@@ -130,7 +130,10 @@ describe("enrichItinerary Places rating passthrough", () => {
     );
 
     const zoo = enriched.days[0]!.activities.find((a) => /Dallas Zoo/i.test(a.title) && a.type === "activity");
-    const museum = enriched.days[0]!.activities.find((a) => /Perot/i.test(a.title));
+    // Travel legs are titled after their destination too, so match the stop itself.
+    const museum = enriched.days[0]!.activities.find(
+      (a) => /Perot/i.test(a.title) && a.type === "activity",
+    );
     expect(zoo?.rating).toBe(4.6);
     expect(zoo?.reviewCount).toBe(12345);
     expect(zoo?.placeId).toBe("places/dallas-zoo");

@@ -33,6 +33,7 @@ export type ThemeScoreBreakdown = {
 };
 
 const PLAY_THEME_IDS = new Set<ThemeId>(["play_indoor", "playgrounds"]);
+const PARK_NATURE_THEME_IDS = new Set<ThemeId>(["nature_parks", "scenic"]);
 
 function isPlayTheme(theme: ThemeDefinition): boolean {
   return PLAY_THEME_IDS.has(theme.id);
@@ -40,6 +41,10 @@ function isPlayTheme(theme: ThemeDefinition): boolean {
 
 function isShoppingTheme(theme: ThemeDefinition): boolean {
   return theme.id === "shopping";
+}
+
+function isParkNatureTheme(theme: ThemeDefinition): boolean {
+  return PARK_NATURE_THEME_IDS.has(theme.id);
 }
 
 /**
@@ -86,6 +91,29 @@ function maxShoppingThemesForTrip(
   return 1;
 }
 
+/**
+ * Parks / scenic days fill free POI pools easily — cap them when the family also
+ * selected swimming, museums, shopping, etc.
+ */
+function maxParkNatureThemesForTrip(
+  blueprint: TripBlueprint,
+  eligible: ThemeDefinition[],
+): number {
+  const otherCoverage = eligible.filter(
+    (t) =>
+      !isParkNatureTheme(t) &&
+      !isPlayTheme(t) &&
+      t.coverageTags.length > 0 &&
+      t.id !== "mixed_family" &&
+      t.id !== "recovery",
+  );
+  if (otherCoverage.length === 0) {
+    return Math.max(2, Math.ceil(fullDayCount(blueprint) / 2));
+  }
+  if (fullDayCount(blueprint) >= 7) return 2;
+  return 1;
+}
+
 function cityHasTag(city: CityConfig, tags: LandmarkInterestTag[]): boolean {
   if (tags.length === 0) return true;
   return city.landmarks.some((l) => l.interestTags.some((t) => tags.includes(t)));
@@ -105,8 +133,10 @@ export function eligibleInterestThemes(plan: TripPlan, city: CityConfig): ThemeD
     if (theme.id === "scenic") {
       return selected.has("nature") || selected.has("beaches") || selected.has("history");
     }
+    // City park days only when Parks & Gardens was selected — Nature alone uses
+    // the nature / scenic themes so soft-fill parks don't dominate.
     if (theme.id === "nature_parks") {
-      return selected.has("parks") || selected.has("nature");
+      return selected.has("parks");
     }
     return theme.coverageTags.some((t) => selectedList.includes(t));
   });
@@ -356,8 +386,10 @@ export function applyDailyThemes(
   const consumeRareOnArrivalDeparture = fullDayCount(blueprint) <= 2;
   const maxPlayThemes = maxPlayThemesForTrip(blueprint, eligible);
   const maxShoppingThemes = maxShoppingThemesForTrip(blueprint, eligible);
+  const maxParkNatureThemes = maxParkNatureThemesForTrip(blueprint, eligible);
   let playThemesAssigned = 0;
   let shoppingThemesAssigned = 0;
+  let parkNatureThemesAssigned = 0;
   let previousThemeId: ThemeId | null = null;
   let previousPaid = false;
   let fullDayIndex = 0;
@@ -412,6 +444,12 @@ export function applyDailyThemes(
     if (shoppingThemesAssigned >= maxShoppingThemes) {
       const withoutShopping = candidates.filter((t) => !isShoppingTheme(t));
       if (withoutShopping.length > 0) candidates = withoutShopping;
+    }
+
+    // Cap park / scenic days when swimming, museums, shopping, etc. still need slots
+    if (parkNatureThemesAssigned >= maxParkNatureThemes) {
+      const withoutParks = candidates.filter((t) => !isParkNatureTheme(t));
+      if (withoutParks.length > 0) candidates = withoutParks;
     }
 
     // When remaining full days are scarce, prefer themes that close uncovered gaps
@@ -478,6 +516,12 @@ export function applyDailyThemes(
       if (alt) chosen = alt.theme;
     }
 
+    // Final park/scenic-cap guard
+    if (isParkNatureTheme(chosen) && parkNatureThemesAssigned >= maxParkNatureThemes) {
+      const alt = ranked.find((r) => !isParkNatureTheme(r.theme));
+      if (alt) chosen = alt.theme;
+    }
+
     const intent = budgetIntentForFullDay(
       plan,
       fullDayIndex,
@@ -492,6 +536,7 @@ export function applyDailyThemes(
     fullDayIndex += 1;
     if (isPlayTheme(chosen)) playThemesAssigned += 1;
     if (isShoppingTheme(chosen)) shoppingThemesAssigned += 1;
+    if (isParkNatureTheme(chosen)) parkNatureThemesAssigned += 1;
 
     if (
       chosen.highIntensity &&
@@ -557,6 +602,11 @@ export function applyDailyThemes(
 
     const shoppingAssigned = adjusted.filter((d) => d.theme.id === "shopping").length;
     if (isShoppingTheme(cover) && shoppingAssigned >= maxShoppingThemes) continue;
+
+    const parkNatureAssigned = adjusted.filter(
+      (d) => d.theme.id === "nature_parks" || d.theme.id === "scenic",
+    ).length;
+    if (isParkNatureTheme(cover) && parkNatureAssigned >= maxParkNatureThemes) continue;
 
     const canPlaceAt = (i: number): boolean => {
       const prevId = adjusted[i - 1]?.theme.id;

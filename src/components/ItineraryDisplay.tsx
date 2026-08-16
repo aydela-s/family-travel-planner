@@ -11,6 +11,7 @@ import {
   oneLineNote,
 } from "@/lib/format";
 import { getBudgetStyleLabelPlain, getTravelStyleLabel } from "@/lib/format-labels";
+import { interestSourceLabels } from "@/lib/schedule/interest-map";
 import { Itinerary, ItineraryActivity, ItineraryDay } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -183,20 +184,26 @@ function locationAlreadyInTitle(title: string, locationName: string): boolean {
 function TimelineItem({
   activity,
   currencySymbol,
+  planInterests = [],
 }: {
   activity: ItineraryActivity;
   currencySymbol: string;
+  planInterests?: string[];
 }) {
   const style = typeStyle[activity.type];
   const ratingBadge = formatPlaceRatingBadge(activity.rating, activity.reviewCount);
   const paid =
-    activity.activityCost != null && activity.activityCost > 0
-      ? moneyWhole(activity.activityCost, currencySymbol)
+    activity.type === "meal" ||
+    activity.type === "travel" ||
+    (activity.activityCost != null && activity.activityCost > 0)
+      ? moneyWhole(activity.activityCost ?? 0, currencySymbol)
       : null;
   const rawNote = activity.notes ? oneLineNote(activity.notes) : "";
   const detailNote = rawNote && !isBoilerplateAgeNote(rawNote) ? rawNote : "";
   const maps = mapsUrl(activity);
-  const hasDetails = Boolean(detailNote || activity.endTime || maps);
+  const interestLabels =
+    activity.type === "activity" ? interestSourceLabels(activity.interestTags, planInterests) : [];
+  const hasDetails = Boolean(detailNote || activity.endTime || maps || interestLabels.length > 0);
 
   return (
     <details className={`group border-b border-border/80 last:border-b-0 ${style.row}`}>
@@ -214,6 +221,11 @@ function TimelineItem({
           {ratingBadge && (
             <span className="ml-2 whitespace-nowrap rounded-md bg-background/80 px-1.5 py-0.5 text-xs font-semibold text-muted">
               {ratingBadge}
+            </span>
+          )}
+          {interestLabels.length > 0 && (
+            <span className="mt-0.5 block text-xs font-medium text-muted">
+              Interest: {interestLabels.join(", ")}
             </span>
           )}
         </span>
@@ -285,7 +297,15 @@ function DayCostTiles({ day, symbol }: { day: ItineraryDay; symbol: string }) {
   );
 }
 
-function DayCard({ day, symbol }: { day: ItineraryDay; symbol: string }) {
+function DayCard({
+  day,
+  symbol,
+  planInterests = [],
+}: {
+  day: ItineraryDay;
+  symbol: string;
+  planInterests?: string[];
+}) {
   const total = moneyWhole(day.costBreakdown.total, symbol);
 
   return (
@@ -311,6 +331,7 @@ function DayCard({ day, symbol }: { day: ItineraryDay; symbol: string }) {
               key={`${a.time}-${a.type}-${a.title}`}
               activity={a}
               currencySymbol={symbol}
+              planInterests={planInterests}
             />
           ))}
         </div>
@@ -408,7 +429,12 @@ export default function ItineraryDisplay({
 
       <div className="space-y-8">
         {itinerary.days.map((day) => (
-          <DayCard key={day.day} day={day} symbol={symbol} />
+          <DayCard
+            key={day.day}
+            day={day}
+            symbol={symbol}
+            planInterests={plan?.interests ?? []}
+          />
         ))}
       </div>
     </div>

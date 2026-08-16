@@ -1,4 +1,4 @@
-import type { CityConfig, Landmark } from "@/config/city-pricing";
+import type { CityConfig, Landmark, LandmarkInterestTag } from "@/config/city-pricing";
 import { addDays } from "@/lib/format";
 import { morningActivityDefaultTime } from "@/lib/planning-engine/skeleton-builder";
 import type { DayLandmarkContext } from "@/lib/planning-engine/types";
@@ -16,7 +16,11 @@ import {
   isThemeParkExperience,
   isYoungChildOnlyLandmark,
 } from "@/lib/planning-engine/staged/landmark-experience";
-import type { DayBlueprint, TripBlueprint } from "@/lib/planning-engine/staged/types";
+import type {
+  DayBlueprint,
+  ExperienceCoverage,
+  TripBlueprint,
+} from "@/lib/planning-engine/staged/types";
 import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
 import { getNapWindow, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
@@ -82,6 +86,18 @@ export function coverageKeysFromLandmark(landmark: Landmark): string[] {
     if (!keys.includes(tag)) keys.push(tag);
   }
   return keys;
+}
+
+/**
+ * Selected interests the trip has not covered yet. Selection fills these before
+ * reaching for anything the family did not ask for.
+ */
+export function uncoveredSelectedTags(
+  coverage: ExperienceCoverage,
+): LandmarkInterestTag[] {
+  return coverage.items
+    .filter((item) => item.source === "interest" && item.completed < item.target)
+    .map((item) => item.tag);
 }
 
 function anchorMatchesTheme(day: DayBlueprint, anchor: Landmark): boolean {
@@ -179,10 +195,13 @@ export function commitStopsToBlueprint(
     ledgerNames.add(anchor.name);
     if (day.role === "full") priorFullDayAnchors.add(anchor.name);
 
+    const uncovered = uncoveredSelectedTags(coverage);
+
     let support = selectSupportForDay(city, plan, day, anchor, {
       visitWindow: supportVisitWindow(plan, day),
       ledgerNames,
       alreadyToday: [anchor],
+      uncoveredSelectedTags: uncovered,
     });
 
     // Ensure at least one age-appropriate element on full days (never on theme-park days)
@@ -200,6 +219,7 @@ export function commitStopsToBlueprint(
         ledgerNames,
         supportVisitWindow(plan, day),
         [anchor, ...support],
+        { uncoveredSelectedTags: uncovered },
       );
       if (filler && landmarkAgeScore(filler, profile) > 0) {
         support = [filler, ...support].slice(0, Math.max(1, day.capacity.maxSupportStops));
@@ -223,6 +243,7 @@ export function commitStopsToBlueprint(
         ledgerNames,
         supportVisitWindow(plan, day),
         [anchor, ...support],
+        { uncoveredSelectedTags: uncovered },
       );
       if (filler && dayHasOlderAppeal([filler])) {
         support = [filler, ...support].slice(0, Math.max(1, day.capacity.maxSupportStops));

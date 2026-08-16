@@ -205,7 +205,7 @@ function fillSlot(
       return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
     }
     case "morning_activity": {
-      const base = suggestActivityTitle(ctx.morning.name, plan, "morning");
+      const base = suggestActivityTitle(ctx.morning.name, plan, "morning", ctx.morning.interestTags);
       return tagged(
         {
           time: slot.defaultTime,
@@ -272,7 +272,7 @@ function fillSlot(
           time: slot.defaultTime,
           title: activityTitlePrefix(
             adjustment,
-            suggestActivityTitle(ctx.afternoon.name, plan, "afternoon"),
+            suggestActivityTitle(ctx.afternoon.name, plan, "afternoon", ctx.afternoon.interestTags),
           ),
           type,
           notes:
@@ -291,7 +291,12 @@ function fillSlot(
       return tagged(
         {
           time: slot.defaultTime,
-          title: suggestActivityTitle(ctx.extra?.name ?? ctx.afternoon.name, plan, "afternoon"),
+          title: suggestActivityTitle(
+            ctx.extra?.name ?? ctx.afternoon.name,
+            plan,
+            "afternoon",
+            (ctx.extra ?? ctx.afternoon).interestTags,
+          ),
           type,
           notes: "Extra stop for a packed day.",
         },

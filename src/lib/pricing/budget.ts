@@ -6,7 +6,12 @@ import {
 } from "@/lib/planning-engine/meal-planner";
 import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
 import { CityConfig } from "@/config/city-pricing";
-import { accommodationPlanningTips, estimateAccommodationFoodCosts } from "@/lib/pricing/accommodation";
+import {
+  accommodationMealMultiplier,
+  accommodationPlanningTips,
+  estimateMealPartyCost,
+  type MealPartyCost,
+} from "@/lib/pricing/accommodation";
 import { budgetStyleNote } from "@/lib/pricing/budget-style";
 import { BudgetStyle, TripPlan } from "@/types/trip-plan";
 import { ActivityLocation, ItineraryActivity } from "@/types/itinerary";
@@ -58,12 +63,78 @@ function mealTierFromActivity(activity: ItineraryActivity): keyof typeof MEAL_TI
     t.includes("simple and affordable") ||
     t.includes("light and affordable") ||
     t.includes("share plates") ||
-    t.includes("share dishes")
+    t.includes("share dishes") ||
+    t.includes("café or bakery") ||
+    t.includes("cafe or bakery") ||
+    t.includes("simple bakery")
   ) {
     return "takeaway";
   }
   if (t.includes("hotel breakfast") || t.includes("packed")) return "hotelBreakfast";
+  // Short "Breakfast near…" / "Lunch near…" bakery copy (no restaurant name).
+  if (
+    /^(breakfast|lunch|dinner) near /i.test(activity.title) &&
+    !/\bat\b/i.test(activity.title)
+  ) {
+    return "takeaway";
+  }
   return "restaurant";
+}
+
+/**
+ * One meal, priced for the actual party: an adult price for this meal (city
+ * base × accommodation × tier × budget style), then adults and children summed
+ * separately so kids are never charged at the adult rate.
+ */
+export function estimateMealPartyCostForActivity(
+  activity: ItineraryActivity,
+  city: CityConfig,
+  plan: TripPlan,
+): MealPartyCost {
+  if (activity.type !== "meal") {
+    return { adults: 0, children: 0, total: 0, detail: "" };
+  }
+  const hour = parseInt(activity.time.split(":")[0] ?? "12", 10);
+  const base =
+    hour < 11 ? city.food.breakfast : hour < 16 ? city.food.lunch : city.food.dinner;
+  const tier = MEAL_TIERS[mealTierFromActivity(activity)];
+  const perAdult =
+    base *
+    accommodationMealMultiplier(plan.accommodationType, hour, tier) *
+    budgetStyleFoodFactor(plan.budgetStyle);
+  return estimateMealPartyCost(perAdult, plan, (amount) =>
+    roundMoney(amount, city.currency),
+  );
+}
+
+/** Single meal’s estimated family cost (same model as the day food total). */
+export function estimateMealCostForActivity(
+  activity: ItineraryActivity,
+  city: CityConfig,
+  plan: TripPlan,
+): number {
+  return estimateMealPartyCostForActivity(activity, city, plan).total;
+}
+
+/** Attach per-meal costs plus the adult/child split onto meal rows. */
+export function applyMealActivityCosts(
+  activities: ItineraryActivity[],
+  city: CityConfig,
+  plan: TripPlan,
+): ItineraryActivity[] {
+  return activities.map((a) => {
+    if (a.type !== "meal") return a;
+    const party = estimateMealPartyCostForActivity(a, city, plan);
+    const breakdown =
+      party.total > 0 && party.detail
+        ? `Est. ${city.currencySymbol}${Math.round(party.total)} for ${party.detail}`
+        : "";
+    return {
+      ...a,
+      activityCost: party.total,
+      notes: breakdown ? [a.notes, breakdown].filter(Boolean).join(" ") : a.notes,
+    };
+  });
 }
 
 export function estimateMealCosts(
@@ -71,12 +142,16 @@ export function estimateMealCosts(
   city: CityConfig,
   plan: TripPlan,
 ): number {
-  const base = estimateAccommodationFoodCosts(activities, city, plan, (a) => MEAL_TIERS[mealTierFromActivity(a)]);
-  return base * budgetStyleFoodFactor(plan.budgetStyle);
+  return activities
+    .filter((a) => a.type === "meal")
+    .reduce((sum, a) => sum + estimateMealCostForActivity(a, city, plan), 0);
 }
 
+/** Paid attractions only — meals and travel legs have their own buckets. */
 function sumActivityCosts(activities: ItineraryActivity[]): number {
-  return activities.reduce((s, a) => s + (a.activityCost ?? 0), 0);
+  return activities
+    .filter((a) => a.type === "activity")
+    .reduce((s, a) => s + (a.activityCost ?? 0), 0);
 }
 
 /** Insert the one trip-start grocery run for kitchen accommodations (FAM-75). */

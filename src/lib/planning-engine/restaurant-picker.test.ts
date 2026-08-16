@@ -81,7 +81,7 @@ describe("restaurant picker — FAM-46", () => {
     expect(matchesDietaryOptions(dairyFreeOnly, ["vegan"])).toBe(false);
   });
 
-  it("uses primary-then-options-then-reuse for every dietary preference", () => {
+  it("uses primary then dietary-options and never reuses a restaurant", () => {
     const city = detectCity("San Diego");
     const cases: {
       restriction: string;
@@ -230,7 +230,7 @@ describe("restaurant picker — FAM-46", () => {
     }
   });
 
-  it("does not reuse until primary vegan spots and vegan-option spots are exhausted", () => {
+  it("does not reuse restaurants after the dietary pool is exhausted", () => {
     const city = detectCity("San Diego");
     const trip = plan({ dietaryRestrictions: "Vegan", children: [6] });
     const primary = qualifyingRestaurantsForMeal(city, trip, "dinner");
@@ -260,11 +260,10 @@ describe("restaurant picker — FAM-46", () => {
       day: pool.length + 1,
       excludeNames: used,
     });
-    expect(reuse).not.toBeNull();
-    expect(used.has(reuse!.name)).toBe(true);
+    expect(reuse).toBeNull();
   });
 
-  it("varies named restaurants on a vegan multi-day trip without early repeats", () => {
+  it("varies named restaurants on a vegan multi-day trip without repeats", () => {
     const { raw } = planTrip(plan({
         startDate: "2026-09-15",
         endDate: "2026-09-18",
@@ -280,18 +279,7 @@ describe("restaurant picker — FAM-46", () => {
         .filter((n): n is string => Boolean(n)),
     );
 
-    const city = detectCity("San Diego");
-    const trip = plan({ children: [6, 10], dietaryRestrictions: "Vegan" });
-    const poolSize = new Set(
-      (["breakfast", "lunch", "dinner"] as const).flatMap((meal) => [
-        ...qualifyingRestaurantsForMeal(city, trip, meal).map((r) => r.name),
-        ...dietaryOptionRestaurantsForMeal(city, trip, meal).map((r) => r.name),
-      ]),
-    ).size;
-
-    const expectedUnique = Math.min(names.length, poolSize);
-    // Allow at most one early reuse when lunch+dinner both draw from a small vegan pool.
-    expect(new Set(names).size).toBeGreaterThanOrEqual(Math.max(1, expectedUnique - 1));
+    expect(new Set(names).size).toBe(names.length);
     expect(names.join(" ")).not.toMatch(/standout/i);
   });
 });

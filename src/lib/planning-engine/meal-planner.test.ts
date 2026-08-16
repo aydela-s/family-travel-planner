@@ -59,11 +59,12 @@ describe("breakfastLabel — FAM-26", () => {
     expect(notes.toLowerCase()).not.toMatch(/kid/);
   });
 
-  it("uses bakery/pastry copy for balanced breakfast instead of a named restaurant", () => {
+  // Title stays short; the bakery/café intent belongs in the notes, not the heading.
+  it("keeps balanced breakfast generic instead of naming a restaurant", () => {
     const { title, notes } = breakfastLabel(plan({ budgetStyle: "balanced" }), "Marais", cafe);
-    expect(title).toMatch(/pastries|bakery|café breakfast/i);
+    expect(title).toBe("Breakfast near Marais");
     expect(title).not.toContain("Café Kitsuné");
-    expect(notes.toLowerCase()).toMatch(/takeaway|bakery|pastries/);
+    expect(notes.toLowerCase()).toMatch(/bakery|café|pastries/);
   });
 });
 

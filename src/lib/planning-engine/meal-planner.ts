@@ -111,6 +111,10 @@ function namedMealNotes(
     if (matchesDietaryOptions(restaurant, dietary)) {
       return `Has ${dietary.join(" / ")} options on the menu.`;
     }
+    // Places-sourced restaurants often have empty dietary tags — still name them.
+    if (restaurant.dietary.length === 0 && !(restaurant.dietaryOptions?.length)) {
+      return `Confirm ${dietary.join(" / ")} options on the menu.`;
+    }
   }
   if (extra) return extra;
   const budgetNote = budgetFlavorNote(plan.budgetStyle, meal);
@@ -136,8 +140,10 @@ export function usesNamedRestaurant(
   if (plan.budgetStyle === "splurge") return true;
   if (plan.budgetStyle === "save") return meal === "dinner";
   const noDiet = parseDietaryTags(plan.dietaryRestrictions).length === 0;
+  // Always try to name lunch + dinner on balanced trips — dietary filters the
+  // restaurant pool (with Places fallback) instead of forcing picnic/"area" copy.
   if (noDiet && (meal === "lunch" || meal === "dinner")) return true;
-  if (plan.budgetStyle === "balanced" && meal === "dinner") return true;
+  if (plan.budgetStyle === "balanced" && (meal === "lunch" || meal === "dinner")) return true;
   return false;
 }
 
@@ -173,24 +179,18 @@ function restaurantMealLabel(
   switch (style) {
     case "save":
       return {
-        title: `Casual ${meal} near ${spot}`,
-        notes: `Takeaway or a low-key spot — keeping ${meal} simple and affordable.`,
+        title: `${capitalized} near ${spot}`,
+        notes: `Keep ${meal} simple and affordable.`,
       };
     case "splurge":
       return {
-        title: `${capitalized} at a top pick near ${spot}`,
-        notes: `A special ${meal} in the ${spot} area.`,
+        title: `${capitalized} near ${spot}`,
+        notes: `A special ${meal} nearby.`,
       };
     default:
-      if (meal === "lunch") {
-        return {
-          title: `Picnic or sandwich lunch near ${spot}`,
-          notes: "Grab sandwiches, bakery bites, or a park picnic — keep the sit-down meal for later.",
-        };
-      }
       return {
-        title: `${capitalized} in the ${spot} area`,
-        notes: `A relaxed sit-down ${meal} with a local neighborhood feel.`,
+        title: `${capitalized} near ${spot}`,
+        notes: meal === "lunch" ? "Casual lunch near your activities." : "Dinner near your activities.",
       };
   }
 }
@@ -220,20 +220,20 @@ export function breakfastLabel(
       break;
     case "save":
       return {
-        title: `Bakery breakfast near ${spot}`,
-        notes: "Pastries or takeaway coffee — simple and affordable.",
+        title: `Breakfast near ${spot}`,
+        notes: "Simple bakery or café stop.",
       };
     default:
       return {
-        title: `Pastries or café breakfast near ${spot}`,
-        notes: "Bakery or café takeaway before the main outing — not a full sit-down meal.",
+        title: `Breakfast near ${spot}`,
+        notes: "Café or bakery before the main outing.",
       };
   }
 
   switch (plan.accommodationType) {
     case "airbnb_no_kitchen":
       return {
-        title: `Takeaway breakfast near ${spot}`,
+        title: `Breakfast near ${spot}`,
         notes: "Bakery or café — no kitchen at your rental.",
       };
     default:
@@ -272,7 +272,7 @@ export function lunchLabel(
     // Save: pack/picnic from the rental. Balanced/splurge: lunch is the meal out.
     if (plan.budgetStyle === "save") {
       return {
-        title: `Picnic lunch near ${spot}`,
+        title: `Lunch near ${spot}`,
         notes: "Pack lunch from your rental — save restaurant spend for special treats.",
       };
     }
@@ -280,7 +280,7 @@ export function lunchLabel(
       return restaurantMealLabel("splurge", spot, "lunch");
     }
     return {
-      title: `Lunch in the ${spot} area`,
+      title: `Lunch near ${spot}`,
       notes: "Eat out near your activities — breakfast and dinner stay at your rental.",
     };
   }
@@ -289,12 +289,12 @@ export function lunchLabel(
     const base =
       plan.budgetStyle === "save"
         ? {
-            title: `Casual lunch near ${spot}`,
-            notes: "Sandwiches, takeaway, or a park picnic — keeping lunch simple and affordable.",
+            title: `Lunch near ${spot}`,
+            notes: "Keep lunch simple and affordable.",
           }
         : {
-            title: `Picnic or sandwich lunch near ${spot}`,
-            notes: "Grab sandwiches, bakery bites, or a park picnic — keep the sit-down meal for later.",
+            title: `Lunch near ${spot}`,
+            notes: "Casual lunch near your activities.",
           };
     if (plan.accommodationType === "staying_with_family_or_friends") {
       return {

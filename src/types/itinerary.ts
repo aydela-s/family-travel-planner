@@ -48,8 +48,14 @@ export type RouteSegment = {
   from: string;
   to: string;
   distanceKm: number;
+  /** Actual in-vehicle / on-foot travel time — never includes family overhead. */
   durationMin: number;
+  /** Parking, boarding, car seats, stroller — scheduled on top of durationMin. */
+  bufferMin?: number;
   cost: number;
+  /** Car days only — the two halves of `cost` so the number is explainable. */
+  fuelCost?: number;
+  parkingCost?: number;
   provider?: string;
 };
 

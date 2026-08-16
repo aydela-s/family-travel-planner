@@ -10,6 +10,7 @@ import {
   landmarkFromTopActivity,
   landmarksFromPlacesResults,
   placesSearchCategoriesFromInterests,
+  placesRestaurantSearchPlans,
   refineInterestTagsForPlaceName,
   restaurantFromTopActivity,
   resolvePlanningCity,
@@ -144,19 +145,53 @@ describe("places → CityConfig mapping (FAM-59)", () => {
     });
   });
 
+  it("treats shopping malls as free entry (Places priceLevel is for shops, not tickets)", () => {
+    const mall = landmarkFromTopActivity(
+      place({
+        id: "outlets",
+        name: "Denver Premium Outlets",
+        priceLevel: "PRICE_LEVEL_EXPENSIVE",
+        types: ["shopping_mall"],
+        primaryType: "shopping_mall",
+        websiteUri: "https://example.com",
+      }),
+      ["shopping"],
+    );
+    expect(mall?.interestTags).toContain("shopping");
+    expect(mall?.adultPrice).toBe(0);
+  });
+
   it("maps TopActivity into a CityRestaurant (FAM-58)", () => {
     const restaurant = restaurantFromTopActivity(
-      place({ id: "places/bbq", name: "Pecan Lodge", priceLevel: "PRICE_LEVEL_MODERATE" }),
+      place({
+        id: "places/bbq",
+        name: "Pecan Lodge",
+        priceLevel: "PRICE_LEVEL_MODERATE",
+        reviewCount: 4200,
+      }),
+      ["vegan"],
     );
     expect(restaurant).toMatchObject({
       name: "Pecan Lodge",
       lat: 32.78,
       lng: -96.8,
-      meals: ["lunch", "dinner"],
+      meals: ["breakfast", "lunch", "dinner"],
       placeId: "places/bbq",
       rating: 4.6,
+      reviewCount: 4200,
+      dietary: ["vegan"],
       budgetStyles: ["save", "balanced", "splurge"],
     });
+  });
+
+  it("searches vegan Places categories when dietaryRestrictions include vegan", () => {
+    expect(placesRestaurantSearchPlans("Vegan")).toEqual([
+      { category: "vegan restaurants", dietary: ["vegan"] },
+      { category: "vegan cafes", dietary: ["vegan"] },
+    ]);
+    expect(placesRestaurantSearchPlans("")).toEqual([
+      { category: "family restaurants", dietary: [] },
+    ]);
   });
 
   it("dedupes landmarks across categories and merges tags", () => {

@@ -38,8 +38,10 @@ export function formatCompactActivityLines(
   const badgeText =
     badge && opts.asciiStar ? badge.replace(/^★/, "*") : badge;
   const paid =
-    activity.activityCost != null && activity.activityCost > 0
-      ? moneyWhole(activity.activityCost, currencySymbol)
+    activity.type === "meal" ||
+    activity.type === "travel" ||
+    (activity.activityCost != null && activity.activityCost > 0)
+      ? moneyWhole(activity.activityCost ?? 0, currencySymbol)
       : "";
 
   const summaryParts = [

@@ -567,13 +567,20 @@ export function activityNoteForFamily(_plan: TripPlan, _day: number): string {
   return "";
 }
 
+const TITLE_SHOPPING =
+  /\b(mall|outlet|outlets|galleria|premium\s+outlets|shopping\s+center|westfield|mills)\b/i;
+
 export function suggestActivityTitle(
   landmarkName: string,
   plan: TripPlan,
   _slot: "morning" | "afternoon",
+  interestTags?: import("@/config/city-pricing").LandmarkInterestTag[],
 ): string {
   const profile = getFamilyAgeProfile(plan);
 
+  if (interestTags?.includes("shopping") || TITLE_SHOPPING.test(landmarkName)) {
+    return `Shopping time at ${landmarkName}`;
+  }
   if (TITLE_EXPLORE.test(landmarkName)) {
     return `Explore ${landmarkName}`;
   }

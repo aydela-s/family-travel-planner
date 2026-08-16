@@ -25,6 +25,8 @@ export type CityRestaurant = {
   familyNote: string;
   /** Optional Google rating (used when the family has no dietary filter). */
   rating?: number;
+  /** Google review count — shown next to stars like activities. */
+  reviewCount?: number;
   /** Optional Google Places id for Maps deep-links. */
   placeId?: string;
 };

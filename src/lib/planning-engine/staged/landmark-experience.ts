@@ -1,4 +1,4 @@
-import type { Landmark } from "@/config/city-pricing";
+import type { Landmark, LandmarkInterestTag } from "@/config/city-pricing";
 import type { BudgetStyle } from "@/types/trip-plan";
 
 /** ~20–30 min urban drive — prefer stays inside this for arrival/departure. */
@@ -72,17 +72,28 @@ export function isWaterfrontExperience(landmark: Landmark): boolean {
   );
 }
 
-/** Interest tags that should not repeat across anchor + support on the same day. */
-export const DAY_EXCLUSIVE_ACTIVITY_TAGS = [
+/**
+ * HARD RULE: a day may contain at most one activity from each interest
+ * category, so "Nature & Scenic Views" (or any other category) can never appear
+ * twice on the same day. Every catalog interest tag is day-exclusive.
+ */
+export const DAY_EXCLUSIVE_ACTIVITY_TAGS: readonly LandmarkInterestTag[] = [
+  "parks",
   "beaches",
+  "nature",
+  "history",
+  "museums",
+  "playgrounds",
+  "indoor-play",
   "zoos",
   "theme-parks",
   "interactive",
-  "indoor-play",
-  "playgrounds",
+  "food-markets",
   "shopping",
-  "museums",
-] as const;
+  "entertainment",
+  "sports",
+  "spas",
+];
 
 export function dayActivityCategories(landmark: Landmark): Set<string> {
   const cats = new Set<string>();

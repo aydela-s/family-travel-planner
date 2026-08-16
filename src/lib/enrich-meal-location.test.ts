@@ -42,7 +42,7 @@ describe("enrich meal locations from title landmarks", () => {
             activities: [
               {
                 time: "08:00",
-                title: "Pastries or café breakfast near Fleet Science Center",
+                title: "Breakfast near Fleet Science Center",
                 type: "meal",
                 slotKind: "breakfast",
               },
@@ -54,7 +54,7 @@ describe("enrich meal locations from title landmarks", () => {
               },
               {
                 time: "12:30",
-                title: "Picnic or sandwich lunch near Belmont Park",
+                title: "Lunch near Belmont Park",
                 type: "meal",
                 slotKind: "lunch",
               },

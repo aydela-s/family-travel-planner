@@ -202,7 +202,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
     const activities = [
       {
         time: "08:00",
-        title: "Pastries or café breakfast near Funbox (Plaza Bonita, National City)",
+        title: "Breakfast near Funbox (Plaza Bonita, National City)",
         type: "meal" as ActivityType,
         slotKind: "breakfast" as const,
       },
@@ -215,7 +215,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
       },
       {
         time: "11:00",
-        title: "Picnic or sandwich lunch near Funbox (Plaza Bonita, National City)",
+        title: "Lunch near Funbox (Plaza Bonita, National City)",
         type: "meal" as ActivityType,
         slotKind: "lunch" as const,
       },
@@ -353,7 +353,7 @@ describe("isDinnerMeal — landmark names containing Dinner", () => {
     expect(
       isDinnerMeal({
         time: "08:00",
-        title: "Pastries or café breakfast near Medieval Times Dinner & Tournament",
+        title: "Breakfast near Medieval Times Dinner & Tournament",
         type: "meal",
         slotKind: "breakfast",
       }),
@@ -361,7 +361,7 @@ describe("isDinnerMeal — landmark names containing Dinner", () => {
     expect(
       isDinnerMeal({
         time: "12:00",
-        title: "Picnic or sandwich lunch near Medieval Times Dinner & Tournament",
+        title: "Lunch near Medieval Times Dinner & Tournament",
         type: "meal",
         slotKind: "lunch",
       }),
@@ -369,7 +369,7 @@ describe("isDinnerMeal — landmark names containing Dinner", () => {
     expect(
       isDinnerMeal({
         time: "17:00",
-        title: "Dinner in the Medieval Times Dinner & Tournament area",
+        title: "Dinner near Medieval Times Dinner & Tournament",
         type: "meal",
         slotKind: "dinner",
       }),
@@ -382,7 +382,7 @@ describe("isDinnerMeal — landmark names containing Dinner", () => {
       [
         {
           time: "08:00",
-          title: "Pastries or café breakfast near Medieval Times Dinner & Tournament",
+          title: "Breakfast near Medieval Times Dinner & Tournament",
           type: "meal",
           slotKind: "breakfast",
         },
@@ -393,13 +393,13 @@ describe("isDinnerMeal — landmark names containing Dinner", () => {
         },
         {
           time: "12:00",
-          title: "Picnic or sandwich lunch near Medieval Times Dinner & Tournament",
+          title: "Lunch near Medieval Times Dinner & Tournament",
           type: "meal",
           slotKind: "lunch",
         },
         {
           time: "17:00",
-          title: "Dinner in the Medieval Times Dinner & Tournament area",
+          title: "Dinner near Medieval Times Dinner & Tournament",
           type: "meal",
           slotKind: "dinner",
         },

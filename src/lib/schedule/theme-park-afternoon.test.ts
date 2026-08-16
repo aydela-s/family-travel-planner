@@ -36,7 +36,7 @@ describe("theme-park afternoon fills lunch→dinner (FAM-70)", () => {
         },
         {
           time: "12:00",
-          title: "Picnic or sandwich lunch near Belmont Park",
+          title: "Lunch near Belmont Park",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },

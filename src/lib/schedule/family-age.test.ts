@@ -169,4 +169,14 @@ describe("suggestActivityTitle — FAM-18", () => {
       /^(Morning|Afternoon):/,
     );
   });
+
+  it("uses Shopping time at for malls and shopping tags", () => {
+    const plan = planWithChildren([8]);
+    expect(suggestActivityTitle("Denver Premium Outlets", plan, "afternoon")).toBe(
+      "Shopping time at Denver Premium Outlets",
+    );
+    expect(suggestActivityTitle("NorthPark Center", plan, "afternoon", ["shopping"])).toBe(
+      "Shopping time at NorthPark Center",
+    );
+  });
 });

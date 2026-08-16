@@ -241,12 +241,11 @@ describe("FAM-7 — enrich title ↔ location match", () => {
     expect(extractLandmarkFromTitle("Explore Balboa Park")).toBe("Balboa Park");
     expect(extractLandmarkFromTitle("Family time at San Diego Zoo")).toBe("San Diego Zoo");
     expect(extractLandmarkFromTitle("Visit USS Midway Museum")).toBe("USS Midway Museum");
-    expect(
-      extractLandmarkFromTitle("Pastries or café breakfast near Fleet Science Center"),
-    ).toBe("Fleet Science Center");
-    expect(extractLandmarkFromTitle("Picnic or sandwich lunch near Belmont Park")).toBe(
-      "Belmont Park",
+    expect(extractLandmarkFromTitle("Breakfast near Fleet Science Center")).toBe(
+      "Fleet Science Center",
     );
+    expect(extractLandmarkFromTitle("Lunch near Belmont Park")).toBe("Belmont Park");
+    expect(extractLandmarkFromTitle("Dinner near Balboa Park")).toBe("Balboa Park");
     expect(extractLandmarkFromTitle("Break at Belmont Park")).toBe("Belmont Park");
   });
 

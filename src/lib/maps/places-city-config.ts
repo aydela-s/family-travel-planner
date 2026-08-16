@@ -13,7 +13,7 @@ import {
   LandmarkInterestTag,
   LandmarkOpeningHours,
 } from "@/config/city-pricing";
-import type { CityRestaurant } from "@/config/city-restaurants";
+import type { CityRestaurant, RestaurantDietary } from "@/config/city-restaurants";
 import { detectCity, detectCityFromPlan } from "@/lib/city-detect";
 import {
   DEFAULT_PLACES_RADIUS_METERS,
@@ -33,6 +33,7 @@ import {
   mergeHoursByWeekdayPreferExisting,
   typicalOpeningHoursFromWeekday,
 } from "@/lib/maps/places-hours";
+import { parseDietaryTags } from "@/lib/planning-engine/restaurant-picker";
 import { INTEREST_LABEL_TO_TAGS } from "@/lib/schedule/interest-map";
 import type { BudgetStyle, TripPlan } from "@/types/trip-plan";
 
@@ -40,6 +41,29 @@ import type { BudgetStyle, TripPlan } from "@/types/trip-plan";
 export const MIN_PLACES_LANDMARKS = 4;
 const MAX_CATEGORIES = 8;
 export const PLACES_RESTAURANT_CATEGORY = "family restaurants";
+
+/** Places Text Search categories for restaurants, tagged by dietary need. */
+export function placesRestaurantSearchPlans(
+  dietaryRestrictions: string,
+): Array<{ category: string; dietary: RestaurantDietary[] }> {
+  const tags = parseDietaryTags(dietaryRestrictions);
+  if (tags.includes("vegan")) {
+    return [
+      { category: "vegan restaurants", dietary: ["vegan"] },
+      { category: "vegan cafes", dietary: ["vegan"] },
+    ];
+  }
+  if (tags.includes("vegetarian")) {
+    return [{ category: "vegetarian restaurants", dietary: ["vegetarian"] }];
+  }
+  if (tags.includes("gluten-free")) {
+    return [{ category: "gluten free restaurants", dietary: ["gluten-free"] }];
+  }
+  if (tags.includes("dairy-free")) {
+    return [{ category: "dairy free restaurants", dietary: ["dairy-free"] }];
+  }
+  return [{ category: PLACES_RESTAURANT_CATEGORY, dietary: [] }];
+}
 
 const INDOOR_TAGS = new Set<LandmarkInterestTag>([
   "museums",
@@ -118,6 +142,9 @@ export function placesSearchCategoriesFromInterests(
     if (label === "Beaches & Waterfronts") {
       return "beach waterfront boardwalk swimming";
     }
+    if (label === "Nature & Scenic Views") {
+      return "scenic overlook nature trail botanical garden viewpoint";
+    }
     return label;
   });
   return [...new Set(queries)].slice(0, MAX_CATEGORIES);
@@ -157,6 +184,9 @@ export function interestTagsForSearchCategory(category: string): LandmarkInteres
   }
   if (/beach\s+waterfront|boardwalk\s+swimming/.test(lower)) {
     return ["beaches"];
+  }
+  if (/scenic\s+overlook|nature\s+trail|botanical\s+garden|viewpoint/.test(lower)) {
+    return ["nature"];
   }
   for (const [label, tags] of Object.entries(INTEREST_LABEL_TO_TAGS)) {
     if (lower.includes(label.toLowerCase()) || label.toLowerCase().includes(lower)) {
@@ -267,6 +297,10 @@ export function adultPriceForPlace(
     if (tags.includes("indoor-play") || INDOOR_PLAY_NAME.test(name)) {
       return mapped > 0 ? mapped : 20;
     }
+    return 0;
+  }
+  // Malls / outlets aren't ticketed attractions — Google priceLevel is for shops, not entry.
+  if (tags.includes("shopping")) {
     return 0;
   }
   return mapped;
@@ -461,7 +495,10 @@ export function landmarksFromPlacesResults(
   return [...byName.values()];
 }
 
-export function restaurantFromTopActivity(place: TopActivity): CityRestaurant | null {
+export function restaurantFromTopActivity(
+  place: TopActivity,
+  dietary: RestaurantDietary[] = [],
+): CityRestaurant | null {
   if (typeof place.latitude !== "number" || typeof place.longitude !== "number") {
     return null;
   }
@@ -469,23 +506,42 @@ export function restaurantFromTopActivity(place: TopActivity): CityRestaurant | 
     name: place.name,
     lat: place.latitude,
     lng: place.longitude,
-    meals: ["lunch", "dinner"],
+    meals: ["breakfast", "lunch", "dinner"],
     ageTags: ["toddler", "child", "tween", "teen"],
-    dietary: [],
+    dietary: [...dietary],
     budgetStyles: budgetStylesFromPriceLevel(place.priceLevel),
-    familyNote: "Nearby restaurant from Google Places.",
+    familyNote:
+      dietary.length > 0
+        ? `Family-friendly spot from Google Places (${dietary.join(", ")} search).`
+        : "Nearby restaurant from Google Places.",
     rating: place.rating,
+    reviewCount: place.reviewCount,
     placeId: place.id,
   };
 }
 
-export function restaurantsFromPlacesResults(places: TopActivity[]): CityRestaurant[] {
+export function restaurantsFromPlacesResults(
+  places: TopActivity[],
+  dietary: RestaurantDietary[] = [],
+): CityRestaurant[] {
   const byName = new Map<string, CityRestaurant>();
   for (const place of places) {
-    const restaurant = restaurantFromTopActivity(place);
+    const restaurant = restaurantFromTopActivity(place, dietary);
     if (!restaurant) continue;
     const key = restaurant.name.toLowerCase();
-    if (!byName.has(key)) byName.set(key, restaurant);
+    const existing = byName.get(key);
+    if (!existing) {
+      byName.set(key, restaurant);
+      continue;
+    }
+    // Merge dietary tags when the same place appears in multiple diet searches.
+    const merged = new Set([...existing.dietary, ...restaurant.dietary]);
+    byName.set(key, {
+      ...existing,
+      dietary: [...merged],
+      reviewCount: existing.reviewCount ?? restaurant.reviewCount,
+      rating: existing.rating ?? restaurant.rating,
+    });
   }
   return [...byName.values()].slice(0, MAX_RESTAURANT_RESULTS);
 }
@@ -500,6 +556,7 @@ function locationBiasFromCity(lat: number, lng: number): PlacesLocationBias | un
 export type BuildPlacesCityOptions = GetOrFetchOptions & {
   minLandmarks?: number;
   youngestChildAge?: number | null;
+  dietaryRestrictions?: string;
 };
 
 /**
@@ -514,13 +571,15 @@ export async function buildCityConfigFromPlaces(
   const categories = placesSearchCategoriesFromInterests(interests, {
     youngestChildAge: options.youngestChildAge,
   });
+  const restaurantPlans = placesRestaurantSearchPlans(options.dietaryRestrictions ?? "");
   const detected = detectCity(destination);
   const location =
     options.location ?? locationBiasFromCity(detected.lat, detected.lng);
   const searchOptions = { ...options, location };
 
+  const restaurantCategories = new Set(restaurantPlans.map((p) => p.category));
   const settled = await Promise.all(
-    [...categories, PLACES_RESTAURANT_CATEGORY].map(async (category) => {
+    [...categories, ...restaurantPlans.map((p) => p.category)].map(async (category) => {
       try {
         const result = await getOrFetchTopActivities(destination, category, searchOptions);
         return { category, places: result.places };
@@ -530,11 +589,28 @@ export async function buildCityConfigFromPlaces(
     }),
   );
 
-  const landmarkRows = settled.filter((row) => row.category !== PLACES_RESTAURANT_CATEGORY);
-  const restaurantRow = settled.find((row) => row.category === PLACES_RESTAURANT_CATEGORY);
+  const landmarkRows = settled.filter((row) => !restaurantCategories.has(row.category));
   // Hours come from Text Search `regularOpeningHours` on each TopActivity — no Details fan-out.
   const landmarks = landmarksFromPlacesResults(landmarkRows);
-  const restaurants = restaurantsFromPlacesResults(restaurantRow?.places ?? []);
+  const restaurantsByName = new Map<string, CityRestaurant>();
+  for (const plan of restaurantPlans) {
+    const row = settled.find((r) => r.category === plan.category);
+    for (const restaurant of restaurantsFromPlacesResults(row?.places ?? [], plan.dietary)) {
+      const key = restaurant.name.toLowerCase();
+      const existing = restaurantsByName.get(key);
+      if (!existing) {
+        restaurantsByName.set(key, restaurant);
+        continue;
+      }
+      restaurantsByName.set(key, {
+        ...existing,
+        dietary: [...new Set([...existing.dietary, ...restaurant.dietary])],
+        reviewCount: existing.reviewCount ?? restaurant.reviewCount,
+        rating: existing.rating ?? restaurant.rating,
+      });
+    }
+  }
+  const restaurants = [...restaurantsByName.values()].slice(0, MAX_RESTAURANT_RESULTS);
   const minLandmarks = options.minLandmarks ?? MIN_PLACES_LANDMARKS;
   if (landmarks.length < minLandmarks) {
     return null;
@@ -566,6 +642,7 @@ export async function resolvePlanningCity(
     | "destinationLng"
     | "destinationPlaceId"
     | "children"
+    | "dietaryRestrictions"
   >,
   options: BuildPlacesCityOptions = {},
 ): Promise<CityConfig> {
@@ -583,6 +660,7 @@ export async function resolvePlanningCity(
     ...options,
     location,
     youngestChildAge,
+    dietaryRestrictions: options.dietaryRestrictions ?? plan.dietaryRestrictions,
   });
   if (fromPlaces) {
     return {

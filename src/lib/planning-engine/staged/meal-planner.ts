@@ -16,7 +16,7 @@ import {
 import {
   findRestaurantByName,
   parseDietaryTags,
-  pickRestaurantForMeal,
+  pickRestaurantWithRoute,
 } from "@/lib/planning-engine/restaurant-picker";
 import type {
   DayBlueprint,
@@ -71,6 +71,30 @@ function shouldPreferOnSiteCafe(plan: TripPlan, meal: MealSlotKind): boolean {
 
 function cityHasRestaurant(city: CityConfig, name: string): boolean {
   return restaurantsForCity(city).some((r) => r.name === name);
+}
+
+/**
+ * The leg a meal sits on: where the family eats between, so a restaurant that is
+ * roughly on the way costs no extra driving.
+ * Breakfast starts at the stay; dinner ends back at the stay when known.
+ */
+function mealRouteContext(
+  slot: MealSlotKind,
+  anchor: Landmark | null,
+  support: Landmark[],
+  near: Landmark | null,
+  plan: TripPlan,
+): { from: Landmark | null; to: Landmark | null } {
+  const stay = stayLandmark(plan);
+  const morning = support[0] ?? anchor;
+  switch (slot) {
+    case "breakfast":
+      return { from: stay ?? morning ?? near, to: morning ?? anchor ?? near };
+    case "lunch":
+      return { from: morning ?? near, to: anchor ?? near };
+    case "dinner":
+      return { from: anchor ?? near, to: stay ?? near };
+  }
 }
 
 function planSlotMeal(
@@ -140,32 +164,46 @@ function planSlotMeal(
     (slot === "dinner" && shouldAutoScheduleRestaurantDinner(plan));
 
   if (wantNamed) {
-    const restaurant = pickRestaurantForMeal(city, plan, {
+    // Judge the restaurant against the leg it sits on, not just one landmark,
+    // so lunch/dinner stay on the day's geographic flow.
+    const route = mealRouteContext(slot, anchor, support, near, plan);
+    const pick = pickRestaurantWithRoute(city, plan, {
       meal: slot,
       day: day.dayIndex,
       near,
       excludeNames: usedRestaurants,
+      routeFrom: route.from,
+      routeTo: route.to,
     });
-    if (restaurant && cityHasRestaurant(city, restaurant.name)) {
-      usedRestaurants.add(restaurant.name);
+    if (pick && cityHasRestaurant(city, pick.restaurant.name)) {
+      usedRestaurants.add(pick.restaurant.name);
       return {
         slot,
         mode: "named_restaurant",
-        restaurantName: restaurant.name,
+        restaurantName: pick.restaurant.name,
         nearLandmarkName: near?.name,
+        dietaryFit: pick.dietaryFit,
+        detourKm: Math.round(pick.detourKm * 10) / 10,
       };
     }
   }
 
+  // Wanted a name but every option was either used or a long drive away: eat
+  // near the day's stops and tell the family what to look for there.
+  const unmetDietary =
+    wantNamed && parseDietaryTags(plan.dietaryRestrictions).length > 0
+      ? ({ dietaryFit: "none" } as const)
+      : {};
+
   if (slot === "breakfast") {
-    return { slot, mode: "bakery_casual", nearLandmarkName: near?.name };
+    return { slot, mode: "bakery_casual", nearLandmarkName: near?.name, ...unmetDietary };
   }
   if (slot === "lunch") {
     // Kitchen + save packs from the rental; other kitchen budgets eat lunch out upstream.
-    return { slot, mode: "picnic", nearLandmarkName: near?.name };
+    return { slot, mode: "picnic", nearLandmarkName: near?.name, ...unmetDietary };
   }
   // No curated restaurants for this city — stay-area dinner (never NYC default fakes).
-  return { slot, mode: "picnic", nearLandmarkName: near?.name };
+  return { slot, mode: "picnic", nearLandmarkName: near?.name, ...unmetDietary };
 }
 
 /** Plan meal intents for one day; mutates usedRestaurants for trip uniqueness. */
@@ -222,11 +260,13 @@ export function labelForMealIntent(
   dayIndex: number,
   spotName: string,
 ): { title: string; notes: string } {
-  const spot = intent.nearLandmarkName ?? spotName;
-
+  // Placement knows the real morning/lunch/dinner stop. Meal-plan
+  // nearLandmarkName can be stale (e.g. breakfast near the afternoon mall
+  // before a soft-filler morning companion was chosen).
   if (intent.mode === "on_site" && intent.nearLandmarkName) {
     return onSiteCafeLabel(intent.slot, intent.nearLandmarkName);
   }
+  const spot = spotName;
 
   let restaurant: CityRestaurant | null = null;
   if (intent.mode === "named_restaurant" && intent.restaurantName) {
@@ -246,12 +286,39 @@ export function labelForMealIntent(
     }
   }
 
-  switch (intent.slot) {
-    case "breakfast":
-      return breakfastLabel(plan, spot, restaurant);
-    case "lunch":
-      return lunchLabel(plan, spot, restaurant);
-    case "dinner":
-      return dinnerLabel(plan, spot, dayIndex, undefined, restaurant);
+  const label = (() => {
+    switch (intent.slot) {
+      case "breakfast":
+        return breakfastLabel(plan, spot, restaurant);
+      case "lunch":
+        return lunchLabel(plan, spot, restaurant);
+      case "dinner":
+        return dinnerLabel(plan, spot, dayIndex, undefined, restaurant);
+    }
+  })();
+
+  const caveat = dietaryCheckNote(plan, intent.dietaryFit);
+  return caveat ? { ...label, notes: `${label.notes} ${caveat}`.trim() } : label;
+}
+
+/**
+ * When the nearby pick isn't a certain dietary match, say so plainly instead of
+ * either hiding it or sending the family across town for a guaranteed one.
+ */
+export function dietaryCheckNote(
+  plan: TripPlan,
+  fit: MealIntent["dietaryFit"],
+): string {
+  if (fit !== "options" && fit !== "unverified" && fit !== "none") return "";
+  const needs = parseDietaryTags(plan.dietaryRestrictions);
+  if (needs.length === 0) return "";
+  const list = needs.join(" / ");
+  switch (fit) {
+    case "options":
+      return `This one is close by and lists ${list} options — check the current menu before you go.`;
+    case "unverified":
+      return `Closest good family option on today's route, but it isn't a dedicated ${list} spot — check the current menu or call ahead.`;
+    default:
+      return `No dedicated ${list} spot is close to today's stops — look for ${list} options nearby rather than driving across town.`;
   }
 }

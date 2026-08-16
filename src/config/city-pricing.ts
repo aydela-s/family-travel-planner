@@ -102,6 +102,11 @@ export type CityConfig = {
     /** Typical paid parking fee per stop when driving (car rental). */
     parkingFeePerStop: number;
   };
+  /**
+   * Price for ONE ADULT at a normal sit-down family restaurant, tax and tip
+   * included. Children are priced off this by age (childMealShare), never at
+   * the adult rate; accommodation type and meal tier scale it further.
+   */
   food: {
     breakfast: number;
     lunch: number;
@@ -140,7 +145,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       avgFuelLitersPerDay: 8,
       parkingFeePerStop: 10,
     },
-    food: { breakfast: 35, lunch: 55, dinner: 80 },
+    food: { breakfast: 18, lunch: 24, dinner: 38 },
     landmarks: [
       {
         name: "Balboa Park",
@@ -477,7 +482,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       avgFuelLitersPerDay: 6,
       parkingFeePerStop: 12,
     },
-    food: { breakfast: 30, lunch: 50, dinner: 90 },
+    food: { breakfast: 14, lunch: 22, dinner: 36 },
     landmarks: [
       {
         name: "Eiffel Tower area",
@@ -571,7 +576,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       avgFuelLitersPerDay: 7,
       parkingFeePerStop: 8,
     },
-    food: { breakfast: 32, lunch: 48, dinner: 85 },
+    food: { breakfast: 14, lunch: 20, dinner: 34 },
     landmarks: [
       {
         name: "Hyde Park",
@@ -742,7 +747,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       avgFuelLitersPerDay: 6,
       parkingFeePerStop: 25,
     },
-    food: { breakfast: 90, lunch: 140, dinner: 220 },
+    food: { breakfast: 50, lunch: 75, dinner: 125 },
     landmarks: [
       {
         name: "Tel Aviv Beach",
@@ -833,7 +838,7 @@ export const CITY_CONFIGS: CityConfig[] = [
       avgFuelLitersPerDay: 5,
       parkingFeePerStop: 800,
     },
-    food: { breakfast: 2500, lunch: 4000, dinner: 6000 },
+    food: { breakfast: 900, lunch: 1400, dinner: 2800 },
     landmarks: [
       {
         name: "Ueno Park",
@@ -929,7 +934,7 @@ export const DEFAULT_CITY: CityConfig = {
     avgFuelLitersPerDay: 7,
     parkingFeePerStop: 8,
   },
-  food: { breakfast: 30, lunch: 50, dinner: 75 },
+  food: { breakfast: 16, lunch: 22, dinner: 34 },
   landmarks: [
     {
       name: "City Center Park",

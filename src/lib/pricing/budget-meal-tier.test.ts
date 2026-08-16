@@ -33,7 +33,22 @@ describe("estimateMealCosts meal tiers", () => {
     ];
 
     const cost = estimateMealCosts(activities, city, plan);
-    // SD lunch base $55 × picnic tier 0.4 × 2.0 family meal units
-    expect(cost).toBe(44);
+    // SD adult lunch $24 × picnic tier 0.4 = $9.60 per adult,
+    // then 1 adult + a 4yo (0.4 share) + an 8yo (0.6 share) = 2.0 units.
+    expect(cost).toBe(19.2);
+  });
+
+  it("charges a full restaurant lunch far more than the picnic tier", () => {
+    const picnic = estimateMealCosts(
+      [{ time: "12:30 PM", title: "Takeout lunch at your stay", type: "meal", slotKind: "lunch" }],
+      city,
+      plan,
+    );
+    const sitDown = estimateMealCosts(
+      [{ time: "12:30 PM", title: "Lunch at Kono's Cafe", type: "meal", slotKind: "lunch" }],
+      city,
+      plan,
+    );
+    expect(sitDown).toBeGreaterThan(picnic * 1.5);
   });
 });

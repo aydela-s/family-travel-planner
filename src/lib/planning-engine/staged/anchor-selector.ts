@@ -8,6 +8,7 @@ import {
   stayTravelMin,
   travelFrictionScore,
 } from "@/lib/maps/travel-estimate";
+import { interestTagsFromPlan } from "@/lib/schedule/interest-map";
 import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
 import { isLandmarkOpenForVisit, type VisitWindow } from "@/lib/schedule/landmark-hours";
 import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
@@ -627,6 +628,11 @@ export function selectAnchorForDay(
   return ranked[0]!.lm;
 }
 
+export type SoftFillerOptions = {
+  /** Selected interests with coverage still outstanding — filled first. */
+  uncoveredSelectedTags?: LandmarkInterestTag[];
+};
+
 /** Soft near-stay / outdoor filler when no support stop is available. */
 export function selectSoftFiller(
   city: CityConfig,
@@ -636,6 +642,7 @@ export function selectSoftFiller(
   ledgerNames: Set<string>,
   visitWindow?: VisitWindow,
   alreadyToday: Landmark[] = [],
+  opts: SoftFillerOptions = {},
 ): Landmark | null {
   if (isThemeParkExperience(anchor) || day.theme.id === "theme_park") return null;
   const today = alreadyToday.length > 0 ? alreadyToday : [anchor];
@@ -643,6 +650,7 @@ export function selectSoftFiller(
   const budget = travelTimeBudget(plan);
   const dayBudget = travelDayBudget(plan);
   const exclude = new Set([...ledgerNames, anchor.name, ...today.map((l) => l.name)]);
+  const selected = new Set(interestTagsFromPlan(plan.interests));
   let pool = city.landmarks.filter(
     (l) =>
       !exclude.has(l.name) &&
@@ -684,15 +692,28 @@ export function selectSoftFiller(
     const open = pool.filter((l) => isLandmarkOpenForVisit(l, visitWindow));
     if (open.length > 0) pool = open;
   }
-  const outdoor = pool.filter((l) =>
-    l.interestTags.some((t) => ["parks", "beaches", "nature", "playgrounds"].includes(t)),
-  );
-  const list = outdoor.length > 0 ? outdoor : pool;
-  if (list.length === 0) return null;
+
+  // Selected interests come first, and an interest the trip hasn't covered yet
+  // beats one it already has. An unselected category (e.g. a city park when only
+  // Nature was chosen) is only allowed when no selected interest has a candidate.
+  if (pool.length === 0) return null;
+
+  const uncovered = new Set(opts.uncoveredSelectedTags ?? []);
+  const interestTier = (l: Landmark): number => {
+    if (uncovered.size > 0 && l.interestTags.some((t) => uncovered.has(t))) return 0;
+    if (selected.size > 0 && l.interestTags.some((t) => selected.has(t))) return 1;
+    return 2;
+  };
+
   const profile = getFamilyAgeProfile(plan);
-  return [...list].sort(
+  const fillerScore = (l: Landmark) =>
+    l.interestTags.filter((t) => uncovered.has(t)).length * 40 +
+    l.interestTags.filter((t) => selected.has(t)).length * 30 +
+    landmarkAgeScore(l, profile);
+  return [...pool].sort(
     (a, b) =>
-      landmarkAgeScore(b, profile) - landmarkAgeScore(a, profile) ||
+      interestTier(a) - interestTier(b) ||
+      fillerScore(b) - fillerScore(a) ||
       a.adultPrice - b.adultPrice,
   )[0]!;
 }

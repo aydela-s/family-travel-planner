@@ -65,7 +65,7 @@ export const MIN_RATING = 4.3;
 export const MIN_REVIEWS = 150;
 export const MAX_RESULTS = 15;
 export const MAX_ATTRACTION_RESULTS = 15;
-export const MAX_RESTAURANT_RESULTS = 12;
+export const MAX_RESTAURANT_RESULTS = 20;
 
 export class PlacesApiKeyMissingError extends Error {
   constructor() {

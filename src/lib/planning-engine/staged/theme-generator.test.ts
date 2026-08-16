@@ -45,6 +45,25 @@ describe("eligibleInterestThemes", () => {
     expect(themes).toContain("beach");
     expect(themes).not.toContain("arrival");
   });
+
+  it("does not open nature_parks theme for Nature & Scenic Views alone", () => {
+    const themes = eligibleInterestThemes(
+      sdPlan({
+        interests: [
+          "Swimming & Water Play",
+          "Nature & Scenic Views",
+          "Playgrounds & Indoor Play",
+          "Theme Parks",
+          "Interactive Museums",
+          "Shopping",
+        ],
+      }),
+      city,
+    ).map((t) => t.id);
+    expect(themes).toContain("nature");
+    expect(themes).toContain("scenic");
+    expect(themes).not.toContain("nature_parks");
+  });
 });
 
 describe("scoreTheme weights", () => {

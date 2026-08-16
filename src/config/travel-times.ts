@@ -1,3 +1,4 @@
+import { familyTravelBufferMin } from "@/lib/schedule/travel-buffer";
 import type { TransportationType, TripPlan } from "@/types/trip-plan";
 
 /**
@@ -9,6 +10,11 @@ export type TravelTimeBudget = {
   softMaxMin: number;
 };
 
+/**
+ * How far the family is willing to *travel* per hop — pure driving / transit /
+ * walking time, the number a map app would quote. Parking, boarding and
+ * kid-wrangling are added separately by travelTimeBudget below.
+ */
 export const TRAVEL_TIME_BY_MODE: Record<TransportationType, TravelTimeBudget> = {
   walking: { preferredMin: 15, softMaxMin: 25 },
   "public-transportation": { preferredMin: 25, softMaxMin: 40 },
@@ -36,38 +42,30 @@ type TravelTimePlan = Pick<
 >;
 
 /**
- * Mode-specific travel-time budget, adjusted for young kids, pace, and walking limit.
+ * Mode-specific door-to-door travel budget, adjusted for young kids, pace, and
+ * walking limit. Age/pace factors scale the *travel* allowance; the family
+ * buffer is then added, so a toddler shortens the drive rather than the parking.
  */
 export function travelTimeBudget(plan: TravelTimePlan): TravelTimeBudget {
   const mode = (plan.transportationType || "public-transportation") as TransportationType;
   const base = TRAVEL_TIME_BY_MODE[mode] ?? TRAVEL_TIME_BY_MODE["public-transportation"];
-  let preferredMin = base.preferredMin;
-  let softMaxMin = base.softMaxMin;
 
+  let factor = 1;
   const youngest = plan.children.length > 0 ? Math.min(...plan.children) : null;
-  if (youngest !== null && youngest <= 3) {
-    preferredMin -= 8;
-    softMaxMin -= 10;
-  } else if (youngest !== null && youngest <= 7) {
-    preferredMin -= 4;
-    softMaxMin -= 5;
-  }
+  if (youngest !== null && youngest <= 3) factor *= 0.78;
+  else if (youngest !== null && youngest <= 7) factor *= 0.9;
 
-  if (plan.travelStyle === "packed") {
-    preferredMin += 10;
-    softMaxMin += 10;
-  } else if (plan.travelStyle === "relaxed") {
-    preferredMin -= 8;
-    softMaxMin -= 8;
-  }
+  if (plan.travelStyle === "packed") factor *= 1.22;
+  else if (plan.travelStyle === "relaxed") factor *= 0.82;
 
-  if (plan.walkingLimit === "low" && mode !== "car-rental") {
-    preferredMin -= 5;
-    softMaxMin -= 5;
-  }
+  if (plan.walkingLimit === "low" && mode !== "car-rental") factor *= 0.89;
 
-  preferredMin = Math.max(10, preferredMin);
-  softMaxMin = Math.max(preferredMin + 8, softMaxMin);
+  const buffer = familyTravelBufferMin(plan);
+  const preferredMin = Math.max(6, Math.round(base.preferredMin * factor)) + buffer;
+  const softMaxMin = Math.max(
+    preferredMin + 5,
+    Math.round(base.softMaxMin * factor) + buffer,
+  );
   return { preferredMin, softMaxMin };
 }
 
@@ -77,8 +75,11 @@ export function travelTimeBudget(plan: TravelTimePlan): TravelTimeBudget {
  */
 export function travelDayBudget(plan: TravelTimePlan): TravelTimeBudget {
   const full = travelTimeBudget(plan);
+  const buffer = familyTravelBufferMin(plan);
+  // Shrink the travel allowance, not the fixed parking/boarding overhead.
+  const travelAllowance = Math.max(0, full.preferredMin - buffer);
   return {
-    preferredMin: Math.max(10, Math.round(full.preferredMin * 0.7)),
+    preferredMin: Math.max(6, Math.round(travelAllowance * 0.7)) + buffer,
     softMaxMin: full.preferredMin,
   };
 }

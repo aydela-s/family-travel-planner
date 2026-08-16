@@ -128,14 +128,66 @@ export function accommodationMealMultiplier(
   return base * mealTier;
 }
 
-export function familyMealUnits(plan: TripPlan): number {
-  const childUnits = plan.children.reduce((sum, age) => {
-    if (age <= 2) return sum + 0.1;  // toddlers eat from parents' plates
-    if (age <= 6) return sum + 0.4;  // kids menu
-    if (age <= 12) return sum + 0.6; // kids menu / smaller portion
-    return sum + 0.9;                // teen, nearly full meal
-  }, 0);
+/**
+ * What a child of this age actually costs relative to one adult's meal.
+ * Children are never billed at the adult restaurant price — they order from the
+ * kids menu (or share a plate), and that scales with age.
+ */
+export function childMealShare(age: number): number {
+  if (age <= 2) return 0.1; // toddlers eat from parents' plates
+  if (age <= 6) return 0.4; // kids menu
+  if (age <= 12) return 0.6; // kids menu / smaller portion
+  return 0.9; // teen, nearly full meal
+}
+
+export function familyMealUnits(plan: Pick<TripPlan, "adults" | "children">): number {
+  const childUnits = plan.children.reduce((sum, age) => sum + childMealShare(age), 0);
   return plan.adults + childUnits;
+}
+
+export type MealPartyCost = {
+  /** Total for every adult in the party. */
+  adults: number;
+  /** Total for every child, priced by age. */
+  children: number;
+  total: number;
+  /** Human-readable arithmetic, e.g. "1 adult 34 + 2 kids 27". */
+  detail: string;
+};
+
+function pluralPeople(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
+ * Split one meal's cost across the real traveller composition. `perAdultCost`
+ * is the adult price for this meal after accommodation / tier / budget-style
+ * adjustments; children are priced from it by age, never counted as adults.
+ */
+export function estimateMealPartyCost(
+  perAdultCost: number,
+  plan: Pick<TripPlan, "adults" | "children">,
+  round: (amount: number) => number = (a) => Math.round(a * 100) / 100,
+): MealPartyCost {
+  const perAdult = Math.max(0, perAdultCost);
+  const adults = round(perAdult * Math.max(0, plan.adults));
+  const children = round(
+    plan.children.reduce((sum, age) => sum + perAdult * childMealShare(age), 0),
+  );
+  const parts = [
+    `${pluralPeople(plan.adults, "adult", "adults")} ${Math.round(adults)}`,
+  ];
+  if (plan.children.length > 0) {
+    parts.push(
+      `${pluralPeople(plan.children.length, "kid", "kids")} ${Math.round(children)}`,
+    );
+  }
+  return {
+    adults,
+    children,
+    total: round(adults + children),
+    detail: parts.join(" + "),
+  };
 }
 
 export function estimateAccommodationFoodCosts(

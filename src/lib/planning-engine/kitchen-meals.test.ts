@@ -50,15 +50,16 @@ describe("FAM-74 — rental + kitchen meal logic", () => {
     expect(shouldCookDinnerAtHome(plan({ budgetStyle: "splurge" }), 1)).toBe(false);
   });
 
-  it("keeps picnic lunch from the rental on save budget", () => {
+  // Titles stay short ("Lunch near X"); the packed-from-the-rental intent lives in the notes.
+  it("keeps packed-from-the-rental lunch on save budget", () => {
     const { title, notes } = lunchLabel(plan({ budgetStyle: "save" }), "Balboa Park");
-    expect(title.toLowerCase()).toContain("picnic");
+    expect(title).toBe("Lunch near Balboa Park");
     expect(notes.toLowerCase()).toMatch(/pack|rental/);
   });
 
   it("plans lunch out for balanced kitchen stays", () => {
     const { title, notes } = lunchLabel(plan(), "Balboa Park");
-    expect(title.toLowerCase()).not.toContain("picnic");
+    expect(notes.toLowerCase()).not.toMatch(/pack lunch/);
     expect(`${title} ${notes}`.toLowerCase()).toMatch(/lunch/);
   });
 

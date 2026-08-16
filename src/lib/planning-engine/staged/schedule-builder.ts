@@ -67,7 +67,7 @@ function fillActivitySlot(
       return tagged(
         {
           time: slot.defaultTime,
-          title: suggestActivityTitle(ctx.morning.name, plan, "morning"),
+          title: suggestActivityTitle(ctx.morning.name, plan, "morning", ctx.morning.interestTags),
           type,
         },
         ctx.morning,
@@ -76,7 +76,7 @@ function fillActivitySlot(
       return tagged(
         {
           time: slot.defaultTime,
-          title: suggestActivityTitle(ctx.afternoon.name, plan, "afternoon"),
+          title: suggestActivityTitle(ctx.afternoon.name, plan, "afternoon", ctx.afternoon.interestTags),
           type,
           notes:
             ctx.afternoon.adultPrice > 0 ? "Paid stop within your family budget." : undefined,
@@ -87,7 +87,12 @@ function fillActivitySlot(
       return tagged(
         {
           time: slot.defaultTime,
-          title: suggestActivityTitle(ctx.extra?.name ?? ctx.afternoon.name, plan, "afternoon"),
+          title: suggestActivityTitle(
+            ctx.extra?.name ?? ctx.afternoon.name,
+            plan,
+            "afternoon",
+            (ctx.extra ?? ctx.afternoon).interestTags,
+          ),
           type,
           notes: "Extra stop for a packed day.",
         },

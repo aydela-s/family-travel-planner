@@ -1,5 +1,6 @@
-import type { CityConfig, Landmark } from "@/config/city-pricing";
+import type { CityConfig, Landmark, LandmarkInterestTag } from "@/config/city-pricing";
 import { clusterRadiusKm } from "@/config/cluster-distances";
+import { interestTagsFromPlan } from "@/lib/schedule/interest-map";
 import { travelDayBudget, travelTimeBudget } from "@/config/travel-times";
 import { haversineKm } from "@/lib/maps/directions";
 import {
@@ -34,6 +35,8 @@ export type SelectSupportOptions = {
   ledgerNames: Set<string>;
   /** Already committed today (anchor + prior support). */
   alreadyToday: Landmark[];
+  /** Selected interests with coverage still outstanding — filled before anything else. */
+  uncoveredSelectedTags?: LandmarkInterestTag[];
 };
 
 function maxSupport(day: DayBlueprint, anchor?: Landmark): number {
@@ -273,9 +276,25 @@ export function selectSupportForDay(
     if (open.length > 0) pool = open;
   }
 
+  // Selected interests are the priority: an unselected category is only used
+  // once no selected-interest candidate survives the gates in the loop below,
+  // so this ranks tiers instead of discarding the lower ones outright.
+  const selected = new Set(interestTagsFromPlan(plan.interests));
+  const uncovered = new Set(opts.uncoveredSelectedTags ?? []);
+  const interestTier = (l: Landmark): number => {
+    if (uncovered.size > 0 && l.interestTags.some((t) => uncovered.has(t))) return 0;
+    if (selected.size > 0 && l.interestTags.some((t) => selected.has(t))) return 1;
+    return 2;
+  };
+
   const ranked = [...pool]
     .map((lm) => ({ lm, score: scoreSupportCandidate(lm, day, plan, anchor) }))
-    .sort((a, b) => b.score - a.score || a.lm.name.localeCompare(b.lm.name));
+    .sort(
+      (a, b) =>
+        interestTier(a.lm) - interestTier(b.lm) ||
+        b.score - a.score ||
+        a.lm.name.localeCompare(b.lm.name),
+    );
 
   const picked: Landmark[] = [];
   for (const row of ranked) {

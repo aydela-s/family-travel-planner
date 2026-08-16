@@ -148,7 +148,7 @@ export function extractLandmarkFromTitle(title: string): string | null {
   );
   if (match) return match[1].trim();
 
-  // Meal / rest copy: "Pastries or café breakfast near Fleet Science Center"
+  // Meal / rest copy: "Breakfast near Fleet Science Center" / "Lunch near Belmont Park"
   const near = title.match(/\bnear\s+(.+)$/i);
   if (near) return near[1].trim();
 

@@ -181,6 +181,39 @@ function packedActivityDuration(
 }
 
 /** Expand packed activities to the longer duration and shift following items. */
+/** Latest a meal may start and still sit inside its age-based window. */
+function mealStartDeadline<T extends RawActivity>(item: T, plan: TripPlan): number | null {
+  if (item.type !== "meal") return null;
+  if (isDinnerMeal(item)) return dinnerTimeWindow(plan).maxMin - MIN_LUNCH_DURATION_MIN;
+  if (isDaytimeMeal(item)) return lunchTimeWindow(plan).maxMin;
+  return null;
+}
+
+/**
+ * How late stop `i` may end before the next meal would be pushed out of its
+ * window — a longer morning must never buy itself a 2pm toddler lunch.
+ */
+function latestEndBeforeNextMeal<T extends RawActivity & { endTime: string }>(
+  items: T[],
+  i: number,
+  plan: TripPlan,
+  gap: number,
+): number {
+  let budget = Infinity;
+  let spent = 0;
+  for (let k = i + 1; k < items.length; k++) {
+    spent += gap;
+    const deadline = mealStartDeadline(items[k]!, plan);
+    if (deadline != null) {
+      budget = Math.min(budget, deadline - spent);
+      break;
+    }
+    const start = parseTimeToMinutes(items[k]!.time);
+    spent += parseTimeToMinutes(items[k]!.endTime) - start;
+  }
+  return budget;
+}
+
 export function applyPackedFewerLonger<T extends RawActivity & { endTime: string }>(
   scheduled: T[],
   plan: TripPlan,
@@ -195,10 +228,12 @@ export function applyPackedFewerLonger<T extends RawActivity & { endTime: string
       const start = parseTimeToMinutes(item.time);
       const current = parseTimeToMinutes(item.endTime) - start;
       const target = packedLongerDurationForTags(item.interestTags);
-      if (current < target) {
+      const cap = latestEndBeforeNextMeal(out, i, plan, gap);
+      const end = Math.min(start + target, cap);
+      if (current < target && end > start + current) {
         out[i] = {
           ...item,
-          endTime: minutesToTime(start + target),
+          endTime: minutesToTime(end),
         };
       }
     }
@@ -209,7 +244,10 @@ export function applyPackedFewerLonger<T extends RawActivity & { endTime: string
       const nextStart = parseTimeToMinutes(next.time);
       const nextDur = parseTimeToMinutes(next.endTime) - nextStart;
       if (nextStart < prevEnd + gap) {
-        const newStart = prevEnd + gap;
+        // A meal keeps its window even if that means a shorter transfer.
+        const deadline = mealStartDeadline(next, plan);
+        const newStart =
+          deadline != null ? Math.min(prevEnd + gap, Math.max(nextStart, deadline)) : prevEnd + gap;
         out[i + 1] = {
           ...next,
           time: minutesToTime(newStart),

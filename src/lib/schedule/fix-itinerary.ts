@@ -18,6 +18,7 @@ import {
   rescheduleActivitiesWithMealAnchors,
   validateMealPlan,
 } from "@/lib/schedule/meal-planning";
+import { scheduledSegmentMinutes } from "@/lib/maps/route-segments";
 import { validateDaySchedule } from "@/lib/schedule/schedule-invariants";
 import {
   applyNapTiming,
@@ -305,10 +306,13 @@ export function finalizeEnrichedDay(day: ItineraryDay, plan: TripPlan): Itinerar
     return day;
   }
 
-  const segmentDurations = day.routeSegments.map((s) => s.durationMin);
   return {
     ...day,
-    activities: rescheduleEnrichedActivities(day.activities, plan, segmentDurations),
+    activities: rescheduleEnrichedActivities(
+      day.activities,
+      plan,
+      scheduledSegmentMinutes(day.routeSegments, plan),
+    ),
   };
 }
 

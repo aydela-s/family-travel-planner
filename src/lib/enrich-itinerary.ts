@@ -9,7 +9,7 @@ import {
   oneLineNote,
 } from "@/lib/format";
 import { estimateDailyTransport, formatTransportDisplay } from "@/lib/maps/directions";
-import { buildRouteSegments } from "@/lib/maps/route-segments";
+import { buildRouteSegments, scheduledSegmentMinutes } from "@/lib/maps/route-segments";
 import { buildStaticMapUrl } from "@/lib/maps/static-map";
 import { normalizeRawItinerary } from "@/lib/itinerary";
 import { isGroceryActivity } from "@/lib/schedule/meal-planning";
@@ -21,6 +21,10 @@ import {
 import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
 import { findRestaurantByName } from "@/lib/planning-engine/restaurant-picker";
 import {
+  repairDuplicateCategories,
+  validateItinerary,
+} from "@/lib/planning-engine/validate-itinerary";
+import {
   activityUsesStayHome,
   stayHomeLocation,
 } from "@/lib/planning-engine/stay-home";
@@ -29,10 +33,15 @@ import {
   rescheduleEnrichedActivities,
   validateEnrichedDay,
 } from "@/lib/schedule/fix-itinerary";
+import { classifyActivities } from "@/lib/schedule/classify-activity";
 import { itemDurationMin, isUnpaidTimelineActivity } from "@/lib/schedule/timeline";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
-import { maybeAddAccommodationGroceryStop, summarizeDailyCost, type DaySpendSummary } from "@/lib/pricing/budget";
+import { maybeAddAccommodationGroceryStop, applyMealActivityCosts, summarizeDailyCost, type DaySpendSummary } from "@/lib/pricing/budget";
 import { familyActivityCost } from "@/lib/pricing/activity-cost";
+import {
+  allocateRouteSegmentCosts,
+  injectTravelActivities,
+} from "@/lib/pricing/transport-planner";
 import { TripPlan } from "@/types/trip-plan";
 import {
   ActivityLocation,
@@ -210,6 +219,7 @@ async function enrichDay(
         };
         if (restaurant.placeId) act.placeId = restaurant.placeId;
         if (typeof restaurant.rating === "number") act.rating = restaurant.rating;
+        if (typeof restaurant.reviewCount === "number") act.reviewCount = restaurant.reviewCount;
       } else if (titleLandmark) {
         // Honor "near Fleet Science Center" / café copy — don't fall back to landmarks[0].
         const cafeStyle = /café|cafe|pastries|bakery/i.test(a.title);
@@ -260,8 +270,16 @@ async function enrichDay(
     return act;
   });
 
+  // HARD RULE gate: at most one activity per category per day. Classification
+  // first so a stop that arrived without catalog tags still competes for its
+  // category; both run before routing/pricing so a swapped stop is costed and
+  // routed like any other.
+  const deduped = repairDuplicateCategories(classifyActivities(located, city), plan, city, {
+    usedNames: tripExcludedLandmarks,
+  });
+
   const { routeSegments, totalKm, segmentCosts, segmentDurations } = await buildRouteSegments(
-    located,
+    deduped,
     city,
     plan,
   );
@@ -276,7 +294,7 @@ async function enrichDay(
 
   const lockedDailyTransport = transportEstimate.cost;
 
-  const scheduledActivities = rescheduleEnrichedActivities(located, plan, segmentDurations).map(
+  const scheduledActivities = rescheduleEnrichedActivities(deduped, plan, segmentDurations).map(
     normalizeActivity,
   );
 
@@ -290,12 +308,21 @@ async function enrichDay(
   }
   const withHoursNotes = applyOpeningHoursNotes(scheduledActivities, hoursIssues, city.landmarks);
 
-  const summary = summarizeDailyCost(withHoursNotes, lockedDailyTransport, city, plan, rawDay.day);
+  const pricedSegments = allocateRouteSegmentCosts(routeSegments, plan, city);
+  const withMealCosts = applyMealActivityCosts(withHoursNotes, city, plan);
+  const withTravel = injectTravelActivities(
+    withMealCosts,
+    pricedSegments,
+    plan,
+    city.currencySymbol,
+  ).map(normalizeActivity);
+
+  const summary = summarizeDailyCost(withTravel, lockedDailyTransport, city, plan, rawDay.day);
   const costBreakdown = buildCostBreakdown(summary, city.currency);
   const transportCost = costBreakdown.transport;
 
-  const mapLocations = withHoursNotes
-    .filter((a) => a.location)
+  const mapLocations = withTravel
+    .filter((a) => a.type !== "travel" && a.location)
     .map((a) => a.location!);
 
   const dayResult: ItineraryDay = {
@@ -303,7 +330,7 @@ async function enrichDay(
     date,
     weekday: formatDayHeader(date).split(",")[0],
     formattedDate: formatDayHeader(date),
-    activities: withHoursNotes,
+    activities: withTravel,
     costBreakdown,
     accommodationTips: summary.accommodationTips,
     costs: costBreakdown,
@@ -319,7 +346,7 @@ async function enrichDay(
         city.currencySymbol,
       ),
     },
-    routeSegments,
+    routeSegments: pricedSegments,
     mapUrl: buildStaticMapUrl(mapLocations),
   };
 
@@ -340,10 +367,13 @@ function validateBeforeDisplay(days: ItineraryDay[], plan: TripPlan): ItineraryD
   return days.map((day) => {
     const issues = validateEnrichedDay(day, plan);
     if (issues.length === 0) return day;
-    const segmentDurations = day.routeSegments.map((s) => s.durationMin);
     return {
       ...day,
-      activities: rescheduleEnrichedActivities(day.activities, plan, segmentDurations),
+      activities: rescheduleEnrichedActivities(
+        day.activities,
+        plan,
+        scheduledSegmentMinutes(day.routeSegments, plan),
+      ),
     };
   });
 }
@@ -405,6 +435,13 @@ export async function enrichItinerary(
   }
 
   days = validateBeforeDisplay(days, plan);
+
+  // Final gate: every rule the selection stages are supposed to have enforced.
+  if (process.env.NODE_ENV === "development") {
+    for (const violation of validateItinerary(days, plan, city)) {
+      console.warn(`[itinerary] ${violation.code}: ${violation.message}`);
+    }
+  }
 
   return {
     destination: plan.destination,

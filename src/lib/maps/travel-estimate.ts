@@ -6,6 +6,7 @@ import {
   travelDayBudget,
   travelTimeBudget,
 } from "@/config/travel-times";
+import { scheduledTravelMin } from "@/lib/schedule/travel-buffer";
 import type { TripPlan } from "@/types/trip-plan";
 
 type Located = { lat: number; lng: number };
@@ -28,8 +29,27 @@ export function haversineKm(
 }
 
 /**
+ * Actual travel time for a road distance — the number a maps app would report.
+ * Deliberately excludes parking, boarding, and kid-wrangling time; that lives in
+ * familyTravelBufferMin so the itinerary can never report it as driving time.
+ *
+ * Driving assumes ~40 km/h door-to-door urban average plus 2 min to pull in and
+ * out; transit assumes ~20 km/h plus an 8 min walk/wait.
+ */
+export function travelMinutesForDistance(
+  distanceKm: number,
+  mode: DirectionsTravelMode,
+): number {
+  if (distanceKm <= 0) return 0;
+  if (mode === "walking") return Math.round(distanceKm * 12);
+  if (mode === "transit") return Math.round(distanceKm * 3 + 8);
+  return Math.round(distanceKm * 1.5 + 2);
+}
+
+/**
  * Same road-distance / duration fallback used when Google Directions is unavailable.
  * Transit is slower than driving (waits + transfers) instead of a driving clone.
+ * `durationMin` is pure travel time — callers add the family buffer for scheduling.
  */
 export function estimateRoutedMetrics(
   straightKm: number,
@@ -41,16 +61,13 @@ export function estimateRoutedMetrics(
   const roadFactor =
     travelMode === "walking" ? 1.3 : travelMode === "transit" ? 1.55 : 1.45;
   const distanceKm = Math.round(straightKm * roadFactor * 10) / 10;
-  const durationMin =
-    travelMode === "walking"
-      ? Math.round(distanceKm * 12)
-      : travelMode === "transit"
-        ? Math.round(distanceKm * 5.5 + 8)
-        : Math.round(distanceKm * 3.2 + 5);
-  return { distanceKm, durationMin };
+  return { distanceKm, durationMin: travelMinutesForDistance(distanceKm, travelMode) };
 }
 
-export function estimateDurationMin(
+type DurationPlan = Pick<TripPlan, "transportationType" | "children">;
+
+/** Pure travel time between two points — no family buffer. */
+export function pureTravelMin(
   from: Located,
   to: Located,
   plan: Pick<TripPlan, "transportationType">,
@@ -60,9 +77,18 @@ export function estimateDurationMin(
     .durationMin;
 }
 
+/**
+ * Door-to-door minutes used by selection/scoring and the schedule: travel time
+ * plus the family buffer. Travel-time budgets in travel-times.ts are expressed
+ * on the same scale.
+ */
+export function estimateDurationMin(from: Located, to: Located, plan: DurationPlan): number {
+  return scheduledTravelMin(pureTravelMin(from, to, plan), plan);
+}
+
 export function stayTravelMin(
   landmark: Located,
-  plan: Pick<TripPlan, "transportationType" | "stayLat" | "stayLng">,
+  plan: Pick<TripPlan, "transportationType" | "children" | "stayLat" | "stayLng">,
 ): number | null {
   if (typeof plan.stayLat !== "number" || typeof plan.stayLng !== "number") return null;
   return estimateDurationMin({ lat: plan.stayLat, lng: plan.stayLng }, landmark, plan);

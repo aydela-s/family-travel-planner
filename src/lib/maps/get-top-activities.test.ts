@@ -112,8 +112,8 @@ describe("rankTopActivitiesFromPlaces (FAM-58 / FAM-60)", () => {
     expect(a).toEqual(b);
   });
 
-  it("caps restaurant pools lower than attraction pools by default", () => {
-    const many: PlacesSearchTextPlace[] = Array.from({ length: 20 }, (_, i) => ({
+  it("keeps a deep restaurant pool so dietary matches survive filtering", () => {
+    const many: PlacesSearchTextPlace[] = Array.from({ length: 30 }, (_, i) => ({
       id: `r-${i}`,
       displayName: { text: `Restaurant ${String(i).padStart(2, "0")}` },
       rating: 4.5,
@@ -122,7 +122,7 @@ describe("rankTopActivitiesFromPlaces (FAM-58 / FAM-60)", () => {
       primaryType: "restaurant",
       location: { latitude: 1, longitude: 2 },
     }));
-    expect(rankTopActivitiesFromPlaces(many, { kind: "restaurant" })).toHaveLength(12);
+    expect(rankTopActivitiesFromPlaces(many, { kind: "restaurant" })).toHaveLength(20);
     expect(rankTopActivitiesFromPlaces(many, { kind: "attraction" })).toHaveLength(15);
   });
 
