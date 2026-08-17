@@ -7,6 +7,7 @@ import {
   fitsInDailyLoadBudget,
   sumActivityLoadUnits,
   typicalDurationMinForLandmark,
+  visitDurationForTags,
 } from "@/lib/schedule/activity-load";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
 import type { TripPlan } from "@/types/trip-plan";
@@ -146,5 +147,23 @@ describe("activity load units (FAM-77)", () => {
     expect(fitsInDailyLoadBudget([], zoo, plan({ travelStyle: "relaxed", children: [2] }))).toBe(
       true,
     );
+  });
+});
+
+describe("visit duration by category and kid age", () => {
+  it("schedules indoor play for 1.5–2 hours, not a 45-minute stop", () => {
+    expect(visitDurationForTags(["indoor-play"], { youngest: 4 })).toBe(90);
+    expect(visitDurationForTags(["indoor-play"], { youngest: 10 })).toBe(105);
+    expect(visitDurationForTags(["indoor-play"], { youngest: 15 })).toBe(120);
+  });
+
+  it("gives water play 2–3 hours and shopping 1.5–3 hours by age", () => {
+    expect(visitDurationForTags(["beaches"], { youngest: 4, title: "Heights Aquatic Center" })).toBe(
+      120,
+    );
+    expect(visitDurationForTags(["beaches"], { youngest: 10 })).toBe(150);
+    expect(visitDurationForTags(["beaches"], { youngest: null })).toBe(180);
+    expect(visitDurationForTags(["shopping"], { youngest: 5 })).toBe(90);
+    expect(visitDurationForTags(["shopping"], { youngest: 16 })).toBe(180);
   });
 });

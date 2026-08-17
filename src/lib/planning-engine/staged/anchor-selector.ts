@@ -13,6 +13,17 @@ import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-pro
 import { isLandmarkOpenForVisit, type VisitWindow } from "@/lib/schedule/landmark-hours";
 import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import {
+  compileTripConstraints,
+  describeHardConstraint,
+  type TripConstraints,
+} from "@/lib/planning-engine/constraints";
+import { recordConflict, type PlannerConflict } from "@/lib/planning-engine/conflicts";
+import {
+  isEligibleStop,
+  splitEligibleStops,
+  type StopRejection,
+} from "@/lib/planning-engine/staged/eligibility";
+import {
   exceedsBudgetStyleTicket,
   fitsBudgetStyle,
   hasFixedOpeningHours,
@@ -39,6 +50,21 @@ import type { TripPlan } from "@/types/trip-plan";
 function stayKm(landmark: Landmark, plan: TripPlan): number | null {
   if (typeof plan.stayLat !== "number" || typeof plan.stayLng !== "number") return null;
   return haversineKm(landmark.lat, landmark.lng, plan.stayLat, plan.stayLng);
+}
+
+/** City pool with every hard-rule violation removed (see staged/eligibility). */
+function eligibleCityLandmarks(
+  city: CityConfig,
+  plan: TripPlan,
+  visitWindow?: VisitWindow,
+  constraints?: TripConstraints,
+): Landmark[] {
+  const ctx = {
+    plan,
+    visitWindow,
+    constraints: constraints ?? compileTripConstraints(plan),
+  };
+  return city.landmarks.filter((l) => isEligibleStop(l, ctx));
 }
 
 function hasConstraint(day: DayBlueprint, type: DayConstraint["type"]): boolean {
@@ -132,19 +158,25 @@ export function filterAnchorCandidates(
   ledgerNames: Set<string>,
   visitWindow?: VisitWindow,
   priorFullDayAnchors: Set<string> = new Set(),
+  constraints?: TripConstraints,
 ): Landmark[] {
-  const unused = city.landmarks.filter((l) => !ledgerNames.has(l.name));
-  const notPriorFullAnchor = city.landmarks.filter((l) => !priorFullDayAnchors.has(l.name));
+  // HARD GATE first: closed venues, enforced age limits, and explicit user
+  // exclusions / drive limits are removed before any soft preference runs.
+  const cityLandmarks = eligibleCityLandmarks(city, plan, visitWindow, constraints);
+  const unused = cityLandmarks.filter((l) => !ledgerNames.has(l.name));
+  const notPriorFullAnchor = cityLandmarks.filter((l) => !priorFullDayAnchors.has(l.name));
   // Full days: never reopen a prior full-day anchor while any other landmark exists.
-  // Prefer unused; if support ate the pool, promote landmarks that were only support.
-  // Travel days may soft-reuse near stay (including prior anchors).
+  // Prefer unused. HARD RULE: never recycle a used landmark onto another day.
   let pool: Landmark[];
-  if (day.role === "arrival" || day.role === "departure") {
-    pool = unused.length > 0 ? unused : [...city.landmarks];
-  } else if (unused.length > 0) {
+  if (unused.length > 0) {
     pool = unused;
+  } else if (day.role === "arrival" || day.role === "departure") {
+    // Travel days with nothing left unused: leave the pool empty so the
+    // low-friction fallback can pick a free near-stay stop that still isn't
+    // on the ledger when possible; otherwise the last resort below runs.
+    pool = [];
   } else if (notPriorFullAnchor.length > 0) {
-    pool = notPriorFullAnchor;
+    pool = notPriorFullAnchor.filter((l) => !ledgerNames.has(l.name));
   } else {
     pool = [];
   }
@@ -210,21 +242,32 @@ export function filterAnchorCandidates(
         !l.interestTags.includes("shopping") &&
         !isIndoorPlayExperience(l),
     );
-    // Never soft-reuse a stop already used earlier in the trip while unused options remain.
+    // HARD RULE: never reuse a landmark already used on this trip. Prefer an
+    // empty local pool over recycling Play Street Museum (or any stop) again.
     if (unused.length > 0) {
       const unusedOnly = pool.filter((l) => !ledgerNames.has(l.name));
       if (unusedOnly.length > 0) pool = unusedOnly;
+      else {
+        // No unused stop inside the travel-day filters — still refuse reuse.
+        pool = unused.filter(
+          (l) =>
+            !isThemeParkExperience(l) &&
+            !l.interestTags.includes("theme-parks") &&
+            !l.interestTags.includes("shopping") &&
+            !isIndoorPlayExperience(l),
+        );
+      }
     }
     const { maxKm, maxMin, preferredMin } = farLimits(day, plan);
     const isNear = (l: Landmark) => {
+      const km = stayKm(l, plan);
+      if (km != null && km > maxKm) return false;
       const mins = stayTravelMin(l, plan);
       if (mins != null) return mins <= maxMin;
-      const km = stayKm(l, plan);
       return km == null || km <= maxKm;
     };
 
-    // Prefer unused near-stay; if ledger exhausted locally, reuse near landmarks
-    // rather than falling through to far unused POIs (e.g. Torrey Pines).
+    // Prefer unused near-stay landmarks; never fall back to reusing a prior stop.
     let nearPool = unused.filter(isNear);
     const unusedFree = nearPool.filter(
       (l) =>
@@ -234,20 +277,10 @@ export function filterAnchorCandidates(
     );
     if (unusedFree.length > 0) {
       nearPool = unusedFree;
-    } else {
-      const reusedFree = city.landmarks.filter(
-        (l) =>
-          isNear(l) &&
-          l.adultPrice <= 0 &&
-          !l.interestTags.includes("theme-parks") &&
-          !isIndoorPlayExperience(l),
+    } else if (nearPool.length === 0) {
+      nearPool = unused.filter(
+        (l) => isNear(l) && !isIndoorPlayExperience(l) && !isThemeParkExperience(l),
       );
-      if (reusedFree.length > 0) nearPool = reusedFree;
-      else if (nearPool.length === 0) {
-        nearPool = city.landmarks.filter(
-          (l) => isNear(l) && !isIndoorPlayExperience(l) && !isThemeParkExperience(l),
-        );
-      }
     }
     if (nearPool.length > 0) pool = nearPool;
 
@@ -502,7 +535,7 @@ export function scoreAnchorCandidate(
   }
 
   // Arrival/departure may soft-reuse near-stay POIs when the local unused pool is empty.
-  if (ledgerNames.has(landmark.name) && !lowFrictionDay) score -= 500;
+  if (ledgerNames.has(landmark.name)) score -= 5000;
 
   // Tiny deterministic jitter from name for stable ties
   score += (landmark.name.length % 7) * 0.01;
@@ -527,24 +560,26 @@ export type SelectAnchorOptions = {
   softExcludeNames?: Set<string>;
   /** Full-day anchors already used this trip — hard-avoid while alternatives exist. */
   priorFullDayAnchors?: Set<string>;
+  /** Compiled user constraints; derived from the plan when omitted. */
+  constraints?: TripConstraints;
+  /** Sink for hard rules that could not be satisfied. */
+  conflicts?: PlannerConflict[];
 };
 
 /** Last-resort near-stay pick for arrival/departure — never leave the low-friction ring. */
 function lowFrictionFallback(
-  city: CityConfig,
+  candidates: Landmark[],
   plan: TripPlan,
   day: DayBlueprint,
 ): Landmark | null {
   const { maxKm, maxMin } = farLimits(day, plan);
 
-  const near = city.landmarks
+  const near = candidates
     .filter((l) => {
+      const km = stayKm(l, plan);
+      if (km != null && km > maxKm) return false;
       const mins = stayTravelMin(l, plan);
       if (mins != null && mins > maxMin) return false;
-      if (mins == null) {
-        const km = stayKm(l, plan);
-        if (km != null && km > maxKm) return false;
-      }
       if (l.adultPrice > 0) return false;
       if (l.interestTags.includes("theme-parks")) return false;
       if (isIndoorPlayExperience(l)) return false;
@@ -566,6 +601,60 @@ function lowFrictionFallback(
   return near[0] ?? null;
 }
 
+const CONFLICT_CODE_BY_RULE: Record<StopRejection["rule"], PlannerConflict["code"]> = {
+  venue_closed: "no_open_venue",
+  age_restriction: "no_age_appropriate_venue",
+  exclude_venue: "exclusion_leaves_nothing",
+  exclude_interest: "exclusion_leaves_nothing",
+  max_drive_min: "drive_limit_exceeded",
+  no_naps: "exclusion_leaves_nothing",
+  dietary_required: "dietary_unreachable",
+};
+
+/**
+ * Every candidate breaks a hard rule but the day still needs an anchor. Take the
+ * best-scoring one and publish the whole trade-off, so the violation is visible
+ * in the conflict data instead of silently shipping as a normal pick.
+ */
+function anchorViolatingFallback(
+  city: CityConfig,
+  plan: TripPlan,
+  day: DayBlueprint,
+  rejected: Array<{ landmark: Landmark; rejection: StopRejection }>,
+  opts: SelectAnchorOptions,
+): Landmark {
+  const ranked = [...rejected].sort(
+    (a, b) =>
+      scoreAnchorCandidate(b.landmark, day, plan, opts.ledgerNames) -
+        scoreAnchorCandidate(a.landmark, day, plan, opts.ledgerNames) ||
+      a.landmark.name.localeCompare(b.landmark.name),
+  );
+  const fallback = ranked[0];
+  if (!fallback) return city.landmarks[0]!;
+
+  const options = ranked.slice(0, 4).map(({ landmark, rejection }) => ({
+    kind: "venue" as const,
+    name: landmark.name,
+    placeId: landmark.placeId,
+    violates: [rejection.rule],
+    reason: rejection.reason,
+  }));
+
+  recordConflict(opts.conflicts, {
+    code: CONFLICT_CODE_BY_RULE[fallback.rejection.rule],
+    rule: fallback.rejection.rule,
+    constraint: fallback.rejection.constraint,
+    scope: { day: day.dayIndex, slot: "anchor" },
+    message: fallback.rejection.constraint
+      ? `Day ${day.dayIndex}: no activity satisfies "${describeHardConstraint(fallback.rejection.constraint)}".`
+      : `Day ${day.dayIndex}: no activity is available that meets every requirement.`,
+    options,
+    chosen: options[0],
+  });
+
+  return fallback.landmark;
+}
+
 /** Pick the day's hero stop from a small filtered candidate set. */
 export function selectAnchorForDay(
   city: CityConfig,
@@ -573,6 +662,12 @@ export function selectAnchorForDay(
   day: DayBlueprint,
   opts: SelectAnchorOptions,
 ): Landmark {
+  const constraints = opts.constraints ?? compileTripConstraints(plan);
+  const eligibility = splitEligibleStops(city.landmarks, {
+    plan,
+    constraints,
+    visitWindow: opts.visitWindow,
+  });
   let candidates = filterAnchorCandidates(
     city,
     day,
@@ -580,6 +675,7 @@ export function selectAnchorForDay(
     opts.ledgerNames,
     opts.visitWindow,
     opts.priorFullDayAnchors,
+    constraints,
   );
   if (opts.softExcludeNames && opts.softExcludeNames.size > 0) {
     const filtered = candidates.filter((l) => !opts.softExcludeNames!.has(l.name));
@@ -587,27 +683,31 @@ export function selectAnchorForDay(
   }
   if (candidates.length === 0) {
     if (day.role === "arrival" || day.role === "departure") {
-      const near = lowFrictionFallback(city, plan, day);
+      const near = lowFrictionFallback(eligibility.eligible, plan, day);
       if (near) return near;
     }
     const prior = opts.priorFullDayAnchors ?? new Set<string>();
     const travelDay = day.role === "arrival" || day.role === "departure";
     const eligible = (l: Landmark) =>
       !travelDay || (!isIndoorPlayExperience(l) && !isThemeParkExperience(l));
-    const unusedAny = city.landmarks.filter(
+    const cityLandmarks = eligibility.eligible;
+    const unusedAny = cityLandmarks.filter(
       (l) => !opts.ledgerNames.has(l.name) && eligible(l),
     );
-    const notPriorAnchor = city.landmarks.filter((l) => !prior.has(l.name) && eligible(l));
+    const notPriorAnchor = cityLandmarks.filter((l) => !prior.has(l.name) && eligible(l));
     const pool =
       unusedAny.length > 0
         ? unusedAny
         : notPriorAnchor.length > 0
           ? notPriorAnchor
           : travelDay
-            ? city.landmarks.filter(eligible)
+            ? cityLandmarks.filter(eligible)
             : notPriorAnchor;
     if (pool.length === 0) {
-      return city.landmarks.find(eligible) ?? city.landmarks[0]!;
+      // Nothing in the city satisfies the hard rules. The day still needs a hero
+      // stop, so record exactly what was rejected and mark the fallback as a
+      // known violation rather than passing it off as a valid pick.
+      return anchorViolatingFallback(city, plan, day, eligibility.rejected, opts);
     }
     const ranked = [...pool]
       .map((lm) => ({
@@ -631,6 +731,7 @@ export function selectAnchorForDay(
 export type SoftFillerOptions = {
   /** Selected interests with coverage still outstanding — filled first. */
   uncoveredSelectedTags?: LandmarkInterestTag[];
+  constraints?: TripConstraints;
 };
 
 /** Soft near-stay / outdoor filler when no support stop is available. */
@@ -651,7 +752,9 @@ export function selectSoftFiller(
   const dayBudget = travelDayBudget(plan);
   const exclude = new Set([...ledgerNames, anchor.name, ...today.map((l) => l.name)]);
   const selected = new Set(interestTagsFromPlan(plan.interests));
-  let pool = city.landmarks.filter(
+  // HARD GATE — a filler is optional, so a rule violation simply means no filler.
+  const cityLandmarks = eligibleCityLandmarks(city, plan, visitWindow, opts.constraints);
+  let pool = cityLandmarks.filter(
     (l) =>
       !exclude.has(l.name) &&
       l.intensity !== "high" &&
@@ -676,7 +779,7 @@ export function selectSoftFiller(
       (l) => estimateDurationMin(anchor, l, plan) <= Math.round(budget.softMaxMin * 1.25),
     );
     if (pool.length === 0) {
-      pool = city.landmarks.filter(
+      pool = cityLandmarks.filter(
         (l) =>
           !exclude.has(l.name) &&
           l.intensity !== "high" &&
@@ -699,6 +802,21 @@ export function selectSoftFiller(
   if (pool.length === 0) return null;
 
   const uncovered = new Set(opts.uncoveredSelectedTags ?? []);
+  if (uncovered.size > 0) {
+    const uncoveredInCity = cityLandmarks.filter(
+      (l) =>
+        !exclude.has(l.name) &&
+        l.interestTags.some((t) => uncovered.has(t)) &&
+        !sharesAnyDayActivityCategory(l, today) &&
+        pairingAllowedForDay(anchor, l) &&
+        today.every((t) => pairingAllowedForDay(t, l)),
+    );
+    if (uncoveredInCity.length > 0) {
+      const inPool = pool.filter((l) => uncoveredInCity.some((u) => u.name === l.name));
+      pool = inPool.length > 0 ? inPool : uncoveredInCity;
+    }
+  }
+
   const interestTier = (l: Landmark): number => {
     if (uncovered.size > 0 && l.interestTags.some((t) => uncovered.has(t))) return 0;
     if (selected.size > 0 && l.interestTags.some((t) => selected.has(t))) return 1;

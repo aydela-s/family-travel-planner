@@ -10,6 +10,22 @@ export type OpeningHoursViolation = {
   code: "outside_opening_hours" | "closed_that_day";
   message: string;
   landmarkName: string;
+  /**
+   * True when the hours behind this violation are real venue data (curated or
+   * Places weekday schedule). Assumed category hours produce a soft
+   * confirm-hours note instead of a hard failure.
+   */
+  hoursReliable: boolean;
+};
+
+/**
+ * Anything with hours we can reason about: curated landmarks, Places-backed
+ * landmarks, and restaurants (which may have no hours at all).
+ */
+export type VenueHours = {
+  openingHours?: LandmarkOpeningHours;
+  hoursByWeekday?: HoursByWeekday;
+  hoursConfidence?: "assumed";
 };
 
 type TimedActivity = {
@@ -47,23 +63,64 @@ export function weekdayIndexFromIso(isoDate: string): 0 | 1 | 2 | 3 | 4 | 5 | 6 
 
 /**
  * Hours for a calendar date.
- * Returns `null` when the venue is closed that weekday.
+ * Returns `null` when the venue is closed that weekday, `undefined` when the
+ * venue publishes no hours at all.
  */
 export function hoursForDate(
-  landmark: Landmark,
+  venue: VenueHours,
   isoDate?: string,
-): LandmarkOpeningHours | null {
-  if (!isoDate || !landmark.hoursByWeekday) {
-    return landmark.openingHours;
+): LandmarkOpeningHours | null | undefined {
+  if (!isoDate || !venue.hoursByWeekday) {
+    return venue.openingHours;
   }
   const weekday = weekdayIndexFromIso(isoDate);
-  if (Object.prototype.hasOwnProperty.call(landmark.hoursByWeekday, weekday)) {
-    return landmark.hoursByWeekday[weekday] ?? null;
+  if (Object.prototype.hasOwnProperty.call(venue.hoursByWeekday, weekday)) {
+    return venue.hoursByWeekday[weekday] ?? null;
   }
-  return landmark.openingHours;
+  return venue.openingHours;
 }
 
-export function isLandmarkOpenForVisit(landmark: Landmark, window: VisitWindow): boolean {
+/**
+ * True when the hours on this venue are real data we may act on: a weekday
+ * schedule (curated or Places `regularOpeningHours`), or curated `openingHours`.
+ * Category guesses (`hoursConfidence: "assumed"`) and missing hours are not.
+ */
+export function hoursAreReliable(venue: VenueHours): boolean {
+  if (venue.hoursByWeekday && Object.keys(venue.hoursByWeekday).length > 0) return true;
+  return Boolean(venue.openingHours) && venue.hoursConfidence !== "assumed";
+}
+
+/** Any part of the planned visit falls inside the open window. */
+export function overlapsOpeningHours(
+  startMin: number,
+  endMin: number,
+  hours: LandmarkOpeningHours,
+): boolean {
+  const open = parseTimeToMinutes(hours.open);
+  const close = parseTimeToMinutes(hours.close);
+  return startMin < close && endMin > open;
+}
+
+/**
+ * HARD RULE input: reliable hours say the venue is shut for the whole planned
+ * slot — closed that weekday, or open at a completely different time of day
+ * (an evening-only venue against a morning visit).
+ *
+ * A visit that merely starts a few minutes early or runs past closing is NOT
+ * hard-excluded: planning windows are estimates the scheduler still shifts, and
+ * the soft `isLandmarkOpenForVisit` preference plus the confirm-hours note
+ * already cover that case.
+ */
+export function isKnownClosedForVisit(venue: VenueHours, window: VisitWindow): boolean {
+  if (!hoursAreReliable(venue)) return false;
+  const hours = hoursForDate(venue, window.visitDate);
+  if (hours === null) return true;
+  if (!hours) return false;
+  return !overlapsOpeningHours(window.startMin, window.endMin, hours);
+}
+
+/** Soft preference: the whole planned visit fits inside the open window. */
+export function isLandmarkOpenForVisit(landmark: VenueHours, window: VisitWindow): boolean {
   const hours = hoursForDate(landmark, window.visitDate);
   if (!hours) return false;
   return isWithinOpeningHours(window.startMin, window.endMin, hours);
@@ -103,12 +160,14 @@ export function validateActivityOpeningHours(
     const landmark = findLandmarkByName(landmarks, landmarkName);
     if (!landmark) continue;
 
+    const reliable = hoursAreReliable(landmark);
     const hours = hoursForDate(landmark, visitDate);
     if (!hours) {
       issues.push({
         code: "closed_that_day",
         landmarkName: landmark.name,
         message: `${activity.title} is scheduled on a day ${landmark.name} is closed`,
+        hoursReliable: reliable,
       });
       continue;
     }
@@ -123,6 +182,9 @@ export function validateActivityOpeningHours(
         code: "outside_opening_hours",
         landmarkName: landmark.name,
         message: `${activity.title} (${activity.time}–${formatEnd(end)}) is outside ${landmark.name} hours (${hours.open}–${hours.close})`,
+        // Same bar as selection: a slot with no overlap at all is a hard
+        // failure; an early arrival or an overrun stays advisory.
+        hoursReliable: reliable && !overlapsOpeningHours(start, end, hours),
       });
     }
   }

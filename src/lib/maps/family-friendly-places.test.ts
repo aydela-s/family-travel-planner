@@ -4,8 +4,10 @@ import {
   familyPlaceScore,
   hasBlockedPlaceName,
   hasBlockedPlaceType,
+  isBakeryStyleVenue,
   isBlockedFamilyPlace,
   isRestaurantSearchCategory,
+  mealsServedByPlace,
   placeKindForCategory,
   preferredTypeBoost,
 } from "@/lib/maps/family-friendly-places";
@@ -95,5 +97,24 @@ describe("family-friendly Places filter (FAM-60)", () => {
         kind: "attraction",
       }),
     ).toBe(zoo);
+  });
+
+  it("keeps bakeries and coffee shops off the dinner list", () => {
+    expect(mealsServedByPlace({ name: "Oak Lawn Bakeshop", primaryType: "bakery" })).toEqual([
+      "breakfast",
+    ]);
+    expect(
+      mealsServedByPlace({ name: "Houndstooth Coffee", types: ["coffee_shop"], primaryType: "coffee_shop" }),
+    ).toEqual(["breakfast"]);
+    expect(mealsServedByPlace({ name: "Neighborhood Cafe", primaryType: "cafe" })).toEqual([
+      "breakfast",
+      "lunch",
+    ]);
+    expect(mealsServedByPlace({ name: "Pecan Lodge", primaryType: "restaurant" })).toEqual([
+      "lunch",
+      "dinner",
+    ]);
+    expect(isBakeryStyleVenue({ name: "Oak Lawn Bakeshop" })).toBe(true);
+    expect(isBakeryStyleVenue({ name: "Pecan Lodge", primaryType: "restaurant" })).toBe(false);
   });
 });

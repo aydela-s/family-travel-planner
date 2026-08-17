@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { CITY_CONFIGS, type CityConfig, type Landmark } from "@/config/city-pricing";
 import type { CityRestaurant } from "@/config/city-restaurants";
+import type { PlannerConflict } from "@/lib/planning-engine/conflicts";
 import {
   mealDetourKm,
   mealDetourLimits,
+  mealDetourMin,
   pickRestaurantWithRoute,
 } from "@/lib/planning-engine/restaurant-picker";
 import { dietaryCheckNote } from "@/lib/planning-engine/staged/meal-planner";
@@ -212,5 +214,111 @@ describe("restaurant routing — no long detours for a dietary match", () => {
       excludeNames: new Set(["Close Vegan Kitchen"]),
     });
     expect(pick?.restaurant.name).toBe("Second Vegan Kitchen");
+  });
+
+  it("prefers an 8-minute restaurant with vegan options over a 35-minute dedicated kitchen", () => {
+    const stay = stop("Stay", 0);
+    const nearby = restaurant("Corner Cafe", 4, {
+      dietary: [],
+      dietaryOptions: ["vegan"],
+    });
+    const dedicated = restaurant("Far Vegan Kitchen", 22, { dietary: ["vegan"], rating: 4.9 });
+    const city = cityWith([nearby, dedicated]);
+    const trip = plan();
+    const pick = pickRestaurantWithRoute(city, trip, {
+      meal: "dinner",
+      day: 1,
+      near: stay,
+      routeFrom: stay,
+      routeTo: stay,
+    });
+    expect(mealDetourMin(nearby, { from: stay, to: stay }, trip)).toBeLessThan(12);
+    expect(mealDetourMin(dedicated, { from: stay, to: stay }, trip)).toBeGreaterThan(30);
+    expect(pick?.restaurant.name).toBe("Corner Cafe");
+    expect(pick?.dietaryFit).toBe("options");
+  });
+
+  it("lets a dedicated vegan kitchen a couple of minutes farther still win", () => {
+    const stay = stop("Stay", 0);
+    const nearby = restaurant("Corner Cafe", 1, {
+      dietary: [],
+      dietaryOptions: ["vegan"],
+    });
+    const dedicated = restaurant("Next Door Vegan", 2, { dietary: ["vegan"] });
+    const city = cityWith([nearby, dedicated]);
+    const pick = pickRestaurantWithRoute(city, plan(), {
+      meal: "dinner",
+      day: 1,
+      near: stay,
+      routeFrom: stay,
+      routeTo: stay,
+    });
+    expect(pick?.restaurant.name).toBe("Next Door Vegan");
+    expect(pick?.dietaryFit).toBe("strong");
+  });
+
+  it("does not pick a restaurant known to be closed at the meal window", () => {
+    const stay = stop("Stay", 0);
+    const closed = restaurant("Closed Kitchen", 2, {
+      dietary: ["vegan"],
+      hoursByWeekday: { 2: null },
+      openingHours: { open: "11:00", close: "21:00" },
+    });
+    const open = restaurant("Open Kitchen", 3, { dietary: ["vegan"] });
+    const city = cityWith([closed, open]);
+    const pick = pickRestaurantWithRoute(city, plan(), {
+      meal: "dinner",
+      day: 1,
+      near: stay,
+      routeFrom: stay,
+      routeTo: stay,
+      visitWindow: { startMin: 18 * 60, endMin: 19 * 60, visitDate: "2026-08-11" },
+    });
+    expect(pick?.restaurant.name).toBe("Open Kitchen");
+  });
+
+  it("keeps an hours-unknown restaurant eligible", () => {
+    const stay = stop("Stay", 0);
+    const unknown = restaurant("No Hours Kitchen", 2, { dietary: ["vegan"] });
+    const city = cityWith([unknown]);
+    const pick = pickRestaurantWithRoute(city, plan(), {
+      meal: "dinner",
+      day: 1,
+      near: stay,
+      routeFrom: stay,
+      routeTo: stay,
+      visitWindow: { startMin: 18 * 60, endMin: 19 * 60, visitDate: "2026-08-11" },
+    });
+    expect(pick?.restaurant.name).toBe("No Hours Kitchen");
+  });
+
+  it("records a conflict when strict vegan and a 15 min drive cap cannot both be met", () => {
+    const stay = stop("Stay", 0);
+    const nearbyOptions = restaurant("Corner Cafe", 4, {
+      dietary: [],
+      dietaryOptions: ["vegan"],
+    });
+    const farDedicated = restaurant("Far Vegan Kitchen", 22, { dietary: ["vegan"] });
+    const city = cityWith([nearbyOptions, farDedicated]);
+    const trip = plan({
+      dietaryRestrictions: "only vegan restaurants",
+      userConstraints: { maxDriveMin: 15 },
+    });
+    const conflicts: PlannerConflict[] = [];
+    const pick = pickRestaurantWithRoute(city, trip, {
+      meal: "dinner",
+      day: 1,
+      near: stay,
+      routeFrom: stay,
+      routeTo: stay,
+      conflicts,
+    });
+    expect(pick).toBeNull();
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]!.code).toBe("dietary_unreachable");
+    expect(conflicts[0]!.options.some((o) => o.name === "Far Vegan Kitchen")).toBe(true);
+    expect(conflicts[0]!.options.some((o) => o.violates.includes("max_drive_min"))).toBe(true);
+    expect(conflicts[0]!.options.some((o) => o.name === "Corner Cafe")).toBe(true);
+    expect(conflicts[0]!.options.some((o) => o.violates.includes("dietary_required"))).toBe(true);
   });
 });

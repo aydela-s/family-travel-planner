@@ -147,3 +147,66 @@ export function preferredTypeBoost(
 ): number {
   return preferredBoost(normalizePlaceTypes(types, primaryType), kind);
 }
+
+const BAKERY_NAME =
+  /\b(bakeshop|bake\s*shop|bakery|patisserie|boulangerie|donut|doughnut|coffee\s*(shop|house|bar)|espresso)\b/i;
+
+const BREAKFAST_ONLY_TYPES = new Set(["bakery", "coffee_shop", "donut_shop"]);
+const BREAKFAST_LUNCH_TYPES = new Set([
+  "cafe",
+  "breakfast_restaurant",
+  "brunch_restaurant",
+  "tea_house",
+]);
+const LUNCH_SNACK_TYPES = new Set(["ice_cream_shop", "sandwich_shop", "meal_takeaway"]);
+const SIT_DOWN_TYPES = new Set([
+  "restaurant",
+  "family_restaurant",
+  "pizza_restaurant",
+  "hamburger_restaurant",
+  "mexican_restaurant",
+  "american_restaurant",
+  "italian_restaurant",
+  "seafood_restaurant",
+  "steak_house",
+  "barbecue_restaurant",
+  "meal_delivery",
+]);
+
+/** True for bakeries / coffee counters that are not a sit-down dinner. */
+export function isBakeryStyleVenue(opts: {
+  name: string;
+  types?: string[];
+  primaryType?: string | null;
+}): boolean {
+  if (BAKERY_NAME.test(opts.name)) return true;
+  const types = normalizePlaceTypes(opts.types, opts.primaryType);
+  if (types.some((t) => SIT_DOWN_TYPES.has(t))) return false;
+  return types.some((t) => BREAKFAST_ONLY_TYPES.has(t) || t === "cafe");
+}
+
+/**
+ * Which itinerary meals a Places dining spot can fill. Bakeries and coffee
+ * shops must not land on dinner.
+ */
+export function mealsServedByPlace(opts: {
+  name: string;
+  types?: string[];
+  primaryType?: string | null;
+}): Array<"breakfast" | "lunch" | "dinner"> {
+  const types = normalizePlaceTypes(opts.types, opts.primaryType);
+  const bakeryName = BAKERY_NAME.test(opts.name);
+  const breakfastOnly = bakeryName || types.some((t) => BREAKFAST_ONLY_TYPES.has(t));
+  const sitDown = types.some((t) => SIT_DOWN_TYPES.has(t));
+  const breakfastLunch = types.some((t) => BREAKFAST_LUNCH_TYPES.has(t));
+  const snack = types.some((t) => LUNCH_SNACK_TYPES.has(t));
+
+  if (breakfastOnly && !sitDown) return ["breakfast"];
+  if ((breakfastLunch || snack) && !sitDown) {
+    return breakfastLunch ? ["breakfast", "lunch"] : ["lunch"];
+  }
+  if (sitDown && (breakfastLunch || types.includes("breakfast_restaurant"))) {
+    return ["breakfast", "lunch", "dinner"];
+  }
+  return ["lunch", "dinner"];
+}

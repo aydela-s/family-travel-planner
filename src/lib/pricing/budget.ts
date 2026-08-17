@@ -57,13 +57,8 @@ function mealTierFromActivity(activity: ItineraryActivity): keyof typeof MEAL_TI
   if (
     t.includes("pastries") ||
     t.includes("bakery") ||
-    t.includes("casual") ||
     t.includes("takeaway") ||
     t.includes("street food") ||
-    t.includes("simple and affordable") ||
-    t.includes("light and affordable") ||
-    t.includes("share plates") ||
-    t.includes("share dishes") ||
     t.includes("café or bakery") ||
     t.includes("cafe or bakery") ||
     t.includes("simple bakery")
@@ -71,13 +66,8 @@ function mealTierFromActivity(activity: ItineraryActivity): keyof typeof MEAL_TI
     return "takeaway";
   }
   if (t.includes("hotel breakfast") || t.includes("packed")) return "hotelBreakfast";
-  // Short "Breakfast near…" / "Lunch near…" bakery copy (no restaurant name).
-  if (
-    /^(breakfast|lunch|dinner) near /i.test(activity.title) &&
-    !/\bat\b/i.test(activity.title)
-  ) {
-    return "takeaway";
-  }
+  // Named restaurants and "Dinner/Lunch near…" use the sit-down adult price so
+  // 1 adult + kids is never billed as bakery takeaway for one person.
   return "restaurant";
 }
 

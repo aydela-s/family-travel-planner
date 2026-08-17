@@ -59,6 +59,16 @@ export {
   validateAndRepairBlueprint,
 } from "@/lib/planning-engine/staged/repair-blueprint";
 export {
+  isEligibleStop,
+  stopRejection,
+  violatesAgeRestriction,
+} from "@/lib/planning-engine/staged/eligibility";
+export {
+  anchorVisitWindow,
+  supportVisitWindow,
+  mealVisitWindow,
+} from "@/lib/planning-engine/staged/visit-windows";
+export {
   TRIP_BLUEPRINT_VERSION,
   type CommittedStop,
   type DayBlueprint,

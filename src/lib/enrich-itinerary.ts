@@ -16,9 +16,11 @@ import { isGroceryActivity } from "@/lib/schedule/meal-planning";
 import {
   extractLandmarkFromTitle,
   findLandmarkByName,
+  hoursForDate,
   validateActivityOpeningHours,
 } from "@/lib/schedule/landmark-hours";
 import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
+import { recordConflict, type PlannerConflict } from "@/lib/planning-engine/conflicts";
 import { findRestaurantByName } from "@/lib/planning-engine/restaurant-picker";
 import {
   repairDuplicateCategories,
@@ -34,7 +36,8 @@ import {
   validateEnrichedDay,
 } from "@/lib/schedule/fix-itinerary";
 import { classifyActivities } from "@/lib/schedule/classify-activity";
-import { itemDurationMin, isUnpaidTimelineActivity } from "@/lib/schedule/timeline";
+import { adultPriceForPlace } from "@/lib/maps/places-city-config";
+import { itemDurationMin, isUnpaidTimelineActivity, parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
 import { maybeAddAccommodationGroceryStop, applyMealActivityCosts, summarizeDailyCost, type DaySpendSummary } from "@/lib/pricing/budget";
 import { familyActivityCost } from "@/lib/pricing/activity-cost";
@@ -60,6 +63,87 @@ function normalizeActivity(activity: ItineraryActivity): ItineraryActivity {
     title: alignTitleWithTimeOfDay(activity.title, timeOfDay),
     notes: activity.notes ? oneLineNote(activity.notes) : activity.notes,
   };
+}
+
+/**
+ * Pin unnamed meals to the next (or previous) real stop so breakfast "near X"
+ * does not taxi to a random catalog landmark.
+ */
+function pinMealsToNeighborStops(
+  activities: ItineraryActivity[],
+  home: ActivityLocation | null,
+): ItineraryActivity[] {
+  const neighbor = (from: number, dir: 1 | -1): ItineraryActivity | undefined => {
+    for (let i = from + dir; i >= 0 && i < activities.length; i += dir) {
+      const candidate = activities[i]!;
+      if (candidate.type === "activity" && candidate.location && !isUnpaidTimelineActivity(candidate)) {
+        return candidate;
+      }
+    }
+    return undefined;
+  };
+
+  return activities.map((act, i) => {
+    if (act.type !== "meal" || act.location) return act;
+    const next = neighbor(i, 1);
+    const prev = neighbor(i, -1);
+    const anchor = next ?? prev;
+    if (anchor?.location) {
+      return {
+        ...act,
+        location: {
+          name: `${anchor.location.name} area`,
+          lat: anchor.location.lat,
+          lng: anchor.location.lng,
+        },
+        placeId: anchor.placeId,
+      };
+    }
+    if (home) return { ...act, location: home };
+    return act;
+  });
+}
+
+function delayFirstActivityToOpeningHours(
+  activities: ItineraryActivity[],
+  landmarks: Landmark[],
+  visitDate: string,
+): ItineraryActivity[] {
+  const first = activities.find(
+    (a) => a.type === "activity" && a.location && !isUnpaidTimelineActivity(a),
+  );
+  if (!first?.location) return activities;
+  const landmark = findLandmarkByName(landmarks, first.location.name);
+  if (!landmark) return activities;
+  const hours = hoursForDate(landmark, visitDate);
+  if (!hours) return activities;
+  const open = parseTimeToMinutes(hours.open);
+  if (open <= parseTimeToMinutes(first.time)) return activities;
+  return activities.map((a) => (a === first ? { ...a, time: hours.open } : a));
+}
+
+/**
+ * HARD RULE: the same venue must not appear twice on one day. With naps that
+ * would send the family home and then taxi them back to the morning stop.
+ */
+function dropSameDayVenueRepeats(activities: ItineraryActivity[]): ItineraryActivity[] {
+  const seen = new Set<string>();
+  const out: ItineraryActivity[] = [];
+  for (const activity of activities) {
+    if (activity.type !== "activity" || isUnpaidTimelineActivity(activity)) {
+      out.push(activity);
+      continue;
+    }
+    const key = (activity.location?.name ?? activity.title).trim().toLowerCase();
+    if (!key) {
+      out.push(activity);
+      continue;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(activity);
+  }
+  return out;
 }
 
 function buildCostBreakdown(summary: DaySpendSummary, currency: string): DayCostBreakdown {
@@ -138,6 +222,7 @@ async function enrichDay(
   city: CityConfig,
   dayIndex: number,
   tripExcludedLandmarks: Set<string> = new Set(),
+  conflicts?: PlannerConflict[],
 ): Promise<ItineraryDay> {
   const date = addDays(plan.startDate, dayIndex);
   const pickedLandmarks: Landmark[] = [];
@@ -178,11 +263,20 @@ async function enrichDay(
         if (named?.placeId) act.placeId = named.placeId;
         return act;
       }
-      // Resolve landmarks from the planned title only — never re-pick a different POI.
+      // Resolve landmarks from the planned title only — never re-pick a different POI
+      // unless that POI was already used on an earlier day (HARD no-reuse rule).
       const fromTitle = extractLandmarkFromTitle(a.title);
-      const matched =
+      let matched =
         (fromTitle ? findLandmarkByName(city.landmarks, fromTitle) : undefined) ??
         city.landmarks.find((l) => a.title.includes(l.name));
+      if (matched && tripExcludedLandmarks.has(matched.name)) {
+        const replacement = city.landmarks.find(
+          (l) =>
+            !tripExcludedLandmarks.has(l.name) &&
+            l.interestTags.some((t) => (matched!.interestTags ?? []).includes(t)),
+        );
+        matched = replacement;
+      }
       if (matched) {
         pickedLandmarks.push(matched);
         tripExcludedLandmarks.add(matched.name);
@@ -195,6 +289,7 @@ async function enrichDay(
         if (matched.placeId) act.placeId = matched.placeId;
         if (typeof matched.rating === "number") act.rating = matched.rating;
         if (typeof matched.reviewCount === "number") act.reviewCount = matched.reviewCount;
+        if (matched.interestTags?.length) act.interestTags = matched.interestTags;
       } else {
         // Keep planned title; pin coords to last known stop or city center without swapping POIs.
         const anchor = pickedLandmarks[pickedLandmarks.length - 1] ?? city.landmarks[0]!;
@@ -229,16 +324,6 @@ async function enrichDay(
           lng: titleLandmark.lng,
         };
         if (titleLandmark.placeId) act.placeId = titleLandmark.placeId;
-      } else {
-        // Prefer anchoring meals near an already-picked activity, not a fresh random landmark.
-        // Use the same coords — a tiny offset was billing fake taxi hops (~0.4km+).
-        const anchor = pickedLandmarks[pickedLandmarks.length - 1] ?? city.landmarks[0]!;
-        act.location = {
-          name: `${anchor.name} area`,
-          lat: anchor.lat,
-          lng: anchor.lng,
-        };
-        if (anchor.placeId) act.placeId = anchor.placeId;
       }
       act.activityCost = 0;
     } else {
@@ -262,24 +347,52 @@ async function enrichDay(
 
   const home = stayHomeLocation(plan);
   const withGroceryStop = maybeAddAccommodationGroceryStop(activities, plan, city, home, rawDay.day);
-  const located = applyGroceryLocations(withGroceryStop, city, home).map((act) => {
-    // Cook-at-home / naps must stay at the rental — never inherit supermarket pins.
-    if (home && activityUsesStayHome(act)) {
-      return { ...act, location: home, activityCost: 0 };
-    }
-    return act;
-  });
+  const located = pinMealsToNeighborStops(
+    applyGroceryLocations(withGroceryStop, city, home).map((act) => {
+      // Cook-at-home / naps must stay at the rental — never inherit supermarket pins.
+      if (home && activityUsesStayHome(act)) {
+        return { ...act, location: home, activityCost: 0 };
+      }
+      return act;
+    }),
+    home,
+  );
 
   // HARD RULE gate: at most one activity per category per day. Classification
   // first so a stop that arrived without catalog tags still competes for its
   // category; both run before routing/pricing so a swapped stop is costed and
   // routed like any other.
-  const deduped = repairDuplicateCategories(classifyActivities(located, city), plan, city, {
+  const classified = classifyActivities(located, city).map((act) => {
+    if (act.type !== "activity" || !act.location || isUnpaidTimelineActivity(act)) return act;
+    const tags = act.interestTags ?? [];
+    const price = adultPriceForPlace(act.location.name, tags, null);
+    if (price <= 0) return act;
+    // Re-price paid water parks / aquatic centers that were wrongly tagged free parks.
+    if ((act.activityCost ?? 0) > 0) return act;
+    const landmark = city.landmarks.find(
+      (l) => l.name.toLowerCase() === act.location!.name.toLowerCase(),
+    );
+    return {
+      ...act,
+      activityCost: familyActivityCost(
+        landmark ?? { adultPrice: price },
+        plan.adults,
+        plan.children,
+      ),
+    };
+  });
+  const withoutDupVenues = dropSameDayVenueRepeats(classified);
+  const deduped = repairDuplicateCategories(withoutDupVenues, plan, city, {
     usedNames: tripExcludedLandmarks,
   });
+  for (const a of deduped) {
+    if (a.location?.name) tripExcludedLandmarks.add(a.location.name);
+  }
+
+  const timedForHours = delayFirstActivityToOpeningHours(deduped, city.landmarks, date);
 
   const { routeSegments, totalKm, segmentCosts, segmentDurations } = await buildRouteSegments(
-    deduped,
+    timedForHours,
     city,
     plan,
   );
@@ -294,16 +407,47 @@ async function enrichDay(
 
   const lockedDailyTransport = transportEstimate.cost;
 
-  const scheduledActivities = rescheduleEnrichedActivities(deduped, plan, segmentDurations).map(
+  const scheduledActivities = rescheduleEnrichedActivities(timedForHours, plan, segmentDurations).map(
     normalizeActivity,
   );
 
-  const hoursIssues = validateActivityOpeningHours(scheduledActivities, city.landmarks, (a) =>
-    itemDurationMin(a, plan),
+  // The day's real date matters: a venue closed on Mondays is only a problem on
+  // a Monday. Without it every weekday schedule collapsed to the default hours.
+  const hoursIssues = validateActivityOpeningHours(
+    scheduledActivities,
+    city.landmarks,
+    (a) => itemDurationMin(a, plan),
+    date,
   );
   for (const v of hoursIssues) {
     if (process.env.NODE_ENV === "development") {
       console.warn(`[schedule:hours] ${v.code}: ${v.message}`);
+    }
+    // Reliable hours that say "closed" are a hard-rule failure, not a caveat.
+    if (v.hoursReliable) {
+      recordConflict(conflicts, {
+        code: "no_open_venue",
+        rule: "venue_closed",
+        scope: { day: rawDay.day },
+        message: v.message,
+        options: [
+          {
+            kind: "venue",
+            name: v.landmarkName,
+            violates: ["venue_closed"],
+            reason:
+              v.code === "closed_that_day"
+                ? `${v.landmarkName} is closed on ${formatDayHeader(date).split(",")[0]}`
+                : `${v.landmarkName} is not open at the scheduled time`,
+          },
+        ],
+        chosen: {
+          kind: "venue",
+          name: v.landmarkName,
+          violates: ["venue_closed"],
+          reason: v.message,
+        },
+      });
     }
   }
   const withHoursNotes = applyOpeningHoursNotes(scheduledActivities, hoursIssues, city.landmarks);
@@ -361,19 +505,29 @@ export type EnrichOptions = {
   transportNote?: string;
   /** Places-built or curated city override (FAM-59). */
   cityOverride?: CityConfig;
+  /** Conflicts already reported by the planner (planTrip result). */
+  conflicts?: PlannerConflict[];
 };
 
 function validateBeforeDisplay(days: ItineraryDay[], plan: TripPlan): ItineraryDay[] {
   return days.map((day) => {
-    const issues = validateEnrichedDay(day, plan);
+    const issues = validateEnrichedDay(
+      {
+        ...day,
+        activities: day.activities.filter((a) => a.type !== "travel"),
+      },
+      plan,
+    );
     if (issues.length === 0) return day;
+    const withoutTravel = day.activities.filter((a) => a.type !== "travel");
+    const rescheduled = rescheduleEnrichedActivities(
+      withoutTravel,
+      plan,
+      scheduledSegmentMinutes(day.routeSegments, plan),
+    );
     return {
       ...day,
-      activities: rescheduleEnrichedActivities(
-        day.activities,
-        plan,
-        scheduledSegmentMinutes(day.routeSegments, plan),
-      ),
+      activities: injectTravelActivities(rescheduled, day.routeSegments ?? [], plan),
     };
   });
 }
@@ -393,6 +547,7 @@ export async function enrichItinerary(
   );
 
   let days: ItineraryDay[];
+  const conflicts: PlannerConflict[] = [...(options?.conflicts ?? [])];
 
   if (options?.adjustDay && options.previousItinerary) {
     const adjustIndex = prepared.days.findIndex((d) => d.day === options.adjustDay);
@@ -406,6 +561,7 @@ export async function enrichItinerary(
       city,
       adjustIndex,
       tripExcluded,
+      conflicts,
     );
     days = options.previousItinerary.days.map((d) =>
       d.day === options.adjustDay ? newDay : d,
@@ -414,7 +570,9 @@ export async function enrichItinerary(
     const tripExcluded = new Set<string>();
     days = [];
     for (let index = 0; index < prepared.days.length; index++) {
-      days.push(await enrichDay(prepared.days[index]!, plan, city, index, tripExcluded));
+      days.push(
+        await enrichDay(prepared.days[index]!, plan, city, index, tripExcluded, conflicts),
+      );
     }
   }
 
@@ -453,6 +611,7 @@ export async function enrichItinerary(
     transportNote: options?.transportNote,
     budgetStyle: plan.budgetStyle,
     days,
+    conflicts: conflicts.length > 0 ? conflicts : undefined,
   };
 }
 

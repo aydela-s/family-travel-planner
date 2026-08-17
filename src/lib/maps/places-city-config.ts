@@ -21,6 +21,7 @@ import {
   type PlacesLocationBias,
   type TopActivity,
 } from "@/lib/maps/get-top-activities";
+import { mealsServedByPlace } from "@/lib/maps/family-friendly-places";
 import {
   coordsMatchDefaultCity,
   resolveDestinationCenter,
@@ -33,7 +34,7 @@ import {
   mergeHoursByWeekdayPreferExisting,
   typicalOpeningHoursFromWeekday,
 } from "@/lib/maps/places-hours";
-import { parseDietaryTags } from "@/lib/planning-engine/restaurant-picker";
+import { dietaryEvidenceFromText, parseDietaryTags } from "@/lib/planning-engine/dietary";
 import { INTEREST_LABEL_TO_TAGS } from "@/lib/schedule/interest-map";
 import type { BudgetStyle, TripPlan } from "@/types/trip-plan";
 
@@ -210,7 +211,7 @@ export function interestTagsForSearchCategory(category: string): LandmarkInteres
  * Places text search for "Theme Parks" often returns green spaces; demote those.
  */
 const REAL_THEME_PARK_NAME =
-  /\b(theme\s*park|amusement|water\s*park|waterpark|six\s*flags|disney|universal|legoland|seaworld|cedar\s*point|busch\s*gardens|roller\s*coaster|ferris\s*wheel)\b/i;
+  /\b(theme\s*park|amusement|water\s*park|waterpark|hawaiian\s+waters|hawaiian\s+falls|six\s*flags|disney|universal|legoland|seaworld|cedar\s*point|busch\s*gardens|roller\s*coaster|ferris\s*wheel)\b/i;
 
 const CITY_OR_GARDEN_PARK_NAME =
   /\b(park|garden|arboretum|greenbelt|plaza|commons)\b/i;
@@ -268,23 +269,32 @@ export function refineInterestTagsForPlaceName(
     if (next.length === 0) next.push("parks");
   }
 
-  // Aquatic centers / water parks count as water-play (beaches coverage), not theme parks alone.
-  if (/\b(aquatic|indoor\s+water\s*park|water\s*park|splash\s*pad)\b/i.test(name)) {
+  // Aquatic centers / water parks count as water-play (beaches coverage).
+  // Match brand names like "Hawaiian Waters" that omit the words "water park".
+  if (
+    /\b(aquatic|indoor\s+water\s*park|water\s*park|waterpark|splash\s*pad|hawaiian\s+waters|hawaiian\s+falls)\b/i.test(
+      name,
+    )
+  ) {
     if (!next.includes("beaches")) next.push("beaches");
-    next = next.filter((t) => t !== "theme-parks");
+    next = next.filter((t) => t !== "theme-parks" && t !== "parks");
   }
 
   return next;
 }
 
-/** Public beaches/parks are free; theme/amusement parks stay ticketed. */
+/** Public beaches/parks are free; theme/amusement parks and aquatic centers stay ticketed. */
 export function adultPriceForPlace(
   name: string,
   tags: LandmarkInterestTag[],
   priceLevel: string | null,
 ): number {
   const mapped = adultPriceFromPriceLevel(priceLevel);
-  if (tags.includes("theme-parks") || REAL_THEME_PARK_NAME.test(name)) {
+  const paidWaterPlay =
+    /\b(aquatic|water\s*park|waterpark|splash\s*pad|hawaiian\s+waters|hawaiian\s+falls)\b/i.test(
+      name,
+    );
+  if (tags.includes("theme-parks") || REAL_THEME_PARK_NAME.test(name) || paidWaterPlay) {
     return mapped > 0 ? mapped : 40;
   }
   if (
@@ -447,7 +457,10 @@ export function landmarkFromTopActivity(
     adultPrice: adultPriceForPlace(place.name, tags, place.priceLevel),
     // Prefer Places weekday-derived typical hours when Text Search returned a schedule.
     openingHours: placesTypical ?? openingHoursForTags(tags),
-    ...(hoursByWeekday ? { hoursByWeekday } : {}),
+    ...(hoursByWeekday
+      ? { hoursByWeekday }
+      : // Category guess, not venue data — must never exclude the place.
+        { hoursConfidence: "assumed" as const }),
     intensity: intensityForTags(tags),
     ageTags: ageTagsForPlaceName(place.name, tags, place.types ?? []),
     interestTags: tags,
@@ -488,7 +501,9 @@ export function landmarksFromPlacesResults(
         intensity: intensityForTags(merged),
         indoor: indoorForTags(merged),
         openingHours: placesTypical ?? openingHoursForTags(merged),
-        ...(hoursByWeekday ? { hoursByWeekday } : {}),
+        ...(hoursByWeekday
+          ? { hoursByWeekday, hoursConfidence: undefined }
+          : { hoursConfidence: "assumed" as const }),
       });
     }
   }
@@ -502,18 +517,34 @@ export function restaurantFromTopActivity(
   if (typeof place.latitude !== "number" || typeof place.longitude !== "number") {
     return null;
   }
+  const hoursByWeekday = place.hoursByWeekday ?? undefined;
+  const placesTypical = typicalOpeningHoursFromWeekday(hoursByWeekday);
+  // Only what the place itself states counts as dietary evidence; no hours are
+  // invented, and no ages are inferred (both stay curated-only fields).
+  const evidence = dietaryEvidenceFromText([
+    place.name,
+    place.editorialSummary,
+    ...(place.reviewSnippets ?? []),
+  ]).filter((tag) => !dietary.includes(tag));
   return {
     name: place.name,
     lat: place.latitude,
     lng: place.longitude,
-    meals: ["breakfast", "lunch", "dinner"],
+    meals: mealsServedByPlace({
+      name: place.name,
+      types: place.types,
+      primaryType: place.primaryType,
+    }),
     ageTags: ["toddler", "child", "tween", "teen"],
     dietary: [...dietary],
+    ...(evidence.length > 0 ? { dietaryOptions: evidence } : {}),
     budgetStyles: budgetStylesFromPriceLevel(place.priceLevel),
     familyNote:
       dietary.length > 0
         ? `Family-friendly spot from Google Places (${dietary.join(", ")} search).`
         : "Nearby restaurant from Google Places.",
+    ...(placesTypical ? { openingHours: placesTypical } : {}),
+    ...(hoursByWeekday ? { hoursByWeekday } : {}),
     rating: place.rating,
     reviewCount: place.reviewCount,
     placeId: place.id,
@@ -536,9 +567,18 @@ export function restaurantsFromPlacesResults(
     }
     // Merge dietary tags when the same place appears in multiple diet searches.
     const merged = new Set([...existing.dietary, ...restaurant.dietary]);
+    const mergedOptions = new Set([
+      ...(existing.dietaryOptions ?? []),
+      ...(restaurant.dietaryOptions ?? []),
+    ]);
     byName.set(key, {
       ...existing,
       dietary: [...merged],
+      ...(mergedOptions.size > 0
+        ? { dietaryOptions: [...mergedOptions].filter((tag) => !merged.has(tag)) }
+        : {}),
+      openingHours: existing.openingHours ?? restaurant.openingHours,
+      hoursByWeekday: existing.hoursByWeekday ?? restaurant.hoursByWeekday,
       reviewCount: existing.reviewCount ?? restaurant.reviewCount,
       rating: existing.rating ?? restaurant.rating,
     });

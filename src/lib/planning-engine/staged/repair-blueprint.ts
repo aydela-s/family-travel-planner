@@ -11,51 +11,13 @@ import type {
   TripBlueprint,
   ValidationViolation,
 } from "@/lib/planning-engine/staged/types";
-import { addDays } from "@/lib/format";
-import { morningActivityDefaultTime } from "@/lib/planning-engine/skeleton-builder";
-import { getNapWindow, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
-import { minutesToTime, parseTimeToMinutes } from "@/lib/schedule/timeline";
-import type { VisitWindow } from "@/lib/schedule/landmark-hours";
+import { compileTripConstraints, type TripConstraints } from "@/lib/planning-engine/constraints";
+import { mergeConflicts, type PlannerConflict } from "@/lib/planning-engine/conflicts";
+import {
+  anchorVisitWindow,
+  supportVisitWindow,
+} from "@/lib/planning-engine/staged/visit-windows";
 import type { TripPlan } from "@/types/trip-plan";
-
-function visitWindowFromTime(
-  startTime: string,
-  durationMin: number,
-  visitDate: string,
-): VisitWindow {
-  const startMin = parseTimeToMinutes(startTime);
-  return { startMin, endMin: startMin + durationMin, visitDate };
-}
-
-function anchorVisitWindow(plan: TripPlan, day: DayBlueprint): VisitWindow {
-  const activityMins = Math.max(
-    day.capacity.activityDurationMin,
-    day.constraints.some((c) => c.type === "require_half_day_window") ? 240 : 0,
-  );
-  const visitDate = day.date || addDays(plan.startDate, day.dayIndex - 1);
-  const nap = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
-  const halfDay = day.constraints.some((c) => c.type === "require_half_day_window");
-  if (halfDay) {
-    const start = nap
-      ? minutesToTime(Math.min(nap.endMin + 15, 16 * 60))
-      : "13:15";
-    return visitWindowFromTime(start, Math.max(activityMins, 240), visitDate);
-  }
-  if (day.capacity.maxActivitiesPerDay <= 1 || day.role === "departure") {
-    return visitWindowFromTime(morningActivityDefaultTime(plan), activityMins, visitDate);
-  }
-  const start = nap ? minutesToTime(Math.min(nap.endMin + 15, 16 * 60)) : "13:15";
-  return visitWindowFromTime(start, activityMins, visitDate);
-}
-
-function supportVisitWindow(plan: TripPlan, day: DayBlueprint): VisitWindow {
-  const visitDate = day.date || addDays(plan.startDate, day.dayIndex - 1);
-  return visitWindowFromTime(
-    morningActivityDefaultTime(plan),
-    day.capacity.activityDurationMin,
-    visitDate,
-  );
-}
 
 function rebuildLedgerLandmarks(days: DayBlueprint[]): string[] {
   const names: string[] = [];
@@ -83,6 +45,7 @@ function repairAnchorForDay(
   ledgerNames: Set<string>,
   badNames: Set<string>,
   priorFullDayAnchors: Set<string>,
+  ctx: { constraints: TripConstraints; conflicts: PlannerConflict[] },
 ): DayBlueprint {
   if (day.anchor) ledgerNames.delete(day.anchor.landmarkName);
   for (const s of day.support) ledgerNames.delete(s.landmarkName);
@@ -95,6 +58,8 @@ function repairAnchorForDay(
     ledgerNames,
     softExcludeNames: softExclude,
     priorFullDayAnchors,
+    constraints: ctx.constraints,
+    conflicts: ctx.conflicts,
   });
   ledgerNames.add(anchor.name);
 
@@ -102,6 +67,7 @@ function repairAnchorForDay(
     visitWindow: supportVisitWindow(plan, day),
     ledgerNames,
     alreadyToday: [anchor],
+    constraints: ctx.constraints,
   });
   for (const s of support) ledgerNames.add(s.name);
 
@@ -117,13 +83,14 @@ function repairMealsForDay(
   plan: TripPlan,
   city: CityConfig,
   usedRestaurants: Set<string>,
+  ctx: { constraints: TripConstraints; conflicts: PlannerConflict[] },
 ): DayBlueprint {
   for (const m of day.meals) {
     if (m.restaurantName) usedRestaurants.delete(m.restaurantName);
   }
   return {
     ...day,
-    meals: planMealsForDay(day, plan, city, usedRestaurants),
+    meals: planMealsForDay(day, plan, city, usedRestaurants, ctx),
   };
 }
 
@@ -151,6 +118,10 @@ export function repairBlueprint(
   const days = [...blueprint.days];
   const ledgerNames = new Set(blueprint.ledger.landmarkNames);
   const usedRestaurants = new Set(blueprint.ledger.restaurantNames);
+  const ctx = {
+    constraints: blueprint.rules.constraints ?? compileTripConstraints(plan),
+    conflicts: [] as PlannerConflict[],
+  };
 
   for (const [dayIndex, dayViolations] of byDay) {
     const idx = days.findIndex((d) => d.dayIndex === dayIndex);
@@ -184,11 +155,19 @@ export function repairBlueprint(
           .filter((d) => d.dayIndex !== dayIndex && d.role === "full" && d.anchor)
           .map((d) => d.anchor!.landmarkName),
       );
-      day = repairAnchorForDay(day, plan, city, ledgerNames, badNames, priorFullDayAnchors);
+      day = repairAnchorForDay(
+        day,
+        plan,
+        city,
+        ledgerNames,
+        badNames,
+        priorFullDayAnchors,
+        ctx,
+      );
     }
 
     if (needsMeals) {
-      day = repairMealsForDay(day, plan, city, usedRestaurants);
+      day = repairMealsForDay(day, plan, city, usedRestaurants, ctx);
     }
 
     days[idx] = day;
@@ -197,6 +176,7 @@ export function repairBlueprint(
   return {
     ...blueprint,
     days,
+    conflicts: mergeConflicts(blueprint.conflicts ?? [], ctx.conflicts),
     ledger: {
       ...blueprint.ledger,
       landmarkNames: rebuildLedgerLandmarks(days),

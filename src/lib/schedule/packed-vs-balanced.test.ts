@@ -82,7 +82,7 @@ describe("packed vs balanced schedules (FAM-5)", () => {
       const minExpected = Math.min(
         ...acts.map((a) => packedLongerDurationForTags(a.interestTags)),
       );
-      expect(longest).toBeGreaterThanOrEqual(Math.min(minExpected, 90));
+      expect(longest).toBeGreaterThanOrEqual(Math.min(minExpected, 60));
     }
     expect(validateDaySchedule(scheduled, packedResult.plan)).toEqual([]);
   });

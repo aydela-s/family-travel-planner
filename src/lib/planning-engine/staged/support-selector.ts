@@ -27,6 +27,8 @@ import {
   sharesHeavyDayLoad,
 } from "@/lib/planning-engine/staged/landmark-experience";
 import type { DayBlueprint } from "@/lib/planning-engine/staged/types";
+import { compileTripConstraints, type TripConstraints } from "@/lib/planning-engine/constraints";
+import { isEligibleStop } from "@/lib/planning-engine/staged/eligibility";
 import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import type { TripPlan } from "@/types/trip-plan";
 
@@ -37,6 +39,8 @@ export type SelectSupportOptions = {
   alreadyToday: Landmark[];
   /** Selected interests with coverage still outstanding — filled before anything else. */
   uncoveredSelectedTags?: LandmarkInterestTag[];
+  /** Compiled user constraints; derived from the plan when omitted. */
+  constraints?: TripConstraints;
 };
 
 function maxSupport(day: DayBlueprint, anchor?: Landmark): number {
@@ -189,7 +193,17 @@ export function selectSupportForDay(
     anchor.name,
   ]);
 
-  let pool = city.landmarks.filter((l) => !exclude.has(l.name));
+  // HARD GATE before any scoring: closed venues, enforced age limits, explicit
+  // exclusions, and drive limits leave the pool entirely. Support stops are
+  // optional, so an empty pool just means a shorter day.
+  const eligibilityCtx = {
+    plan,
+    constraints: opts.constraints ?? compileTripConstraints(plan),
+    visitWindow: opts.visitWindow,
+  };
+  const cityLandmarks = city.landmarks.filter((l) => isEligibleStop(l, eligibilityCtx));
+
+  let pool = cityLandmarks.filter((l) => !exclude.has(l.name));
 
   // Never stack the same experience category twice on one day (e.g. beach + waterfront playground).
   pool = pool.filter((l) => !sharesDayActivityCategory(l, anchor));
@@ -296,6 +310,15 @@ export function selectSupportForDay(
         a.lm.name.localeCompare(b.lm.name),
     );
 
+  const cityStillHasUncovered = (): boolean =>
+    uncovered.size > 0 &&
+    cityLandmarks.some(
+      (l) =>
+        !exclude.has(l.name) &&
+        l.interestTags.some((t) => uncovered.has(t)) &&
+        !sharesAnyDayActivityCategory(l, [anchor]),
+    );
+
   const picked: Landmark[] = [];
   for (const row of ranked) {
     if (picked.length >= n) break;
@@ -304,9 +327,19 @@ export function selectSupportForDay(
     if (picked.some((p) => !pairingAllowedForDay(p, row.lm))) continue;
     if (dayAlreadyHasHeavyLandmark([anchor, ...picked]) && isHeavyDayLandmark(row.lm)) continue;
     if (!fitsBudgetStyle(row.lm, plan.budgetStyle)) continue;
-    // FAM-77: long/high-intensity stops consume more capacity than raw counts.
+
+    const coversUncovered =
+      uncovered.size > 0 && row.lm.interestTags.some((t) => uncovered.has(t));
+    const isOffInterest =
+      selected.size > 0 && !row.lm.interestTags.some((t) => selected.has(t));
+    // HARD RULE: never schedule an unselected interest while a selected one is
+    // still uncovered and has an unused candidate in the city.
+    if (isOffInterest && cityStillHasUncovered()) continue;
+
     // Arrival light playground companions stay exempt — they are deliberately near-stay fillers.
-    const skipLoadGate = day.role === "arrival" && isLightArrivalSupport(row.lm);
+    // Uncovered selected interests also skip the load gate so coverage is not abandoned.
+    const skipLoadGate =
+      coversUncovered || (day.role === "arrival" && isLightArrivalSupport(row.lm));
     if (!skipLoadGate) {
       const hopMin = estimateDurationMin(
         picked.length > 0 ? picked[picked.length - 1]! : anchor,

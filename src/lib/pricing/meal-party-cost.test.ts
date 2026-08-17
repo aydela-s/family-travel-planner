@@ -67,9 +67,42 @@ describe("meal cost by traveler composition", () => {
     expect(breakfast.total + lunch.total + dinner.total).toBeLessThan(180);
   });
 
+  it("never bills 1 adult + 2 kids as a single adult meal price", () => {
+    const trip = plan({ adults: 1, children: [5, 9] });
+    const breakfast = estimateMealPartyCostForActivity(
+      meal("08:00", "Breakfast near the bay"),
+      city,
+      trip,
+    );
+    const lunch = estimateMealPartyCostForActivity(
+      meal("12:30", "Lunch at Kono's Cafe"),
+      city,
+      trip,
+    );
+    const dinner = estimateMealPartyCostForActivity(
+      meal("18:00", "Dinner at Hodad's"),
+      city,
+      trip,
+    );
+    // Adult-only sit-down would be ~$18 / $24 / $38 in San Diego.
+    expect(breakfast.total).toBeGreaterThan(city.food.breakfast);
+    expect(lunch.total).toBeGreaterThan(city.food.lunch);
+    expect(dinner.total).toBeGreaterThan(city.food.dinner);
+    expect(breakfast.detail).toMatch(/2 kids/);
+    expect(dinner.total).toBeGreaterThanOrEqual(60);
+  });
+
   it("scales with the party, not a flat per-head estimate", () => {
-    const single = estimateMealPartyCostForActivity(meal("18:00", "Dinner at Hodad's"), city, plan({ adults: 1, children: [] }));
-    const withKids = estimateMealPartyCostForActivity(meal("18:00", "Dinner at Hodad's"), city, plan());
+    const single = estimateMealPartyCostForActivity(
+      meal("18:00", "Dinner at Hodad's"),
+      city,
+      plan({ adults: 1, children: [] }),
+    );
+    const withKids = estimateMealPartyCostForActivity(
+      meal("18:00", "Dinner at Hodad's"),
+      city,
+      plan(),
+    );
     expect(withKids.total).toBeGreaterThan(single.total);
     expect(withKids.adults).toBe(single.total);
   });

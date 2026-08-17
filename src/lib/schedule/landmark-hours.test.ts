@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { CITY_CONFIGS, Landmark } from "@/config/city-pricing";
 import {
   findLandmarkByName,
+  hoursAreReliable,
+  isKnownClosedForVisit,
   isWithinOpeningHours,
   validateActivityOpeningHours,
 } from "@/lib/schedule/landmark-hours";
@@ -20,6 +22,24 @@ const louvre: Landmark = {
 };
 
 describe("landmark opening hours", () => {
+  it("treats curated typical hours as reliable and category guesses as not", () => {
+    expect(hoursAreReliable(louvre)).toBe(true);
+    expect(hoursAreReliable({ ...louvre, hoursConfidence: "assumed" })).toBe(false);
+    expect(hoursAreReliable({ hoursConfidence: "assumed" })).toBe(false);
+    expect(
+      isKnownClosedForVisit(
+        { ...louvre, hoursByWeekday: { 2: null } },
+        { startMin: 10 * 60, endMin: 12 * 60, visitDate: "2026-08-11" },
+      ),
+    ).toBe(true);
+    expect(
+      isKnownClosedForVisit(
+        { ...louvre, hoursConfidence: "assumed", openingHours: { open: "18:00", close: "19:00" } },
+        { startMin: 10 * 60, endMin: 12 * 60, visitDate: "2026-08-11" },
+      ),
+    ).toBe(false);
+  });
+
   it("accepts a visit fully inside opening hours", () => {
     expect(isWithinOpeningHours(10 * 60, 12 * 60, louvre.openingHours)).toBe(true);
   });
@@ -50,6 +70,55 @@ describe("landmark opening hours", () => {
     expect(issues).toHaveLength(1);
     expect(issues[0].code).toBe("outside_opening_hours");
     expect(issues[0].landmarkName).toBe("Louvre Museum");
+  });
+
+  it("treats a known-closed weekday as a reliable enrichment failure when visitDate is passed", () => {
+    const museum: Landmark = {
+      ...louvre,
+      hoursByWeekday: { 2: null },
+    };
+    const activity = {
+      time: "10:00",
+      endTime: "12:00",
+      title: "Explore Louvre Museum",
+      type: "activity" as const,
+      location: { name: "Louvre Museum" },
+    };
+    const withoutDate = validateActivityOpeningHours([activity], [museum], () => 120);
+    expect(withoutDate).toEqual([]);
+
+    const withDate = validateActivityOpeningHours(
+      [activity],
+      [museum],
+      () => 120,
+      "2026-08-11",
+    );
+    expect(withDate).toHaveLength(1);
+    expect(withDate[0]!.code).toBe("closed_that_day");
+    expect(withDate[0]!.hoursReliable).toBe(true);
+  });
+
+  it("does not treat assumed category hours as a reliable closed-day failure", () => {
+    const guessed: Landmark = {
+      ...louvre,
+      hoursConfidence: "assumed",
+      openingHours: { open: "09:00", close: "10:00" },
+    };
+    const issues = validateActivityOpeningHours(
+      [
+        {
+          time: "14:00",
+          endTime: "16:00",
+          title: "Explore Louvre Museum",
+          type: "activity",
+          location: { name: "Louvre Museum" },
+        },
+      ],
+      [guessed],
+      () => 120,
+      "2026-08-11",
+    );
+    expect(issues[0]!.hoursReliable).toBe(false);
   });
 
   it("does not flag meals or rest blocks", () => {

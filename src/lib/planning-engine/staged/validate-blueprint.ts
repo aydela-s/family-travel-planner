@@ -65,10 +65,11 @@ function validateDay(
     const dayBudget = travelDayBudget(plan);
     const stayMin = stayTravelMin(anchor, plan);
     const km = stayKm(anchor, plan);
+    // Keep the geographic stay ring even when driving-time estimates improve —
+    // Torrey Pines can look "close enough" in minutes while still being far.
     const tooFar =
-      stayMin != null
-        ? stayMin > dayBudget.softMaxMin
-        : km != null && km > LOW_FRICTION_STAY_KM;
+      (km != null && km > LOW_FRICTION_STAY_KM) ||
+      (stayMin != null && stayMin > dayBudget.softMaxMin);
     if (tooFar) {
       out.push({
         code: "travel_day_far",

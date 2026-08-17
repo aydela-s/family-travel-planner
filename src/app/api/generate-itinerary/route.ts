@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
     const enrichedDay = body.existingItinerary?.days.find((d) => d.day === body.adjustDay);
 
-    const { raw, plan: effectivePlan, transportNote, blueprint } = planTrip(plan, {
+    const { raw, plan: effectivePlan, transportNote, blueprint, conflicts } = planTrip(plan, {
       relaxed: body.relaxed,
       adjustDay: body.adjustDay,
       adjustAction: body.adjustAction,
@@ -88,6 +88,7 @@ export async function POST(request: Request) {
       previousItinerary: body.existingItinerary,
       transportNote,
       cityOverride: city,
+      conflicts,
     });
 
     // Theme display titles always; optional AI polish never blocks the deterministic plan.

@@ -1,6 +1,6 @@
 import { CityConfig } from "@/config/city-pricing";
 import { formatMiles } from "@/lib/format-distance";
-import { travelBufferNote } from "@/lib/schedule/travel-buffer";
+import { minutesToTime, parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { TripPlan } from "@/types/trip-plan";
 import type { ItineraryActivity, RouteSegment } from "@/types/itinerary";
 
@@ -174,12 +174,12 @@ export function allocateRouteSegmentCosts(
   return segments;
 }
 
-function travelVerb(plan: TripPlan, segment: RouteSegment): string {
+function travelVerb(plan: TripPlan, _segment: RouteSegment): string {
   switch (plan.transportationType) {
     case "car-rental":
       return "Drive";
     case "taxis":
-      return segment.provider?.trim() || "Ride";
+      return "Taxi";
     case "public-transportation":
       return "Transit";
     case "walking":
@@ -204,51 +204,47 @@ function travelTimeLabel(plan: TripPlan): string {
   }
 }
 
-function money(amount: number, symbol: string): string {
-  return `${symbol}${amount.toFixed(2)}`;
-}
-
-/**
- * Cost detail for one leg: driving always shows fuel and parking separately so
- * the total is never an unexplained number.
- */
-function segmentCostNote(segment: RouteSegment, plan: TripPlan, symbol: string): string {
-  if (
-    plan.transportationType === "car-rental" &&
-    (segment.fuelCost != null || segment.parkingCost != null)
-  ) {
-    const fuel = segment.fuelCost ?? 0;
-    const parking = segment.parkingCost ?? 0;
-    if (parking > 0) {
-      return `fuel ${money(fuel, symbol)} + parking ${money(parking, symbol)}`;
-    }
-    return `fuel ${money(fuel, symbol)} · parking included at your stay`;
-  }
-  if (
-    plan.transportationType === "public-transportation" &&
-    segment.provider === "Day pass" &&
-    segment.cost === 0
-  ) {
-    return "covered by the day pass";
-  }
-  if (segment.cost > 0) return `${money(segment.cost, symbol)} fare`;
-  return "";
-}
-
 /**
  * Insert priced travel rows between consecutive located stops so each route
- * cost is visible on the timeline next to meals and attractions.
+ * cost is visible on the timeline. Notes stay short: distance + travel time
+ * only — buffer and fare live on the cost badge / schedule, not the copy.
+ *
+ * When route segments bookend the day with the stay (stay → first, last → stay),
+ * those legs are inserted even though the stay is not a timeline activity.
  */
 export function injectTravelActivities(
   activities: ItineraryActivity[],
   segments: RouteSegment[],
   plan: TripPlan,
-  currencySymbol: string = "$",
+  _currencySymbol: string = "$",
 ): ItineraryActivity[] {
   if (segments.length === 0) return activities;
 
   const result: ItineraryActivity[] = [];
   let segIdx = 0;
+
+  const firstLocated = activities.find((a) => a.location);
+  const firstSeg = segments[0];
+  if (
+    firstLocated &&
+    firstSeg &&
+    firstSeg.to &&
+    firstLocated.location &&
+    namesMatch(firstSeg.to, firstLocated.location.name) &&
+    !namesMatch(firstSeg.from, firstLocated.location.name) &&
+    (firstSeg.distanceKm > 0 || firstSeg.cost > 0)
+  ) {
+    const inboundMin = firstSeg.durationMin + (firstSeg.bufferMin ?? 0);
+    result.push(
+      travelActivity(
+        firstSeg,
+        plan,
+        travelStartForArrival(firstLocated.time, inboundMin),
+        firstLocated,
+      ),
+    );
+    segIdx = 1;
+  }
 
   for (let i = 0; i < activities.length; i++) {
     const current = activities[i]!;
@@ -264,24 +260,79 @@ export function injectTravelActivities(
     if (segment.distanceKm <= 0 && segment.cost <= 0) continue;
 
     const next = activities[nextIdx]!;
-    const verb = travelVerb(plan, segment);
-    const parts = [
-      formatMiles(segment.distanceKm),
-      `~${segment.durationMin} min ${travelTimeLabel(plan)}`,
-      travelBufferNote(plan, segment.durationMin),
-      segmentCostNote(segment, plan, currencySymbol),
-    ].filter(Boolean);
+    result.push(travelActivity(segment, plan, current.endTime ?? current.time, next));
+  }
+
+  const lastLocated = [...activities].reverse().find((a) => a.location);
+  const remaining = segments.slice(segIdx);
+  const homeLeg = remaining.find(
+    (s) =>
+      lastLocated?.location &&
+      namesMatch(s.from, lastLocated.location.name) &&
+      !namesMatch(s.to, lastLocated.location.name) &&
+      (s.distanceKm > 0 || s.cost > 0),
+  );
+  if (homeLeg && lastLocated) {
+    const end = lastLocated.endTime ?? lastLocated.time;
     result.push({
-      time: current.endTime ?? current.time,
-      endTime: next.time,
-      title: `${verb} to ${segment.to}`,
+      time: end,
+      endTime: end,
+      title: `${travelVerb(plan, homeLeg)} to ${homeLeg.to}`,
       type: "travel",
-      timeOfDay: next.timeOfDay,
-      notes: parts.join(" · "),
-      activityCost: segment.cost,
-      location: next.location,
+      timeOfDay: "evening",
+      notes: travelNotes(homeLeg, plan),
+      activityCost: homeLeg.cost,
+      location: {
+        name: homeLeg.to,
+        lat: lastLocated.location!.lat,
+        lng: lastLocated.location!.lng,
+      },
     });
   }
 
   return result;
+}
+
+function namesMatch(a: string, b: string): boolean {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/\b(area|café|cafe|near)\b/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const left = norm(a);
+  const right = norm(b);
+  if (!left || !right) return false;
+  return left === right || left.includes(right) || right.includes(left);
+}
+
+function travelNotes(segment: RouteSegment, plan: TripPlan): string {
+  return [
+    formatMiles(segment.distanceKm),
+    `~${segment.durationMin} min ${travelTimeLabel(plan)}`,
+  ].join(" · ");
+}
+
+function travelStartForArrival(arrivalTime: string, durationMin: number): string {
+  const arrival = parseTimeToMinutes(arrivalTime);
+  const start = Math.max(6 * 60, arrival - Math.max(1, durationMin));
+  return minutesToTime(start);
+}
+
+function travelActivity(
+  segment: RouteSegment,
+  plan: TripPlan,
+  startTime: string,
+  next: ItineraryActivity,
+): ItineraryActivity {
+  return {
+    time: startTime,
+    endTime: next.time,
+    title: `${travelVerb(plan, segment)} to ${segment.to}`,
+    type: "travel",
+    timeOfDay: next.timeOfDay,
+    notes: travelNotes(segment, plan),
+    activityCost: segment.cost,
+    location: next.location,
+  };
 }

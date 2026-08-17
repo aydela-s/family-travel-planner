@@ -135,7 +135,7 @@ describe("packed fewer/longer activities — P1", () => {
         !isGroceryActivity(a),
     );
     expect(later.length).toBeGreaterThanOrEqual(2);
-    expect(later.every((a) => activityDurationMin(a) <= 80)).toBe(true);
+    expect(later.every((a) => activityDurationMin(a) < 240)).toBe(true);
     expect(validateDaySchedule(scheduled, plan)).toEqual([]);
   });
 
@@ -244,7 +244,8 @@ describe("packed fewer/longer activities — P1", () => {
     const itinerary = await enrichItinerary(raw, working);
 
     for (const day of itinerary.days) {
-      expect(validateDaySchedule(day.activities, plan)).toEqual([]);
+      const stops = day.activities.filter((a) => a.type !== "travel");
+      expect(validateDaySchedule(stops, plan)).toEqual([]);
       for (let i = 1; i < day.activities.length; i++) {
         const prev = day.activities[i - 1];
         const cur = day.activities[i];

@@ -2,6 +2,7 @@ import { ActivityType } from "@/types/itinerary";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
 import { getFamilyAgeProfile } from "@/lib/schedule/family-profile";
 import { napDurationMin } from "@/lib/schedule/nap-policy";
+import { visitDurationForTags } from "@/lib/schedule/activity-load";
 import { TripPlan } from "@/types/trip-plan";
 
 export function parseTimeToMinutes(time: string): number {
@@ -56,6 +57,15 @@ export function scheduleSpan(
 
 export const GROCERY_DURATION_MIN = 30;
 
+/** Café / bakery breakfast before the first stop. Sit-down lunch and dinner use MEAL_DURATION_MIN. */
+export const BREAKFAST_DURATION_MIN = 45;
+
+/** Sit-down lunch and dinner. */
+export const MEAL_DURATION_MIN = 60;
+
+/** Dinner must stay a real meal — never shrink it to a 15-minute placeholder. */
+export const MIN_DINNER_DURATION_MIN = 60;
+
 /** Minimum gap after grocery before cook-at-home dinner (get back + unpack). */
 export const GROCERY_TO_DINNER_BUFFER_MIN = 30;
 
@@ -89,14 +99,35 @@ export function isUnpaidTimelineActivity(item: {
 }
 
 export function itemDurationMin(
-  item: { type: ActivityType; title: string; slotKind?: string },
+  item: {
+    type: ActivityType;
+    title: string;
+    slotKind?: string;
+    interestTags?: import("@/config/city-pricing").LandmarkInterestTag[];
+  },
   plan: TripPlan,
 ): number {
+  if (item.type === "meal") {
+    if (item.slotKind === "breakfast" || /\bbreakfast\b/i.test(item.title)) {
+      return BREAKFAST_DURATION_MIN;
+    }
+    return MEAL_DURATION_MIN;
+  }
   if (item.type === "activity" && isUnpaidTimelineActivity(item)) {
     if (isGroceryTitle(item.title) || /\bpicnic supplies\b/i.test(item.title)) {
       return GROCERY_DURATION_MIN;
     }
     return defaultDurationMin("rest", plan);
+  }
+  if (item.type === "activity") {
+    const tagged = visitDurationForTags(item.interestTags, {
+      youngest: getFamilyAgeProfile(plan).youngest,
+      title: item.title,
+    });
+    if (item.interestTags?.length) return tagged;
+    if (/\b(indoor\s*play|soft\s*play|water\s*park|aquatic|swim|shopping)\b/i.test(item.title)) {
+      return tagged;
+    }
   }
   return defaultDurationMin(item.type, plan);
 }
@@ -105,7 +136,7 @@ export function defaultDurationMin(type: ActivityType, plan: TripPlan): number {
   const intensity = getIntensityConfig(plan);
   switch (type) {
     case "meal":
-      return 60;
+      return MEAL_DURATION_MIN;
     case "activity":
       return intensity.activityDurationMin;
     case "nap":

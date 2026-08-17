@@ -120,7 +120,12 @@ describe("taxi fare for walkable hops", () => {
 
   it("does not bill taxi between picnic-near and explore at the same venue", async () => {
     const { buildRouteSegments } = await import("@/lib/maps/route-segments");
-    const trip = plan({ transportationType: "taxis" });
+    const trip = plan({
+      transportationType: "taxis",
+      stayLat: 32.7157,
+      stayLng: -117.1611,
+      stayAddress: "Hotel Stay",
+    });
     const result = await buildRouteSegments(
       [
         {
@@ -147,8 +152,16 @@ describe("taxi fare for walkable hops", () => {
       city,
       trip,
     );
-    expect(result.segmentCosts[0]).toBe(0);
-    expect(result.routeSegments[0]?.provider).toBe("Walk");
+    const sameVenue = result.routeSegments.find(
+      (s) =>
+        /kids empire/i.test(s.from) &&
+        /kids empire/i.test(s.to) &&
+        !/hotel stay/i.test(s.from) &&
+        !/hotel stay/i.test(s.to),
+    );
+    expect(sameVenue?.cost).toBe(0);
+    expect(sameVenue?.provider).toBe("Walk");
+    expect(sameVenue?.distanceKm).toBe(0);
   });
 });
 

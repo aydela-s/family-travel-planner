@@ -4,6 +4,7 @@ import {
   type PlanningRules,
   type TripBlueprint,
 } from "@/lib/planning-engine/staged/types";
+import { compileTripConstraints } from "@/lib/planning-engine/constraints";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
 
 /** Placeholder rules — Strategy Builder uses this as the Budget/Pace compiler seed. */
@@ -43,6 +44,7 @@ export function emptyPlanningRules(plan: TripPlan): PlanningRules {
       maxLoadUnits: intensity.maxLoadUnits,
     },
     napWindows: plan.naps ?? [],
+    constraints: compileTripConstraints(plan),
   };
 }
 

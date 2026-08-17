@@ -22,6 +22,7 @@ import {
   resolvePlannerEngine,
   validateAndRepairBlueprint,
 } from "@/lib/planning-engine/staged";
+import type { PlannerConflict } from "@/lib/planning-engine/conflicts";
 import type { PlannerEngine, TripBlueprint } from "@/lib/planning-engine/staged/types";
 import { PlanOptions } from "@/lib/planning-engine/types";
 import { validatePlannedItinerary } from "@/lib/planning-engine/validators";
@@ -37,6 +38,8 @@ export type PlanTripResult = {
   plannerEngine: PlannerEngine;
   /** Present when the staged pipeline builds a blueprint (Phase 1+). */
   blueprint?: TripBlueprint;
+  /** Hard requirements the planner could not satisfy (blueprint.conflicts). */
+  conflicts?: PlannerConflict[];
 };
 
 function effectivePlan(plan: TripPlan, options?: PlanOptions): TripPlan {
@@ -296,6 +299,7 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
     transportNote,
     plannerEngine,
     blueprint,
+    conflicts: blueprint?.conflicts,
   };
 }
 
@@ -327,6 +331,16 @@ export type {
   MealIntent,
   ValidationViolation,
 } from "@/lib/planning-engine/staged";
+export type {
+  HardConstraint,
+  SoftPreference,
+  TripConstraints,
+} from "@/lib/planning-engine/constraints";
+export { compileTripConstraints } from "@/lib/planning-engine/constraints";
+export type {
+  PlannerConflict,
+  ConflictOption,
+} from "@/lib/planning-engine/conflicts";
 
 export function replanDay(
   plan: TripPlan,

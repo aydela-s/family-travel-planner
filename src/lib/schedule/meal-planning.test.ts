@@ -418,3 +418,86 @@ describe("isDinnerMeal — landmark names containing Dinner", () => {
     expect(lunch.time).not.toBe(dinner.time);
   });
 });
+
+describe("breakfast taxi timing and dinner length", () => {
+  it("starts breakfast so it ends when the first activity opens, not at 8:00", () => {
+    const plan = balancedPlan([4, 6], { transportationType: "taxis" });
+    const scheduled = rescheduleActivitiesWithMealAnchors(
+      [
+        {
+          time: "08:00",
+          title: "Breakfast near Kids Empire",
+          type: "meal" as const,
+          slotKind: "breakfast" as const,
+        },
+        {
+          time: "10:00",
+          title: "Family time at Kids Empire",
+          type: "activity" as const,
+          slotKind: "morning_activity" as const,
+          interestTags: ["indoor-play"],
+        },
+        {
+          time: "12:00",
+          title: "Lunch near Kids Empire",
+          type: "meal" as const,
+          slotKind: "lunch" as const,
+        },
+        {
+          time: "18:00",
+          title: "Dinner at a restaurant",
+          type: "meal" as const,
+          slotKind: "dinner" as const,
+        },
+      ],
+      plan,
+    );
+    const breakfast = scheduled.find((a) => a.slotKind === "breakfast")!;
+    const morning = scheduled.find((a) => a.slotKind === "morning_activity")!;
+    expect(parseTimeToMinutes(breakfast.time)).toBeGreaterThanOrEqual(9 * 60);
+    expect(parseTimeToMinutes(breakfast.time)).toBeLessThan(10 * 60);
+    expect(parseTimeToMinutes(morning.time)).toBeGreaterThanOrEqual(10 * 60);
+    expect(parseTimeToMinutes(morning.endTime!) - parseTimeToMinutes(morning.time)).toBeGreaterThanOrEqual(
+      90,
+    );
+  });
+
+  it("keeps dinner at about an hour even when the afternoon runs late", () => {
+    const plan = balancedPlan([4, 6]);
+    const scheduled = rescheduleActivitiesWithMealAnchors(
+      [
+        {
+          time: "10:00",
+          title: "Family time at the mall",
+          type: "activity" as const,
+          slotKind: "morning_activity" as const,
+          interestTags: ["shopping"],
+        },
+        {
+          time: "12:00",
+          title: "Lunch near the mall",
+          type: "meal" as const,
+          slotKind: "lunch" as const,
+        },
+        {
+          time: "14:00",
+          title: "Family time at the water park",
+          type: "activity" as const,
+          slotKind: "afternoon_activity" as const,
+          interestTags: ["beaches"],
+        },
+        {
+          time: "18:00",
+          title: "Dinner at a restaurant",
+          type: "meal" as const,
+          slotKind: "dinner" as const,
+        },
+      ],
+      plan,
+    );
+    const dinner = scheduled.find((a) => a.slotKind === "dinner")!;
+    expect(parseTimeToMinutes(dinner.endTime!) - parseTimeToMinutes(dinner.time)).toBeGreaterThanOrEqual(
+      60,
+    );
+  });
+});

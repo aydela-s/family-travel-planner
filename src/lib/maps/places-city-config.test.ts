@@ -143,6 +143,24 @@ describe("places → CityConfig mapping (FAM-59)", () => {
       rating: 4.6,
       adultPrice: adultPriceFromPriceLevel("PRICE_LEVEL_MODERATE"),
     });
+    expect(landmark?.minAge).toBeUndefined();
+    expect(landmark?.maxAge).toBeUndefined();
+    expect(landmark?.hoursConfidence).toBe("assumed");
+  });
+
+  it("copies Places weekday hours onto restaurants and never infers age limits", () => {
+    const restaurant = restaurantFromTopActivity(
+      place({
+        id: "places/vegan",
+        name: "Neighborhood Grill",
+        hoursByWeekday: { 0: { open: "11:00", close: "21:00" }, 1: null },
+        reviewSnippets: ["Great vegan options for the kids."],
+      }),
+    );
+    expect(restaurant?.hoursByWeekday?.[0]).toEqual({ open: "11:00", close: "21:00" });
+    expect(restaurant?.dietaryOptions).toContain("vegan");
+    expect(restaurant?.minAge).toBeUndefined();
+    expect(restaurant?.maxAge).toBeUndefined();
   });
 
   it("treats shopping malls as free entry (Places priceLevel is for shops, not tickets)", () => {
@@ -175,13 +193,26 @@ describe("places → CityConfig mapping (FAM-59)", () => {
       name: "Pecan Lodge",
       lat: 32.78,
       lng: -96.8,
-      meals: ["breakfast", "lunch", "dinner"],
+      meals: ["lunch", "dinner"],
       placeId: "places/bbq",
       rating: 4.6,
       reviewCount: 4200,
       dietary: ["vegan"],
       budgetStyles: ["save", "balanced", "splurge"],
     });
+  });
+
+  it("does not treat a bakeshop as a dinner restaurant", () => {
+    const bakery = restaurantFromTopActivity(
+      place({
+        id: "places/bake",
+        name: "Oak Lawn Bakeshop",
+        types: ["bakery", "cafe"],
+        primaryType: "bakery",
+      }),
+    );
+    expect(bakery?.meals).toEqual(["breakfast"]);
+    expect(bakery?.meals).not.toContain("dinner");
   });
 
   it("searches vegan Places categories when dietaryRestrictions include vegan", () => {

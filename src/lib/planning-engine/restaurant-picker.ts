@@ -6,24 +6,32 @@ import {
   restaurantsForCity,
 } from "@/config/city-restaurants";
 import { haversineKm } from "@/lib/maps/directions";
+import { isBakeryStyleVenue } from "@/lib/maps/family-friendly-places";
+import { pureTravelMin } from "@/lib/maps/travel-estimate";
+import {
+  compileTripConstraints,
+  describeHardConstraint,
+  excludedVenueNames,
+  findHardConstraint,
+  matchesExcludedVenue,
+  maxDriveMin,
+  requiredDietaryTags,
+  type HardRuleKind,
+  type TripConstraints,
+} from "@/lib/planning-engine/constraints";
+import {
+  recordConflict,
+  type ConflictOption,
+  type ConflictSlot,
+  type PlannerConflict,
+} from "@/lib/planning-engine/conflicts";
+import { parseDietaryTags } from "@/lib/planning-engine/dietary";
+import { violatesAgeRestriction } from "@/lib/planning-engine/staged/eligibility";
+import { isKnownClosedForVisit, type VisitWindow } from "@/lib/schedule/landmark-hours";
 import { FamilyAgeProfile, getFamilyAgeProfile } from "@/lib/schedule/family-profile";
 import { BudgetStyle, TripPlan } from "@/types/trip-plan";
 
-const DIETARY_ALIASES: { tag: RestaurantDietary; patterns: RegExp[] }[] = [
-  { tag: "vegan", patterns: [/\bvegan\b/i] },
-  { tag: "vegetarian", patterns: [/\bvegetarian\b/i, /\bveggie\b/i] },
-  { tag: "gluten-free", patterns: [/\bgluten[-\s]?free\b/i, /\bceliac\b/i] },
-  { tag: "dairy-free", patterns: [/\bdairy[-\s]?free\b/i, /\blactose\b/i] },
-];
-
-export function parseDietaryTags(dietaryRestrictions: string): RestaurantDietary[] {
-  if (!dietaryRestrictions.trim()) return [];
-  const found: RestaurantDietary[] = [];
-  for (const { tag, patterns } of DIETARY_ALIASES) {
-    if (patterns.some((p) => p.test(dietaryRestrictions))) found.push(tag);
-  }
-  return found;
-}
+export { parseDietaryTags } from "@/lib/planning-engine/dietary";
 
 /** Strong fit: every selected dietary need is in the restaurant's primary dietary tags. */
 export function matchesDietaryNeeds(
@@ -185,6 +193,76 @@ export type PickRestaurantOptions = {
   routeFrom?: Landmark | null;
   /** Stop they continue to afterwards — makes the meal a waypoint, not a detour. */
   routeTo?: Landmark | null;
+  /**
+   * When true (dinner), never fall back to "Dinner near stay": pick the closest
+   * unused restaurant even if it sits outside the preferred detour ring.
+   */
+  forcePick?: boolean;
+  /** When the family would sit down — skips restaurants known to be closed. */
+  visitWindow?: VisitWindow;
+  /** Compiled user constraints; derived from the plan when omitted. */
+  constraints?: TripConstraints;
+  /** Sink for hard requirements this meal could not satisfy. */
+  conflicts?: PlannerConflict[];
+};
+
+/** Why a restaurant is unusable. Hard rules only — fit and distance are scored. */
+type RestaurantRejection = { rule: HardRuleKind; reason: string };
+
+/**
+ * HARD gate for a restaurant: explicit exclusions, enforced age limits, and
+ * reliable closed hours. Dietary fit and detour stay in the ranking below.
+ */
+function restaurantRejection(
+  restaurant: CityRestaurant,
+  plan: TripPlan,
+  opts: { constraints: TripConstraints; visitWindow?: VisitWindow },
+): RestaurantRejection | null {
+  if (matchesExcludedVenue(restaurant.name, excludedVenueNames(opts.constraints))) {
+    return {
+      rule: "exclude_venue",
+      reason: `"${restaurant.name}" is on the excluded list`,
+    };
+  }
+  if (violatesAgeRestriction(restaurant, plan)) {
+    return {
+      rule: "age_restriction",
+      reason: `"${restaurant.name}" does not admit every child in the family`,
+    };
+  }
+  if (opts.visitWindow && isKnownClosedForVisit(restaurant, opts.visitWindow)) {
+    return {
+      rule: "venue_closed",
+      reason: `"${restaurant.name}" is closed at the planned meal time`,
+    };
+  }
+  return null;
+}
+
+/** Extra driving minutes the meal adds to the day's route. */
+export function mealDetourMin(
+  restaurant: Pick<CityRestaurant, "lat" | "lng">,
+  route: { from?: Landmark | null; to?: Landmark | null },
+  plan: Pick<TripPlan, "transportationType">,
+): number {
+  const from = route.from ?? null;
+  const to = route.to ?? null;
+  const sameEnds =
+    from && to && haversineKm(from.lat, from.lng, to.lat, to.lng) < SAME_PLACE_KM;
+  if (from && to && !sameEnds) {
+    const viaMeal =
+      pureTravelMin(from, restaurant, plan) + pureTravelMin(restaurant, to, plan);
+    return Math.max(0, viaMeal - pureTravelMin(from, to, plan));
+  }
+  const anchor = from ?? to;
+  if (!anchor) return 0;
+  return pureTravelMin(anchor, restaurant, plan);
+}
+
+const MEAL_SLOT: Record<RestaurantMeal, ConflictSlot> = {
+  breakfast: "breakfast",
+  lunch: "lunch",
+  dinner: "dinner",
 };
 
 /**
@@ -309,7 +387,10 @@ export function qualifyingRestaurantsForMeal(
 ): CityRestaurant[] {
   const dietary = parseDietaryTags(plan.dietaryRestrictions);
   return restaurantsForCity(city).filter(
-    (r) => r.meals.includes(meal) && matchesDietaryNeeds(r, dietary),
+    (r) =>
+      r.meals.includes(meal) &&
+      !(meal === "dinner" && isBakeryStyleVenue({ name: r.name })) &&
+      matchesDietaryNeeds(r, dietary),
   );
 }
 
@@ -322,13 +403,117 @@ export function dietaryOptionRestaurantsForMeal(
   const dietary = parseDietaryTags(plan.dietaryRestrictions);
   if (dietary.length === 0) return [];
   return restaurantsForCity(city).filter(
-    (r) => r.meals.includes(meal) && matchesDietaryOptions(r, dietary),
+    (r) =>
+      r.meals.includes(meal) &&
+      !(meal === "dinner" && isBakeryStyleVenue({ name: r.name })) &&
+      matchesDietaryOptions(r, dietary),
   );
 }
 
 /** Every restaurant that serves this meal, dietary fit aside. */
 function allRestaurantsForMeal(city: CityConfig, meal: RestaurantMeal): CityRestaurant[] {
-  return restaurantsForCity(city).filter((r) => r.meals.includes(meal));
+  return restaurantsForCity(city).filter(
+    (r) =>
+      r.meals.includes(meal) &&
+      !(meal === "dinner" && isBakeryStyleVenue({ name: r.name })),
+  );
+}
+
+/**
+ * Report a meal slot where a hard requirement made every restaurant unusable.
+ * Lists the real alternatives with what each one would break, so a later
+ * "Adjust this day" turn can offer the trade-off instead of guessing.
+ */
+function recordUnsatisfiedMealConstraint(args: {
+  city: CityConfig;
+  plan: TripPlan;
+  opts: PickRestaurantOptions;
+  constraints: TripConstraints;
+  strictDietary: RestaurantDietary[];
+  driveLimitMin: number | null;
+  pools: { primary: CityRestaurant[]; secondary: CityRestaurant[]; general: CityRestaurant[] };
+  rejected: Array<{ restaurant: CityRestaurant; rejection: RestaurantRejection }>;
+  detourMin: (r: CityRestaurant) => number;
+}): void {
+  const { opts, plan, strictDietary, driveLimitMin, pools, rejected, detourMin } = args;
+  if (!opts.conflicts) return;
+
+  const strictConstraint = findHardConstraint(args.constraints, "dietary_required");
+  const driveConstraint = findHardConstraint(args.constraints, "max_drive_min");
+
+  const option = (
+    restaurant: CityRestaurant,
+    fit: DietaryFit,
+    violates: HardRuleKind[],
+    reason: string,
+  ): ConflictOption => ({
+    kind: "restaurant",
+    name: restaurant.name,
+    placeId: restaurant.placeId,
+    dietaryFit: fit,
+    extraDriveMin: detourMin(restaurant),
+    detourKm: Math.round(mealDetourKm(restaurant, { from: opts.routeFrom ?? opts.near, to: opts.routeTo }) * 10) / 10,
+    violates,
+    reason,
+  });
+
+  const options: ConflictOption[] = [];
+  const byDrive = (a: CityRestaurant, b: CityRestaurant) => detourMin(a) - detourMin(b);
+
+  // A dedicated venue that exists but sits beyond the drive limit.
+  for (const restaurant of [...pools.primary].sort(byDrive).slice(0, 2)) {
+    if (driveLimitMin != null && detourMin(restaurant) > driveLimitMin) {
+      options.push(
+        option(restaurant, "strong", ["max_drive_min"], `${detourMin(restaurant)} min of extra driving exceeds the ${driveLimitMin} min limit`),
+      );
+    }
+  }
+  // A close venue that only has suitable options rather than a dedicated menu.
+  if (strictDietary.length > 0) {
+    for (const restaurant of [...pools.secondary, ...pools.general].sort(byDrive).slice(0, 2)) {
+      options.push(
+        option(
+          restaurant,
+          pools.secondary.includes(restaurant) ? "options" : "unverified",
+          ["dietary_required"],
+          `${restaurant.name} is ${detourMin(restaurant)} min away but is not fully ${strictDietary.join(" / ")}`,
+        ),
+      );
+    }
+  }
+  for (const { restaurant, rejection } of rejected.slice(0, 2)) {
+    options.push(option(restaurant, "none", [rejection.rule], rejection.reason));
+  }
+
+  if (options.length === 0) return;
+
+  const rule: HardRuleKind =
+    strictDietary.length > 0
+      ? "dietary_required"
+      : driveLimitMin != null
+        ? "max_drive_min"
+        : rejected[0]!.rejection.rule;
+  const constraint = strictDietary.length > 0 ? strictConstraint : driveConstraint;
+
+  recordConflict(opts.conflicts, {
+    code:
+      rule === "dietary_required"
+        ? "dietary_unreachable"
+        : rule === "max_drive_min"
+          ? "drive_limit_exceeded"
+          : rule === "venue_closed"
+            ? "no_open_venue"
+            : rule === "age_restriction"
+              ? "no_age_appropriate_venue"
+              : "exclusion_leaves_nothing",
+    rule,
+    constraint: constraint ?? undefined,
+    scope: { day: opts.day, slot: MEAL_SLOT[opts.meal] },
+    message: constraint
+      ? `Day ${opts.day} ${opts.meal}: no restaurant satisfies "${describeHardConstraint(constraint)}".`
+      : `Day ${opts.day} ${opts.meal}: no restaurant meets every requirement.`,
+    options,
+  });
 }
 
 /**
@@ -351,10 +536,31 @@ export function pickRestaurantWithRoute(
   opts: PickRestaurantOptions,
 ): RestaurantPick | null {
   const dietary = parseDietaryTags(plan.dietaryRestrictions);
-  const primary = qualifyingRestaurantsForMeal(city, plan, opts.meal);
-  const secondary = dietaryOptionRestaurantsForMeal(city, plan, opts.meal);
-  const general = dietary.length > 0 ? allRestaurantsForMeal(city, opts.meal) : [];
-  if (primary.length === 0 && secondary.length === 0) return null;
+  const constraints = opts.constraints ?? compileTripConstraints(plan);
+  const strictDietary = requiredDietaryTags(constraints);
+  const driveLimitMin = maxDriveMin(constraints);
+
+  // HARD gate before ranking. Rejections are kept so an unsatisfiable
+  // requirement can name the real alternatives it turned down.
+  const rejected: Array<{ restaurant: CityRestaurant; rejection: RestaurantRejection }> = [];
+  const allowed = (pool: CityRestaurant[]): CityRestaurant[] =>
+    pool.filter((r) => {
+      const rejection = restaurantRejection(r, plan, {
+        constraints,
+        visitWindow: opts.visitWindow,
+      });
+      if (!rejection) return true;
+      if (!rejected.some((x) => x.restaurant.name === r.name)) {
+        rejected.push({ restaurant: r, rejection });
+      }
+      return false;
+    });
+
+  const primary = allowed(qualifyingRestaurantsForMeal(city, plan, opts.meal));
+  const secondary = allowed(dietaryOptionRestaurantsForMeal(city, plan, opts.meal));
+  const general = allowed(
+    dietary.length > 0 || opts.forcePick ? allRestaurantsForMeal(city, opts.meal) : [],
+  );
 
   const profile = getFamilyAgeProfile(plan);
   const exclude = opts.excludeNames ?? new Set<string>();
@@ -365,11 +571,35 @@ export function pickRestaurantWithRoute(
   const hasRoute = Boolean(opts.routeFrom || opts.routeTo);
   const { preferredKm, maxKm } = mealDetourLimits(plan);
 
-  const tiers: Array<{ pool: CityRestaurant[]; fit: DietaryFit }> = [
-    { pool: primary, fit: "strong" },
-    { pool: secondary, fit: "options" },
-    { pool: general, fit: "unverified" },
-  ];
+  const detourMin = (r: CityRestaurant) => mealDetourMin(r, route, plan);
+  const withinDriveLimit = (r: CityRestaurant) =>
+    driveLimitMin == null || detourMin(r) <= driveLimitMin;
+
+  // "Vegan only" / "must be fully vegan" is a hard requirement: nothing weaker
+  // than a dedicated kitchen qualifies, and the limit is never widened silently.
+  const tiers: Array<{ pool: CityRestaurant[]; fit: DietaryFit }> =
+    strictDietary.length > 0
+      ? [{ pool: primary.filter(withinDriveLimit), fit: "strong" }]
+      : [
+          { pool: primary.filter(withinDriveLimit), fit: "strong" },
+          { pool: secondary.filter(withinDriveLimit), fit: "options" },
+          { pool: general.filter(withinDriveLimit), fit: "unverified" },
+        ];
+
+  if (tiers.every((t) => t.pool.length === 0)) {
+    recordUnsatisfiedMealConstraint({
+      city,
+      plan,
+      opts,
+      constraints,
+      strictDietary,
+      driveLimitMin,
+      pools: { primary, secondary, general },
+      rejected,
+      detourMin,
+    });
+    return null;
+  }
 
   const pickWithin = (limitKm: number | null): RestaurantPick | null => {
     for (const tier of tiers) {
@@ -397,9 +627,7 @@ export function pickRestaurantWithRoute(
     if (nearby) return nearby;
 
     // Nothing in the rings: take the shortest drive, allowing a little extra
-    // for a better dietary fit rather than crossing the metro for one. Past the
-    // outer ceiling we return nothing — the meal becomes casual copy near the
-    // day's stops instead of an hour in the car for a name.
+    // for a better dietary fit rather than crossing the metro for one.
     const candidates = tiers
       .flatMap((tier) =>
         rankUnused(tier.pool, plan, profile, near, exclude).map((restaurant) => ({
@@ -408,7 +636,7 @@ export function pickRestaurantWithRoute(
           detourKm: mealDetourKm(restaurant, route),
         })),
       )
-      .filter((c) => c.detourKm <= maxKm);
+      .filter((c) => opts.forcePick || c.detourKm <= maxKm);
     if (candidates.length > 0) {
       const best = candidates.reduce((a, b) =>
         b.detourKm + DIETARY_DETOUR_ALLOWANCE_KM[b.fit] <

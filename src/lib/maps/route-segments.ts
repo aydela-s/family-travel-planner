@@ -1,8 +1,13 @@
 import { CityConfig } from "@/config/city-pricing";
 import { getDirections } from "@/lib/maps/directions";
+import { haversineKm } from "@/lib/maps/travel-estimate";
+import { stayHomeLocation } from "@/lib/planning-engine/stay-home";
 import { familyTravelBufferMin } from "@/lib/schedule/travel-buffer";
 import { TripPlan } from "@/types/trip-plan";
-import { ItineraryActivity, RouteSegment } from "@/types/itinerary";
+import { ActivityLocation, ItineraryActivity, RouteSegment } from "@/types/itinerary";
+
+/** Stops closer than this are the same place — no taxi hop. */
+const SAME_PLACE_KM = 0.3;
 
 export type RouteBuildResult = {
   routeSegments: RouteSegment[];
@@ -28,23 +33,51 @@ export function scheduledSegmentMinutes(
   );
 }
 
-/** Build map directions between consecutive located activities (final day list). */
+function isStayLocation(loc: ActivityLocation, stay: ActivityLocation | null): boolean {
+  if (!stay) return false;
+  return sameVenueName(loc.name, stay.name);
+}
+
+/**
+ * Build map directions for the day, including the hop from the stay to the
+ * first stop and the hop from the last stop back home when a stay pin exists.
+ */
 export async function buildRouteSegments(
   activities: ItineraryActivity[],
   city: CityConfig,
   plan: TripPlan,
 ): Promise<RouteBuildResult> {
+  const stay = stayHomeLocation(plan);
   const locActivities = activities.filter((a) => a.location);
+  const stops: ActivityLocation[] = [];
+
+  if (stay && locActivities[0]?.location && !isStayLocation(locActivities[0].location, stay)) {
+    stops.push(stay);
+  }
+  for (const a of locActivities) {
+    if (a.location) stops.push(a.location);
+  }
+  if (
+    stay &&
+    locActivities.length > 0 &&
+    locActivities[locActivities.length - 1]?.location &&
+    !isStayLocation(locActivities[locActivities.length - 1]!.location!, stay)
+  ) {
+    stops.push(stay);
+  }
+
   const routeSegments: RouteSegment[] = [];
   const segmentCosts: number[] = [];
   let totalKm = 0;
   const bufferMin = familyTravelBufferMin(plan);
 
-  for (let i = 0; i < locActivities.length - 1; i++) {
-    const from = locActivities[i]!.location!;
-    const to = locActivities[i + 1]!.location!;
+  for (let i = 0; i < stops.length - 1; i++) {
+    const from = stops[i]!;
+    const to = stops[i + 1]!;
     // Picnic / break / explore at the same venue must not bill a separate Uber.
-    const sameVenue = sameVenueName(from.name, to.name);
+    const sameVenue =
+      sameVenueName(from.name, to.name) ||
+      haversineKm(from.lat, from.lng, to.lat, to.lng) < SAME_PLACE_KM;
     const dir = sameVenue
       ? {
           distanceKm: 0,
@@ -58,7 +91,7 @@ export async function buildRouteSegments(
           from,
           to,
           plan.transportationType,
-          i % city.taxiProviders.length,
+          i % Math.max(1, city.taxiProviders.length),
         );
     totalKm += dir.distanceKm;
     segmentCosts.push(plan.transportationType === "taxis" ? dir.cost : 0);

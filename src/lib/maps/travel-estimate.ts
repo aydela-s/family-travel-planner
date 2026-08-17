@@ -43,7 +43,9 @@ export function travelMinutesForDistance(
   if (distanceKm <= 0) return 0;
   if (mode === "walking") return Math.round(distanceKm * 12);
   if (mode === "transit") return Math.round(distanceKm * 3 + 8);
-  return Math.round(distanceKm * 1.5 + 2);
+  // Driving assumes ~55–60 km/h suburban average (closer to Google Maps than a
+  // congested downtown crawl) plus a couple of minutes for lights / turns.
+  return Math.round(distanceKm * 1.05 + 2);
 }
 
 /**

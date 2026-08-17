@@ -85,10 +85,9 @@ describe("uncovered selected interests come before unselected categories", () =>
     expect(support.map((l) => l.name)).not.toContain("Rose Garden");
   });
 
-  it("uses an unselected category when the selected candidate fails a day constraint", () => {
-    // Balanced day: the aquatic center is a 2.5h high-load stop that no longer
-    // fits beside the anchor, so the lighter park is the correct fallback —
-    // the interest priority must not empty the day instead.
+  it("keeps an uncovered selected interest even when it is a heavier stop", () => {
+    // HARD RULE: never schedule an unselected category while a selected interest
+    // still has an unused candidate — even if that candidate is a heavier day load.
     const trip = plan();
     const city = cityWith([anchor, selectedCandidate, unselectedCandidate]);
     const support = selectSupportForDay(city, trip, fullDay(trip, city), anchor, {
@@ -96,7 +95,8 @@ describe("uncovered selected interests come before unselected categories", () =>
       alreadyToday: [anchor],
       uncoveredSelectedTags: ["beaches"],
     });
-    expect(support.map((l) => l.name)).toEqual(["Rose Garden"]);
+    expect(support.map((l) => l.name)).toEqual(["Splash Aquatic Center"]);
+    expect(support.map((l) => l.name)).not.toContain("Rose Garden");
   });
 
   it("falls back to an unselected category only when the selected one has no candidate", () => {

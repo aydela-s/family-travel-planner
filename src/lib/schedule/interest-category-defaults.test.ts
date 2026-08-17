@@ -27,5 +27,13 @@ describe("interest category defaults (docs/interest-categories.md)", () => {
     expect(packedLongerDurationForTags(["theme-parks"])).toBe(
       INTEREST_CATEGORY_DEFAULTS["theme-parks"].durationMin,
     );
+    expect(packedLongerDurationForTags(["indoor-play"])).toBe(
+      INTEREST_CATEGORY_DEFAULTS["indoor-play"].durationMax,
+    );
+    expect(INTEREST_CATEGORY_DEFAULTS["indoor-play"].durationMin).toBe(90);
+    expect(INTEREST_CATEGORY_DEFAULTS.shopping.durationMin).toBe(90);
+    expect(INTEREST_CATEGORY_DEFAULTS.shopping.durationMax).toBe(180);
+    expect(INTEREST_CATEGORY_DEFAULTS.beaches.durationMin).toBe(120);
+    expect(INTEREST_CATEGORY_DEFAULTS.beaches.durationMax).toBe(180);
   });
 });

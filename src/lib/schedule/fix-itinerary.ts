@@ -179,7 +179,8 @@ export function rescheduleEnrichedActivities(
   plan: TripPlan,
   segmentDurations: number[] = [],
 ): ItineraryActivity[] {
-  const raw = activities.map((a) => ({
+  const withoutTravel = activities.filter((a) => a.type !== "travel");
+  const raw = withoutTravel.map((a) => ({
     time: a.time,
     title: a.title,
     type: a.type,
@@ -188,7 +189,7 @@ export function rescheduleEnrichedActivities(
     ...(a.landmarkIntensity ? { landmarkIntensity: a.landmarkIntensity } : {}),
     ...(a.interestTags?.length ? { interestTags: a.interestTags } : {}),
   }));
-  const travelGaps = travelGapsFromSegments(activities, segmentDurations, plan);
+  const travelGaps = travelGapsFromSegments(withoutTravel, segmentDurations, plan);
 
   let scheduled = rescheduleActivitiesWithMealAnchors(raw, plan, travelGaps);
   scheduled = anchorDinnerTimes(scheduled, plan);
@@ -199,7 +200,7 @@ export function rescheduleEnrichedActivities(
     }
   }
 
-  return mergeEnrichedSchedule(scheduled, activities);
+  return mergeEnrichedSchedule(scheduled, withoutTravel);
 }
 
 function processEnrichedActivities(
@@ -285,7 +286,9 @@ export function validateRawDay(
 
 export function validateEnrichedDay(day: ItineraryDay, plan: TripPlan): ValidationIssue[] {
   return validateRawDay(
-    day.activities.map(({ time, title, type, notes }) => ({ time, title, type, notes })),
+    day.activities
+      .filter((a) => a.type !== "travel")
+      .map(({ time, title, type, notes }) => ({ time, title, type, notes })),
     plan,
   );
 }

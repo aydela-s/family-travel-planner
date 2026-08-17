@@ -28,7 +28,8 @@ export type ItineraryViolation = {
     | "restaurant_detour"
     | "distance_not_in_miles"
     | "meal_cost_mismatch"
-    | "transport_cost_mismatch";
+    | "transport_cost_mismatch"
+    | "activity_reused";
   message: string;
   day?: number;
 };
@@ -165,6 +166,7 @@ export function validateItinerary(
   const selected = new Set(interestTagsFromPlan(plan.interests));
   const covered = new Set<LandmarkInterestTag>();
   const detourLimit = mealDetourLimits(plan).maxKm;
+  const seenVenues = new Map<string, number>();
 
   for (const day of days) {
     for (const category of duplicateDayCategories(day)) {
@@ -186,6 +188,19 @@ export function validateItinerary(
           day: day.day,
           message: `Day ${day.day} "${activity.title}" is not in any selected interest.`,
         });
+      }
+      const venue = (activity.location?.name ?? activity.title).trim().toLowerCase();
+      if (venue) {
+        const prior = seenVenues.get(venue);
+        if (prior != null) {
+          out.push({
+            code: "activity_reused",
+            day: day.day,
+            message: `"${activity.location?.name ?? activity.title}" appears on day ${prior} and day ${day.day}.`,
+          });
+        } else {
+          seenVenues.set(venue, day.day);
+        }
       }
     }
 

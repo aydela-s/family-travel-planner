@@ -33,18 +33,17 @@ Budget style: ${plan.budgetStyle || "balanced"}. Interests: ${plan.interests.joi
 
 Rules:
 - Do NOT invent places, change times, or rename activities.
-- displayTitle: 2–6 words, max 42 characters, evocative vacation name (e.g. "Ocean Adventure Day").
-- Prefer ending with "Day". No markdown, URLs, or restaurant/activity copy ("Explore…", "Lunch at…").
+- Do NOT invent day titles — leave displayTitle empty (the date is enough).
 - tips: optional, max 18 words, practical for parents. Only for keys listed. No dollar amounts.
 
 Return JSON ONLY:
-{"days":[{"day":1,"displayTitle":"Easy Arrival Day","tips":{"1|10:00|Explore X":"Bring water."}}]}
+{"days":[{"day":1,"tips":{"1|10:00|Explore X":"Bring water."}}]}
 
 Days:
 ${daySummaries(itinerary, blueprint)}`;
 }
 
-/** Overlay schema-valid titles/tips. Never mutates activity titles, times, or types. */
+/** Overlay schema-valid tips only. Day theme titles are intentionally not shown. */
 export function applyPolishPayload(
   itinerary: Itinerary,
   payload: ReturnType<typeof parsePolishPayload>,
@@ -56,10 +55,9 @@ export function applyPolishPayload(
     days: itinerary.days.map((day) => {
       const polish = byDay.get(day.day);
       if (!polish) return day;
-      const displayTitle = polish.displayTitle?.trim() || day.displayTitle;
+      const { displayTitle: _ignored, ...rest } = day;
       return {
-        ...day,
-        displayTitle,
+        ...rest,
         activities: day.activities.map((a) => {
           if (a.notes?.trim()) return a;
           const tip = polish.tips?.[tipKey(day.day, a.time, a.title)]?.trim();

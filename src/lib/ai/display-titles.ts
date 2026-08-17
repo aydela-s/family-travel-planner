@@ -40,17 +40,16 @@ export function fallbackDisplayTitle(themeId: string | undefined): string | unde
 /** Stamp fallback titles from the blueprint. Does not overwrite an existing displayTitle. */
 export function applyFallbackDisplayTitles(
   itinerary: Itinerary,
-  blueprint: TripBlueprint | undefined | null,
+  _blueprint: TripBlueprint | undefined | null,
 ): Itinerary {
-  if (!blueprint) return itinerary;
+  // Day theme labels ("Shopping Day", etc.) are intentionally not shown — the
+  // date is enough. Keep displayTitle unset so export/PDF stay date-only too.
   return {
     ...itinerary,
     days: itinerary.days.map((day) => {
-      if (day.displayTitle?.trim()) return day;
-      const bpDay = blueprint.days.find((d) => d.dayIndex === day.day);
-      const title = fallbackDisplayTitle(bpDay?.theme.id);
-      if (!title) return day;
-      return { ...day, displayTitle: title };
+      if (!day.displayTitle) return day;
+      const { displayTitle: _removed, ...rest } = day;
+      return rest;
     }),
   };
 }

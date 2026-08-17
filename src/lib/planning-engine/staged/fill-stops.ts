@@ -1,6 +1,10 @@
 import type { CityConfig, Landmark, LandmarkInterestTag } from "@/config/city-pricing";
-import { addDays } from "@/lib/format";
-import { morningActivityDefaultTime } from "@/lib/planning-engine/skeleton-builder";
+import { compileTripConstraints } from "@/lib/planning-engine/constraints";
+import { mergeConflicts, type PlannerConflict } from "@/lib/planning-engine/conflicts";
+import {
+  anchorVisitWindow,
+  supportVisitWindow,
+} from "@/lib/planning-engine/staged/visit-windows";
 import type { DayLandmarkContext } from "@/lib/planning-engine/types";
 import {
   selectAnchorForDay,
@@ -22,55 +26,13 @@ import type {
   TripBlueprint,
 } from "@/lib/planning-engine/staged/types";
 import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
-import { getNapWindow, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
+import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
-import { minutesToTime, parseTimeToMinutes } from "@/lib/schedule/timeline";
-import type { VisitWindow } from "@/lib/schedule/landmark-hours";
 import type { DayIntent } from "@/lib/planning-engine/types";
 import type { TripPlan } from "@/types/trip-plan";
 
-function visitWindowFromTime(
-  startTime: string,
-  durationMin: number,
-  visitDate: string,
-): VisitWindow {
-  const startMin = parseTimeToMinutes(startTime);
-  return { startMin, endMin: startMin + durationMin, visitDate };
-}
-
 function findLandmark(city: CityConfig, name: string): Landmark | undefined {
   return city.landmarks.find((l) => l.name === name);
-}
-
-function anchorVisitWindow(plan: TripPlan, day: DayBlueprint): VisitWindow {
-  const activityMins = Math.max(
-    day.capacity.activityDurationMin,
-    day.constraints.some((c) => c.type === "require_half_day_window") ? 240 : 0,
-  );
-  const visitDate = day.date || addDays(plan.startDate, day.dayIndex - 1);
-  const nap = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
-  const halfDay = day.constraints.some((c) => c.type === "require_half_day_window");
-  if (halfDay) {
-    const start = nap
-      ? minutesToTime(Math.min(nap.endMin + 15, 16 * 60))
-      : "13:15";
-    return visitWindowFromTime(start, Math.max(activityMins, 240), visitDate);
-  }
-  // Default hero window: post-nap afternoon or late morning for short days
-  if (day.capacity.maxActivitiesPerDay <= 1 || day.role === "departure") {
-    return visitWindowFromTime(morningActivityDefaultTime(plan), activityMins, visitDate);
-  }
-  const start = nap ? minutesToTime(Math.min(nap.endMin + 15, 16 * 60)) : "13:15";
-  return visitWindowFromTime(start, activityMins, visitDate);
-}
-
-function supportVisitWindow(plan: TripPlan, day: DayBlueprint): VisitWindow {
-  const visitDate = day.date || addDays(plan.startDate, day.dayIndex - 1);
-  return visitWindowFromTime(
-    morningActivityDefaultTime(plan),
-    day.capacity.activityDurationMin,
-    visitDate,
-  );
 }
 
 /**
@@ -156,6 +118,8 @@ export function commitStopsToBlueprint(
   const days: DayBlueprint[] = [];
   const profile = getFamilyAgeProfile(plan);
   let toddlerOnlyFullDays = 0;
+  const constraints = blueprint.rules.constraints ?? compileTripConstraints(plan);
+  const conflicts: PlannerConflict[] = [];
 
   for (const day of blueprint.days) {
     const anchorWindow = anchorVisitWindow(plan, day);
@@ -177,6 +141,8 @@ export function commitStopsToBlueprint(
       ledgerNames,
       softExcludeNames: softExclude,
       priorFullDayAnchors,
+      constraints,
+      conflicts,
     });
 
     // Full-day theme match: re-pick once if the winner misses the theme
@@ -188,6 +154,8 @@ export function commitStopsToBlueprint(
         ledgerNames,
         softExcludeNames: themedExclude,
         priorFullDayAnchors,
+        constraints,
+        conflicts,
       });
       if (anchorMatchesTheme(day, retry)) anchor = retry;
     }
@@ -202,6 +170,7 @@ export function commitStopsToBlueprint(
       ledgerNames,
       alreadyToday: [anchor],
       uncoveredSelectedTags: uncovered,
+      constraints,
     });
 
     // Ensure at least one age-appropriate element on full days (never on theme-park days)
@@ -219,7 +188,7 @@ export function commitStopsToBlueprint(
         ledgerNames,
         supportVisitWindow(plan, day),
         [anchor, ...support],
-        { uncoveredSelectedTags: uncovered },
+        { uncoveredSelectedTags: uncovered, constraints },
       );
       if (filler && landmarkAgeScore(filler, profile) > 0) {
         support = [filler, ...support].slice(0, Math.max(1, day.capacity.maxSupportStops));
@@ -243,7 +212,7 @@ export function commitStopsToBlueprint(
         ledgerNames,
         supportVisitWindow(plan, day),
         [anchor, ...support],
-        { uncoveredSelectedTags: uncovered },
+        { uncoveredSelectedTags: uncovered, constraints },
       );
       if (filler && dayHasOlderAppeal([filler])) {
         support = [filler, ...support].slice(0, Math.max(1, day.capacity.maxSupportStops));
@@ -258,10 +227,13 @@ export function commitStopsToBlueprint(
 
     // Arrival/departure do not consume interest coverage quotas
     if (day.role === "full" || day.role === "recovery") {
-      const coveredKeys = coverageKeysFromLandmark(anchor);
-      // Prefer theme primary coverage keys when present on the anchor
+      const coveredKeys = [
+        ...coverageKeysFromLandmark(anchor),
+        ...support.flatMap((s) => coverageKeysFromLandmark(s)),
+      ];
+      // Prefer theme primary coverage keys when present on the day's stops
       const themeKeys = day.theme.primaryTags.filter((t) => coveredKeys.includes(t));
-      const keysToMark = themeKeys.length > 0 ? themeKeys : coveredKeys.slice(0, 1);
+      const keysToMark = themeKeys.length > 0 ? themeKeys : coveredKeys.slice(0, 2);
       if (keysToMark.length > 0) {
         coverage = markExperienceCompletedByKeys(coverage, keysToMark);
       }
@@ -277,6 +249,7 @@ export function commitStopsToBlueprint(
   return {
     ...blueprint,
     days,
+    conflicts: mergeConflicts(blueprint.conflicts ?? [], conflicts),
     experienceCoverage: coverage,
     interestQuota: coverage.items.map((i) => ({
       tag: i.tag,
@@ -367,9 +340,23 @@ export function placementFromDayBlueprint(
     afternoon = anchor;
     extra = support[1];
     if (!extra) dropSlotKinds.push("extra_activity");
-    if (morning.name === afternoon.name) dropSlotKinds.push("morning_activity");
-    // Packed may request 3 activities — only keep extra when we have a distinct stop
+    // HARD: never schedule the same venue twice in one day. With naps that
+    // would taxi the family home and then back to the morning stop.
+    if (morning.name === afternoon.name) {
+      dropSlotKinds.push("morning_activity");
+    }
     if (maxAct < 3) dropSlotKinds.push("extra_activity");
+  }
+
+  // Nap days: if morning was dropped because it matched the afternoon hero,
+  // keep the single outing AFTER the nap (afternoon). Never keep both.
+  if (
+    shouldIncludeNaps(plan) &&
+    morning.name === afternoon.name &&
+    !dropSlotKinds.includes("morning_activity") &&
+    !dropSlotKinds.includes("afternoon_activity")
+  ) {
+    dropSlotKinds.push("morning_activity");
   }
 
   // Relaxed / arrival: respect intensity config afternoon flag via capacity

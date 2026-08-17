@@ -3,6 +3,7 @@ import { CITY_CONFIGS } from "@/config/city-pricing";
 import { scheduledSegmentMinutes } from "@/lib/maps/route-segments";
 import { pureTravelMin } from "@/lib/maps/travel-estimate";
 import { allocateRouteSegmentCosts, injectTravelActivities } from "@/lib/pricing/transport-planner";
+import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import {
   childHandlingBufferMin,
   familyTravelBufferMin,
@@ -65,7 +66,7 @@ describe("driving time vs. family travel time", () => {
     expect(segments[0]!.durationMin).toBe(10);
   });
 
-  it("reports driving time and the total allowance separately on the timeline", () => {
+  it("reports driving time on the timeline without the family buffer in the notes", () => {
     const stops: ItineraryActivity[] = [
       {
         time: "10:00",
@@ -92,10 +93,89 @@ describe("driving time vs. family travel time", () => {
     )!;
 
     expect(travel.notes).toContain("~10 min driving");
-    expect(travel.notes).toMatch(/allow ~\d+ min/);
-    // The allowance must be larger than the drive, and the drive must not absorb it.
-    const allowance = Number(/allow ~(\d+) min/.exec(travel.notes ?? "")![1]);
-    expect(allowance).toBeGreaterThan(10);
+    expect(travel.notes).toContain("5.2 mi");
+    expect(travel.notes).not.toMatch(/allow ~/);
+  });
+
+  it("starts the first taxi before breakfast, not at the same clock time", () => {
+    const stops: ItineraryActivity[] = [
+      {
+        time: "09:15",
+        endTime: "10:00",
+        title: "Breakfast near Kids Empire",
+        type: "meal",
+        location: { name: "Kids Empire café", lat: 32.88, lng: -96.77 },
+      },
+      {
+        time: "10:00",
+        endTime: "11:30",
+        title: "Family time at Kids Empire",
+        type: "activity",
+        location: { name: "Kids Empire", lat: 32.88, lng: -96.77 },
+      },
+    ];
+    const segments: RouteSegment[] = [
+      {
+        from: "Your stay",
+        to: "Kids Empire café",
+        distanceKm: 12,
+        durationMin: 20,
+        bufferMin: 16,
+        cost: 18,
+      },
+    ];
+    const withTravel = injectTravelActivities(stops, segments, plan({ transportationType: "taxis" }));
+    const taxi = withTravel.find((a) => a.type === "travel")!;
+    expect(parseTimeToMinutes(taxi.time)).toBeLessThan(parseTimeToMinutes("09:15"));
+    expect(parseTimeToMinutes(taxi.time)).toBeGreaterThanOrEqual(parseTimeToMinutes("08:30"));
+    expect(parseTimeToMinutes(taxi.time)).toBeLessThan(parseTimeToMinutes("09:00"));
+    expect(withTravel[withTravel.length - 1]!.type).not.toBe("travel");
+  });
+
+  it("puts the taxi home after dinner, not between the restaurant hop and the meal", () => {
+    const stops: ItineraryActivity[] = [
+      {
+        time: "16:00",
+        endTime: "17:30",
+        title: "Family time at the playground",
+        type: "activity",
+        location: { name: "Kids Empire", lat: 32.88, lng: -96.77 },
+      },
+      {
+        time: "18:00",
+        endTime: "19:00",
+        title: "Dinner at Pecan Lodge",
+        type: "meal",
+        slotKind: "dinner",
+        location: { name: "Pecan Lodge", lat: 32.79, lng: -96.78 },
+      },
+    ];
+    const segments: RouteSegment[] = [
+      {
+        from: "Kids Empire",
+        to: "Pecan Lodge",
+        distanceKm: 8,
+        durationMin: 15,
+        bufferMin: 10,
+        cost: 14,
+      },
+      {
+        from: "Pecan Lodge",
+        to: "Your stay",
+        distanceKm: 10,
+        durationMin: 18,
+        bufferMin: 10,
+        cost: 16,
+      },
+    ];
+    const withTravel = injectTravelActivities(stops, segments, plan({ transportationType: "taxis" }));
+    const titles = withTravel.map((a) => a.title);
+    const dinnerIdx = titles.findIndex((t) => t.startsWith("Dinner"));
+    const homeIdx = titles.findIndex((t) => /taxi to your stay/i.test(t));
+    const toDinnerIdx = titles.findIndex((t) => /taxi to pecan lodge/i.test(t));
+    expect(toDinnerIdx).toBeGreaterThanOrEqual(0);
+    expect(dinnerIdx).toBeGreaterThan(toDinnerIdx);
+    expect(homeIdx).toBeGreaterThan(dinnerIdx);
   });
 
   it("explains what the extra minutes are for", () => {

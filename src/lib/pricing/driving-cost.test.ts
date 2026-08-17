@@ -82,7 +82,7 @@ describe("driving cost — fuel and parking, never one unexplained number", () =
     expect(toCove!.cost).toBeCloseTo((toCove!.fuelCost ?? 0) + (toCove!.parkingCost ?? 0), 2);
   });
 
-  it("shows the fuel and parking halves on the travel step", () => {
+  it("shows distance and driving time on the travel step (cost is on the badge)", () => {
     const stops: ItineraryActivity[] = [
       {
         time: "10:00",
@@ -103,9 +103,11 @@ describe("driving cost — fuel and parking, never one unexplained number", () =
     const withTravel = injectTravelActivities(stops, priced, plan(), city.currencySymbol);
     const travel = withTravel.find((a) => a.type === "travel")!;
 
-    expect(travel.notes).toContain("fuel $");
-    expect(travel.notes).toContain("parking $");
     expect(travel.notes).toContain("5.2 mi");
+    expect(travel.notes).toContain("~14 min driving");
     expect(travel.notes).not.toMatch(/\bkm\b/);
+    expect(travel.notes).not.toContain("fuel");
+    expect(travel.notes).not.toContain("parking");
+    expect(travel.activityCost).toBeGreaterThan(0);
   });
 });

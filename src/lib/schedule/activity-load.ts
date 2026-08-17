@@ -6,8 +6,11 @@
  * remaining budget so a long zoo does not get stacked with another heavy stop.
  */
 
-import type { Landmark, LandmarkIntensity } from "@/config/city-pricing";
-import { INTEREST_CATEGORY_DEFAULTS } from "@/lib/schedule/interest-category-defaults";
+import type { Landmark, LandmarkIntensity, LandmarkInterestTag } from "@/config/city-pricing";
+import {
+  INTEREST_CATEGORY_DEFAULTS,
+  type InterestCategoryDefaults,
+} from "@/lib/schedule/interest-category-defaults";
 import { getFamilyAgeProfile } from "@/lib/schedule/family-profile";
 import type { TripPlan, TravelStyle } from "@/types/trip-plan";
 
@@ -36,18 +39,56 @@ const ENERGY_FACTOR: Record<"low" | "medium" | "high", number> = {
 
 /** Typical visit minutes from interest-category defaults (midpoint of min–max). */
 export function typicalDurationMinForLandmark(landmark: Landmark): number {
-  let bestMin = 0;
-  let bestMax = 0;
-  for (const tag of landmark.interestTags) {
+  const defaults = bestCategoryDefaults(landmark.interestTags);
+  if (!defaults) return 90;
+  return Math.round((defaults.durationMin + defaults.durationMax) / 2);
+}
+
+const WATER_PLAY_NAME =
+  /\b(water\s*park|waterpark|aquatic|swim(ming)?|pool|splash\s*pad|hawaiian\s+waters)\b/i;
+
+function durationBandFromYoungest(youngest: number | null): ActivityLoadAgeBand {
+  if (youngest == null) return "adult";
+  if (youngest <= 7) return "young";
+  if (youngest <= 12) return "school";
+  return "adult";
+}
+
+function lerpDuration(min: number, max: number, band: ActivityLoadAgeBand): number {
+  if (band === "young") return min;
+  if (band === "school") return Math.round((min + max) / 2);
+  return max;
+}
+
+function bestCategoryDefaults(tags: LandmarkInterestTag[]): InterestCategoryDefaults | null {
+  let best: InterestCategoryDefaults | null = null;
+  for (const tag of tags) {
     const defaults = INTEREST_CATEGORY_DEFAULTS[tag];
     if (!defaults) continue;
-    if (defaults.durationMax > bestMax) {
-      bestMin = defaults.durationMin;
-      bestMax = defaults.durationMax;
-    }
+    if (!best || defaults.durationMax > best.durationMax) best = defaults;
   }
-  if (bestMax === 0) return 90;
-  return Math.round((bestMin + bestMax) / 2);
+  return best;
+}
+
+/**
+ * How long a stop should last: category min–max scaled by youngest child.
+ * Indoor play 1.5–2h, water play 2–3h, shopping 1.5–3h (younger kids at the short end).
+ */
+export function visitDurationForTags(
+  interestTags: LandmarkInterestTag[] | undefined,
+  opts: { youngest?: number | null; title?: string } = {},
+): number {
+  const tags = [...(interestTags ?? [])];
+  if (opts.title && WATER_PLAY_NAME.test(opts.title) && !tags.includes("beaches")) {
+    tags.push("beaches");
+  }
+  const defaults = bestCategoryDefaults(tags);
+  if (!defaults) return 90;
+  return lerpDuration(
+    defaults.durationMin,
+    defaults.durationMax,
+    durationBandFromYoungest(opts.youngest ?? null),
+  );
 }
 
 function categoryEnergyFactor(landmark: Landmark): number {

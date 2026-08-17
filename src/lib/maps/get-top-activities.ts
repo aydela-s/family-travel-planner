@@ -43,6 +43,18 @@ export type TopActivity = {
    * Null/undefined when Places omitted hours — fall back to tag defaults.
    */
   hoursByWeekday: HoursByWeekday | null;
+  /**
+   * Venue-authored blurb, when a caller supplies one. Not in the Text Search
+   * field mask today (SKU band), so it is normally absent; the dietary evidence
+   * reader treats it as optional.
+   */
+  editorialSummary?: string | null;
+  /**
+   * Optional review / comment snippets. Text Search does not return these today;
+   * callers (and tests) may supply them so conservative dietary evidence can
+   * promote a restaurant from unverified to "has options".
+   */
+  reviewSnippets?: string[];
 };
 
 /** Raw place shape from Places API (New) searchText (field-masked). */

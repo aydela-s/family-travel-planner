@@ -87,6 +87,11 @@ export type Itinerary = {
   transportNote?: string;
   budgetStyle: import("./trip-plan").BudgetStyle | "";
   days: ItineraryDay[];
+  /**
+   * Hard requirements the planner could not satisfy, with the alternatives it
+   * considered. Deterministic input for the future "Adjust this day" flow.
+   */
+  conflicts?: import("@/lib/planning-engine/conflicts").PlannerConflict[];
 };
 
 /** Raw AI/demo output before enrichment */

@@ -55,6 +55,19 @@ export type Landmark = {
   openingHours: LandmarkOpeningHours;
   /** Optional weekday schedule; overrides openingHours when set for that day. */
   hoursByWeekday?: HoursByWeekday;
+  /**
+   * Set to "assumed" when `openingHours` is a category guess rather than real
+   * venue data (Places result with no schedule). Assumed hours are never used to
+   * exclude a venue — see isKnownClosedForVisit.
+   */
+  hoursConfidence?: "assumed";
+  /**
+   * HARD age restriction the venue enforces (curated data only — never inferred
+   * from Places names/types or from ageTags). A family with a child below
+   * minAge / above maxAge cannot use this venue at all.
+   */
+  minAge?: number;
+  maxAge?: number;
   /** Optional curated ticket table; otherwise adultPrice + age multipliers. */
   ticketTiers?: TicketTier[];
   /** Official ticket page used for curated prices (documentation). */
@@ -132,8 +145,8 @@ export const CITY_CONFIGS: CityConfig[] = [
     aliases: ["san diego", "san diego ca", "san diego california"],
     transitQuality: "limited",
     taxiProviders: [
-      { name: "uber", label: "Uber", multiplier: 1.0 },
-      { name: "lyft", label: "Lyft", multiplier: 0.95 },
+      { name: "uber", label: "Taxi", multiplier: 1.0 },
+      { name: "lyft", label: "Taxi", multiplier: 0.95 },
     ],
     transport: {
       baseFare: 2.5,
@@ -921,8 +934,8 @@ export const DEFAULT_CITY: CityConfig = {
   aliases: [],
   transitQuality: "none",
   taxiProviders: [
-    { name: "uber", label: "Uber", multiplier: 1.0 },
-    { name: "lyft", label: "Lyft", multiplier: 0.95 },
+    { name: "uber", label: "Taxi", multiplier: 1.0 },
+    { name: "lyft", label: "Taxi", multiplier: 0.95 },
   ],
   transport: {
     baseFare: 2.5,
@@ -934,7 +947,7 @@ export const DEFAULT_CITY: CityConfig = {
     avgFuelLitersPerDay: 7,
     parkingFeePerStop: 8,
   },
-  food: { breakfast: 16, lunch: 22, dinner: 34 },
+  food: { breakfast: 18, lunch: 24, dinner: 38 },
   landmarks: [
     {
       name: "City Center Park",

@@ -77,16 +77,14 @@ describe("fallback display titles", () => {
     expect(fallbackDisplayTitle("not-a-theme")).toBeUndefined();
   });
 
-  it("stamps titles from the blueprint without changing activity copy", () => {
+  it("does not stamp shopping/theme day titles onto the itinerary", () => {
     const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
     const plan = sdPlan();
     const blueprint = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
     const itinerary = sampleItinerary();
     const stamped = applyFallbackDisplayTitles(itinerary, blueprint);
 
-    expect(stamped.days[0]!.displayTitle).toBe(
-      fallbackDisplayTitle(blueprint.days[0]!.theme.id),
-    );
+    expect(stamped.days[0]!.displayTitle).toBeUndefined();
     expect(stamped.days[0]!.activities[0]!.title).toBe(
       itinerary.days[0]!.activities[0]!.title,
     );
@@ -124,7 +122,7 @@ describe("polish schema", () => {
 });
 
 describe("applyPolishPayload", () => {
-  it("overlays titles and empty-note tips without rewriting stops or existing notes", () => {
+  it("overlays empty-note tips without rewriting stops, notes, or day titles", () => {
     const itinerary = sampleItinerary();
     const originalTitle = itinerary.days[0]!.activities[0]!.title;
     const originalMealNotes = itinerary.days[0]!.activities[1]!.notes;
@@ -147,7 +145,7 @@ describe("applyPolishPayload", () => {
       ),
     );
 
-    expect(polished.days[0]!.displayTitle).toBe("Ocean Adventure Day");
+    expect(polished.days[0]!.displayTitle).toBeUndefined();
     expect(polished.days[0]!.activities[0]!.title).toBe(originalTitle);
     expect(polished.days[0]!.activities[0]!.notes).toBe("Go early for open swings.");
     expect(polished.days[0]!.activities[1]!.notes).toBe(originalMealNotes);

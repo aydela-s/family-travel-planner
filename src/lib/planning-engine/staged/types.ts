@@ -1,4 +1,6 @@
 import type { LandmarkInterestTag } from "@/config/city-pricing";
+import type { TripConstraints } from "@/lib/planning-engine/constraints";
+import type { PlannerConflict } from "@/lib/planning-engine/conflicts";
 import type { NapEntry, BudgetStyle, TravelStyle, TransportationType } from "@/types/trip-plan";
 
 /** Blueprint schema version — bump when fields change incompatibly. */
@@ -86,6 +88,13 @@ export type PlanningRules = {
   };
 
   napWindows: NapEntry[];
+
+  /**
+   * Explicit user hard requirements + soft preferences (compileTripConstraints).
+   * Hard entries are enforced by staged/eligibility and the restaurant picker;
+   * soft entries describe what the existing scoring is already optimizing for.
+   */
+  constraints: TripConstraints;
 };
 
 export type DayTheme = {
@@ -216,6 +225,8 @@ export type TripBlueprint = {
   experienceCoverage: ExperienceCoverage;
   days: DayBlueprint[];
   ledger: TripLedger;
+  /** Hard requirements the planner could not satisfy (see conflicts.ts). */
+  conflicts?: PlannerConflict[];
 };
 
 export type ValidationViolation = {

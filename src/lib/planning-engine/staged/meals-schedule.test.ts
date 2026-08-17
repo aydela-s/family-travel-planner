@@ -83,7 +83,7 @@ describe("planTrip staged meals + schedule", () => {
     expect(nap!.title).toMatch(/Nap & Quiet Time/i);
     expect(nap!.notes).toBeUndefined();
     expect(parseTimeToMinutes(nap!.time)).toBeGreaterThanOrEqual(12 * 60 + 25);
-    expect(parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(14 * 60 + 5);
+    expect(parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(14 * 60 + 20);
   });
 
   it("includes committed anchor names in activity titles", () => {

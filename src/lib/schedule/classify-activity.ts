@@ -9,9 +9,15 @@ import type { ItineraryActivity } from "@/types/itinerary";
  */
 const NAME_RULES: ReadonlyArray<{ tag: LandmarkInterestTag; pattern: RegExp }> = [
   {
+    // Paid water play covers Swimming & Water Play (beaches), not Parks & Gardens.
+    tag: "beaches",
+    pattern:
+      /\b(aquatic(\s+center)?|indoor\s+water\s*park|water\s*park|waterpark|splash\s*pad|hawaiian\s+waters|hawaiian\s+falls)\b/i,
+  },
+  {
     tag: "theme-parks",
     pattern:
-      /\b(theme\s*park|amusement\s*park|six\s*flags|legoland|disneyland|disney|universal\s*studios|sea\s*world|seaworld|water\s*park|waterpark|fun\s*plex|pier\s*rides)\b/i,
+      /\b(theme\s*park|amusement\s*park|six\s*flags|legoland|disneyland|disney|universal\s*studios|sea\s*world|seaworld|fun\s*plex|pier\s*rides)\b/i,
   },
   {
     tag: "zoos",
@@ -21,7 +27,7 @@ const NAME_RULES: ReadonlyArray<{ tag: LandmarkInterestTag; pattern: RegExp }> =
   {
     tag: "interactive",
     pattern:
-      /\b(children'?s\s*museum|kids?\s*museum|discovery\s*(center|centre|museum|place)|science\s*(center|centre|museum)|exploratorium|hands[-\s]?on|maker\s*space)\b/i,
+      /\b(children'?s\s*museum|kids?\s*museum|discovery\s*(center|centre|museum|place)|science\s*(center|centre|museum)|exploratorium|hands[-\s]?on|maker\s*space|play\s*street)\b/i,
   },
   { tag: "museums", pattern: /\b(museum|gallery|art\s*(center|centre|institute)|planetarium)\b/i },
   {
@@ -53,7 +59,7 @@ const NAME_RULES: ReadonlyArray<{ tag: LandmarkInterestTag; pattern: RegExp }> =
   {
     tag: "sports",
     pattern:
-      /\b(aquatic|swim(ming)?|pool|stadium|arena|ballpark|golf|bowling|skate|climbing|surf(ing)?|kayak|bike\s*park)\b/i,
+      /\b(swim(ming)?|pool|stadium|arena|ballpark|golf|bowling|skate|climbing|surf(ing)?|kayak|bike\s*park)\b/i,
   },
   {
     tag: "beaches",
@@ -101,21 +107,34 @@ export function isCategorizableActivity(activity: ItineraryActivity): boolean {
 }
 
 /**
- * Normalized categories for one stop: catalog tags win, then the matching city
- * landmark, then the venue name. Returns [] only when nothing can be inferred,
- * which keeps the stop out of category-balanced selection entirely.
+ * Normalized categories for one stop: catalog tags win (then refined by name),
+ * then the matching city landmark, then the venue name. Returns [] only when
+ * nothing can be inferred, which keeps the stop out of category-balanced selection.
  */
 export function classifyActivityInterestTags(
   activity: ItineraryActivity,
   city: CityConfig,
 ): LandmarkInterestTag[] {
-  if (activity.interestTags?.length) return activity.interestTags;
-  if (!isCategorizableActivity(activity)) return [];
+  if (!isCategorizableActivity(activity)) return activity.interestTags ?? [];
 
   const venue = activity.location?.name ?? activity.title;
+  const fromName = inferInterestTagsFromName(venue);
+  if (activity.interestTags?.length) {
+    // Name-based water-play / museum signals override a stale "parks" Places tag.
+    if (fromName.length > 0 && activity.interestTags.includes("parks") && !fromName.includes("parks")) {
+      return fromName;
+    }
+    return activity.interestTags;
+  }
+
   const landmark = landmarkByName(city, activity.location?.name);
-  if (landmark?.interestTags.length) return landmark.interestTags;
-  return inferInterestTagsFromName(venue);
+  if (landmark?.interestTags.length) {
+    if (fromName.length > 0 && landmark.interestTags.includes("parks") && !fromName.includes("parks")) {
+      return fromName;
+    }
+    return landmark.interestTags;
+  }
+  return fromName;
 }
 
 /**

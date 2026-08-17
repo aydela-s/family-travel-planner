@@ -1,4 +1,4 @@
-import { LandmarkAgeTag } from "@/config/city-pricing";
+import { HoursByWeekday, LandmarkAgeTag, LandmarkOpeningHours } from "@/config/city-pricing";
 import { BudgetStyle } from "@/types/trip-plan";
 
 /** Meal slots that can map to a named restaurant. */
@@ -23,6 +23,15 @@ export type CityRestaurant = {
   budgetStyles: BudgetStyle[];
   /** Short why-this-spot note shown on the itinerary. */
   familyNote: string;
+  /**
+   * Real hours when we have them (Places `regularOpeningHours`). Absent means
+   * unknown — the restaurant stays eligible and keeps the confirm-hours copy.
+   */
+  openingHours?: LandmarkOpeningHours;
+  hoursByWeekday?: HoursByWeekday;
+  /** HARD age restriction (e.g. 21+ rooms) — curated data only, never inferred. */
+  minAge?: number;
+  maxAge?: number;
   /** Optional Google rating (used when the family has no dietary filter). */
   rating?: number;
   /** Google review count — shown next to stars like activities. */

@@ -70,8 +70,8 @@ export const INTEREST_CATEGORY_DEFAULTS: Record<
   },
   "indoor-play": {
     id: "playgrounds_indoor_play",
-    durationMin: 45,
-    durationMax: 90,
+    durationMin: 90,
+    durationMax: 120,
     energyLevel: "high",
     weatherDependent: false,
     indoorOutdoor: "indoor",
@@ -110,8 +110,8 @@ export const INTEREST_CATEGORY_DEFAULTS: Record<
   },
   shopping: {
     id: "shopping",
-    durationMin: 60,
-    durationMax: 120,
+    durationMin: 90,
+    durationMax: 180,
     energyLevel: "low",
     weatherDependent: "mixed",
     indoorOutdoor: "both",

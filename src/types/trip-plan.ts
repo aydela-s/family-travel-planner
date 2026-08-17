@@ -60,6 +60,26 @@ export type TripPlan = {
   naps: NapEntry[] | null;
   budgetStyle: BudgetStyle | "";
   interests: string[];
+  /**
+   * Explicit "must" / "must not" requests, compiled into hard constraints by
+   * compileTripConstraints. Optional: no wizard step writes this yet.
+   */
+  userConstraints?: UserConstraintInput;
+};
+
+/**
+ * Raw explicit user requirements. Everything here is a HARD requirement — soft
+ * preferences stay expressed through interests / travelStyle / budgetStyle.
+ */
+export type UserConstraintInput = {
+  /** Interest categories the family refuses (e.g. theme-parks). */
+  excludeInterests?: string[];
+  /** Named venues/restaurants the family refuses. */
+  excludeVenues?: string[];
+  /** Explicit ceiling on one-way driving to a stop / extra driving for a meal. */
+  maxDriveMin?: number;
+  /** True when the user demanded a fully dedicated dietary venue ("vegan only"). */
+  dietaryStrict?: boolean;
 };
 
 export const initialTripPlan: TripPlan = {

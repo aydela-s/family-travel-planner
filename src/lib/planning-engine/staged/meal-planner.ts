@@ -18,6 +18,9 @@ import {
   parseDietaryTags,
   pickRestaurantWithRoute,
 } from "@/lib/planning-engine/restaurant-picker";
+import { compileTripConstraints, type TripConstraints } from "@/lib/planning-engine/constraints";
+import { mergeConflicts, type PlannerConflict } from "@/lib/planning-engine/conflicts";
+import { mealVisitWindow } from "@/lib/planning-engine/staged/visit-windows";
 import type {
   DayBlueprint,
   MealIntent,
@@ -105,6 +108,8 @@ function planSlotMeal(
   anchor: Landmark | null,
   support: Landmark[],
   usedRestaurants: Set<string>,
+  constraints?: TripConstraints,
+  conflicts?: PlannerConflict[],
 ): MealIntent | null {
   if (slot === "breakfast" && !requiresBreakfastSlot(plan)) return null;
 
@@ -174,6 +179,10 @@ function planSlotMeal(
       excludeNames: usedRestaurants,
       routeFrom: route.from,
       routeTo: route.to,
+      forcePick: slot === "dinner",
+      visitWindow: mealVisitWindow(plan, day, slot),
+      constraints,
+      conflicts,
     });
     if (pick && cityHasRestaurant(city, pick.restaurant.name)) {
       usedRestaurants.add(pick.restaurant.name);
@@ -212,6 +221,7 @@ export function planMealsForDay(
   plan: TripPlan,
   city: CityConfig,
   usedRestaurants: Set<string>,
+  opts: { constraints?: TripConstraints; conflicts?: PlannerConflict[] } = {},
 ): MealIntent[] {
   const anchor = findLandmark(city, day.anchor?.landmarkName);
   const support = day.support
@@ -221,7 +231,17 @@ export function planMealsForDay(
   const slots: MealSlotKind[] = ["breakfast", "lunch", "dinner"];
   const meals: MealIntent[] = [];
   for (const slot of slots) {
-    const intent = planSlotMeal(slot, day, plan, city, anchor, support, usedRestaurants);
+    const intent = planSlotMeal(
+      slot,
+      day,
+      plan,
+      city,
+      anchor,
+      support,
+      usedRestaurants,
+      opts.constraints,
+      opts.conflicts,
+    );
     if (intent) meals.push(intent);
   }
   return meals;
@@ -237,14 +257,17 @@ export function planMealsOnBlueprint(
   city: CityConfig,
 ): TripBlueprint {
   const usedRestaurants = new Set(blueprint.ledger.restaurantNames);
+  const constraints = blueprint.rules.constraints ?? compileTripConstraints(plan);
+  const conflicts: PlannerConflict[] = [];
   const days = blueprint.days.map((day) => ({
     ...day,
-    meals: planMealsForDay(day, plan, city, usedRestaurants),
+    meals: planMealsForDay(day, plan, city, usedRestaurants, { constraints, conflicts }),
   }));
 
   return {
     ...blueprint,
     days,
+    conflicts: mergeConflicts(blueprint.conflicts ?? [], conflicts),
     ledger: {
       ...blueprint.ledger,
       restaurantNames: [...usedRestaurants],
