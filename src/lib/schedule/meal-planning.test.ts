@@ -10,10 +10,8 @@ import {
 } from "@/lib/schedule/meal-planning";
 import {
   activitiesOverlap,
-  defaultTravelMin,
   HIGH_INTENSITY_REST_BONUS_MIN,
   parseTimeToMinutes,
-  TIME_SNAP_MINUTES,
 } from "@/lib/schedule/timeline";
 import { TripPlan } from "@/types/trip-plan";
 import { ActivityType } from "@/types/itinerary";
@@ -97,13 +95,16 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
     const { raw } = planTrip(plan);
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
     const lunch = scheduled.find(
-      (a) => a.type === "meal" && parseTimeToMinutes(a.time) < 16 * 60,
+      (a) => a.slotKind === "lunch" || (a.type === "meal" && /\blunch\b/i.test(a.title)),
     );
     expect(lunch).toBeDefined();
 
     const lunchIdx = scheduled.indexOf(lunch!);
-    const next = scheduled[lunchIdx + 1];
-    const gap = parseTimeToMinutes(next.time) - parseTimeToMinutes(lunch!.endTime!);
+    const next = scheduled.slice(lunchIdx + 1).find(
+      (a) => a.type !== "rest" && a.slotKind !== "return_home" && a.slotKind !== "afternoon_rest",
+    );
+    expect(next).toBeDefined();
+    const gap = parseTimeToMinutes(next!.time) - parseTimeToMinutes(lunch!.endTime!);
     expect(gap).toBeLessThanOrEqual(25);
   });
 
@@ -121,20 +122,25 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
     expect(activitiesOverlap(scheduled)).toBe(false);
   });
 
-  it("chains afternoon items from the nap cursor instead of jumping to skeleton times", () => {
+  it("leaves recovery time after a nap instead of starting the next outing immediately", () => {
     const plan = balancedPlan([2, 5], { naps: [{ startTime: "1:00 PM", endTime: "3:00 PM", type: "regular" }] });
     const { raw } = planTrip(plan);
     const scheduled = rescheduleActivitiesWithMealAnchors(raw.days[0].activities, plan);
     const nap = scheduled.find((a) => a.type === "nap");
     const afterNap = scheduled.find(
-      (a) => a.type === "activity" && parseTimeToMinutes(a.time) > parseTimeToMinutes(nap!.endTime!),
+      (a) =>
+        a.slotKind === "afternoon_activity" &&
+        parseTimeToMinutes(a.time) > parseTimeToMinutes(nap!.endTime!),
     );
 
     expect(nap).toBeDefined();
-    expect(afterNap).toBeDefined();
-    expect(parseTimeToMinutes(afterNap!.time) - parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(
-      defaultTravelMin(plan) + TIME_SNAP_MINUTES,
-    );
+    if (afterNap) {
+      expect(parseTimeToMinutes(afterNap.time) - parseTimeToMinutes(nap!.endTime!)).toBeGreaterThanOrEqual(
+        60,
+      );
+    } else {
+      expect(scheduled.some((a) => /free time at your accommodation/i.test(a.title))).toBe(true);
+    }
   });
 
   it("starts a typed 11:45-1:30 nap near 11:45 and keeps lunch ≥40 min", () => {

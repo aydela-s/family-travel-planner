@@ -22,9 +22,9 @@ import {
 import { groceryLocationNearRoute } from "@/lib/planning-engine/meal-timing";
 import { recordConflict, type PlannerConflict } from "@/lib/planning-engine/conflicts";
 import { findRestaurantByName } from "@/lib/planning-engine/restaurant-picker";
+import { repairItineraryIntegrity } from "@/lib/planning-engine/itinerary-integrity";
 import {
   repairDuplicateCategories,
-  validateItinerary,
 } from "@/lib/planning-engine/validate-itinerary";
 import {
   activityUsesStayHome,
@@ -332,7 +332,8 @@ async function enrichDay(
         act.location = homeRest;
         if (plan.stayPlaceId) act.placeId = plan.stayPlaceId;
       } else {
-        const anchor = pickedLandmarks[0] ?? city.landmarks[0]!;
+        const anchor =
+          pickedLandmarks[pickedLandmarks.length - 1] ?? city.landmarks[0]!;
         act.location = {
           name: anchor.name,
           lat: anchor.lat,
@@ -594,9 +595,10 @@ export async function enrichItinerary(
 
   days = validateBeforeDisplay(days, plan);
 
-  // Final gate: every rule the selection stages are supposed to have enforced.
+  const repaired = repairItineraryIntegrity(days, plan, city);
+  days = repaired.days;
   if (process.env.NODE_ENV === "development") {
-    for (const violation of validateItinerary(days, plan, city)) {
+    for (const violation of repaired.violations) {
       console.warn(`[itinerary] ${violation.code}: ${violation.message}`);
     }
   }

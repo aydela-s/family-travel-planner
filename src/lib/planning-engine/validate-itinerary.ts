@@ -11,6 +11,7 @@ import {
   isCategorizableActivity,
 } from "@/lib/schedule/classify-activity";
 import { suggestActivityTitle } from "@/lib/schedule/family-profile";
+import { extractLandmarkFromTitle } from "@/lib/schedule/landmark-hours";
 import {
   INTEREST_LABEL_TO_TAGS,
   interestSourceLabels,
@@ -387,6 +388,112 @@ export function enforceDayCategoryUniqueness(
   });
 }
 
+/**
+ * If a selected interest was never scheduled and a suitable candidate exists,
+ * swap an off-interest filler for a covering stop. Off-interest activities
+ * remain only as a documented fallback when no candidate is available.
+ */
+export function repairUncoveredSelectedInterests(
+  days: ItineraryDay[],
+  plan: TripPlan,
+  city: CityConfig,
+): ItineraryDay[] {
+  const selectedLabels = plan.interests.filter((label) => (INTEREST_LABEL_TO_TAGS[label] ?? []).length > 0);
+  if (selectedLabels.length === 0) return days;
+
+  const usedNames = new Set<string>();
+  for (const day of days) {
+    for (const a of scheduledAttractions(day)) {
+      if (a.location?.name) usedNames.add(a.location.name);
+    }
+  }
+
+  const coveredTags = (): Set<LandmarkInterestTag> => {
+    const covered = new Set<LandmarkInterestTag>();
+    for (const day of days) {
+      for (const a of scheduledAttractions(day)) {
+        for (const t of a.interestTags ?? []) covered.add(t);
+      }
+    }
+    return covered;
+  };
+
+  const next = days.map((d) => ({ ...d, activities: [...d.activities] }));
+
+  for (const label of selectedLabels) {
+    const tags = INTEREST_LABEL_TO_TAGS[label] ?? [];
+    const covered = coveredTags();
+    if (tags.some((t) => covered.has(t))) continue;
+
+    const candidates = city.landmarks.filter(
+      (l) =>
+        !usedNames.has(l.name) &&
+        l.interestTags.some((t) => tags.includes(t)),
+    );
+    if (candidates.length === 0) continue;
+
+    let swapped = false;
+    for (const day of next) {
+      const fillerIdx = day.activities.findIndex((a) => {
+        if (!isCategorizableActivity(a) || isUnpaidTimelineActivity(a)) return false;
+        const activityTags = a.interestTags ?? [];
+        if (activityTags.length === 0 || activityTags.some((t) => tags.includes(t))) {
+          return false;
+        }
+        const titled = extractLandmarkFromTitle(a.title);
+        if (titled) return false;
+        return true;
+      });
+      if (fillerIdx < 0) continue;
+      const filler = day.activities[fillerIdx]!;
+      const taken = new Set<string>();
+      for (const a of day.activities) {
+        for (const c of categoriesForActivity(a)) taken.add(c);
+      }
+      for (const c of categoriesForActivity(filler)) taken.delete(c);
+
+      const replacement = findReplacementLandmark(city, plan, {
+        takenCategories: taken,
+        usedNames,
+        dayStops: scheduledAttractions(day).map(activityAsLandmark),
+        preferTags: tags,
+        near: filler.location
+          ? {
+              lat: filler.location.lat,
+              lng: filler.location.lng,
+            }
+          : null,
+      });
+      if (!replacement) continue;
+
+      usedNames.add(replacement.name);
+      day.activities[fillerIdx] = {
+        ...filler,
+        title: suggestActivityTitle(
+          replacement.name,
+          plan,
+          filler.timeOfDay === "morning" ? "morning" : "afternoon",
+          replacement.interestTags,
+        ),
+        location: { name: replacement.name, lat: replacement.lat, lng: replacement.lng },
+        placeId: replacement.placeId,
+        rating: replacement.rating,
+        reviewCount: replacement.reviewCount,
+        interestTags: replacement.interestTags,
+        landmarkIntensity: replacement.intensity,
+        activityCost: familyActivityCost(replacement, plan.adults, plan.children),
+      };
+      swapped = true;
+      break;
+    }
+    if (!swapped) {
+      // No filler to swap — leave the gap documented for integrity reporting.
+    }
+  }
+
+  return next;
+}
+
 function findReplacementLandmark(
   city: CityConfig,
   plan: TripPlan,
@@ -395,11 +502,13 @@ function findReplacementLandmark(
     usedNames: Set<string>;
     dayStops: Landmark[];
     preferTags: LandmarkInterestTag[];
+    near?: { lat: number; lng: number } | null;
   },
 ): Landmark | null {
   const prefer = new Set(ctx.preferTags);
   const selected = new Set(interestTagsFromPlan(plan.interests));
-  const centre = ctx.dayStops[ctx.dayStops.length - 1] ?? null;
+  const centre = ctx.near ?? ctx.dayStops[ctx.dayStops.length - 1] ?? null;
+  const maxKm = mealDetourLimits(plan).maxKm * 2;
 
   const candidates = city.landmarks.filter((l) => {
     if (ctx.usedNames.has(l.name)) return false;
@@ -407,6 +516,9 @@ function findReplacementLandmark(
     if (selected.size > 0 && !l.interestTags.some((t) => selected.has(t))) return false;
     for (const c of dayActivityCategories(l)) {
       if (ctx.takenCategories.has(c)) return false;
+    }
+    if (centre && haversineKm(centre.lat, centre.lng, l.lat, l.lng) > maxKm) {
+      return false;
     }
     return true;
   });

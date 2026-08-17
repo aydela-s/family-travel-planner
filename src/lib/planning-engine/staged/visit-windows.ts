@@ -1,10 +1,10 @@
 import { addDays } from "@/lib/format";
 import { dinnerTimeWindow, lunchTimeWindow } from "@/lib/planning-engine/meal-timing";
 import { morningActivityDefaultTime } from "@/lib/planning-engine/skeleton-builder";
+import { afternoonActivityDefaultTime } from "@/lib/schedule/family-rhythm";
 import type { DayBlueprint, MealSlotKind } from "@/lib/planning-engine/staged/types";
 import type { VisitWindow } from "@/lib/schedule/landmark-hours";
-import { getNapWindow, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
-import { minutesToTime, parseTimeToMinutes } from "@/lib/schedule/timeline";
+import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import type { TripPlan } from "@/types/trip-plan";
 
 /**
@@ -31,17 +31,16 @@ export function anchorVisitWindow(plan: TripPlan, day: DayBlueprint): VisitWindo
     day.constraints.some((c) => c.type === "require_half_day_window") ? 240 : 0,
   );
   const visitDate = dayVisitDate(plan, day);
-  const nap = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
   const halfDay = day.constraints.some((c) => c.type === "require_half_day_window");
   if (halfDay) {
-    const start = nap ? minutesToTime(Math.min(nap.endMin + 15, 16 * 60)) : "13:15";
+    const start = afternoonActivityDefaultTime(plan);
     return visitWindowFromTime(start, Math.max(activityMins, 240), visitDate);
   }
-  // Default hero window: post-nap afternoon or late morning for short days
+  // Default hero window: post-nap afternoon (after recovery downtime) or late morning
   if (day.capacity.maxActivitiesPerDay <= 1 || day.role === "departure") {
     return visitWindowFromTime(morningActivityDefaultTime(plan), activityMins, visitDate);
   }
-  const start = nap ? minutesToTime(Math.min(nap.endMin + 15, 16 * 60)) : "13:15";
+  const start = afternoonActivityDefaultTime(plan);
   return visitWindowFromTime(start, activityMins, visitDate);
 }
 

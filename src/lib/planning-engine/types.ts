@@ -65,6 +65,8 @@ export type RawActivity = {
   landmarkIntensity?: LandmarkIntensity;
   /** Landmark interest tags — category defaults in docs/interest-categories.md. */
   interestTags?: import("@/config/city-pricing").LandmarkInterestTag[];
+  dietaryFit?: import("@/lib/planning-engine/restaurant-picker").DietaryFit;
+  allowShortVisit?: boolean;
 };
 
 export type DayLandmarkContext = {

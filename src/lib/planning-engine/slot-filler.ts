@@ -7,11 +7,11 @@ import {
   uncoveredAgeBands,
   VisitWindow,
 } from "@/lib/schedule/family-profile";
+import { afternoonActivityDefaultTime } from "@/lib/schedule/family-rhythm";
 import { morningActivityDefaultTime } from "@/lib/planning-engine/skeleton-builder";
 import { getNapWindow, overlapsStrollerNap, shouldIncludeNaps } from "@/lib/schedule/nap-policy";
-import { minutesToTime } from "@/lib/schedule/timeline";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
-import { parseTimeToMinutes } from "@/lib/schedule/timeline";
+import { minutesToTime, parseTimeToMinutes } from "@/lib/schedule/timeline";
 import {
   activityTitlePrefix,
   AdjustmentContext,
@@ -102,9 +102,7 @@ export function buildLandmarkContext(
   // When a nap is scheduled, afternoon openness checks must use the post-nap window
   // (not a fixed 15:30) or museums that close mid-afternoon get wrongly filtered out.
   const nap = shouldIncludeNaps(plan) ? getNapWindow(plan) : null;
-  const afternoonStart = nap
-    ? minutesToTime(Math.min(nap.endMin + 15, 16 * 60))
-    : "13:15";
+  const afternoonStart = afternoonActivityDefaultTime(plan);
   // Theme parks need a long open window from post-lunch through late afternoon.
   const afternoonDurationMin = Math.max(activityMins, 240);
   const afternoonWindow = visitWindowFromTime(afternoonStart, afternoonDurationMin, visitDate);

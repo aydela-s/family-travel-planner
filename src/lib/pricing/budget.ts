@@ -21,6 +21,40 @@ function roundMoney(amount: number, currency: string): number {
   return Math.round(amount * 100) / 100;
 }
 
+function sumRounded(amounts: number[], currency: string): number {
+  return roundMoney(
+    amounts.reduce((s, n) => s + (Number.isFinite(n) ? n : 0), 0),
+    currency,
+  );
+}
+
+/** Single source of truth: category totals equal the sum of displayed line items. */
+export function costsFromDisplayedItems(
+  activities: ItineraryActivity[],
+  currency: string,
+): { food: number; transport: number; activities: number; total: number } {
+  const food = sumRounded(
+    activities.filter((a) => a.type === "meal").map((a) => a.activityCost ?? 0),
+    currency,
+  );
+  const transport = sumRounded(
+    activities.filter((a) => a.type === "travel").map((a) => a.activityCost ?? 0),
+    currency,
+  );
+  const activitiesCost = sumRounded(
+    activities
+      .filter((a) => a.type === "activity")
+      .map((a) => a.activityCost ?? 0),
+    currency,
+  );
+  return {
+    food,
+    transport,
+    activities: activitiesCost,
+    total: roundMoney(food + transport + activitiesCost, currency),
+  };
+}
+
 /** Meal cost tiers (fraction of city base) — set by Budget Style via lunchLabel/dinnerLabel copy, not a dollar target. */
 const MEAL_TIERS = {
   premium: 1.4,
@@ -137,13 +171,6 @@ export function estimateMealCosts(
     .reduce((sum, a) => sum + estimateMealCostForActivity(a, city, plan), 0);
 }
 
-/** Paid attractions only — meals and travel legs have their own buckets. */
-function sumActivityCosts(activities: ItineraryActivity[]): number {
-  return activities
-    .filter((a) => a.type === "activity")
-    .reduce((s, a) => s + (a.activityCost ?? 0), 0);
-}
-
 /** Insert the one trip-start grocery run for kitchen accommodations (FAM-75). */
 export function maybeAddAccommodationGroceryStop(
   activities: ItineraryActivity[],
@@ -199,9 +226,13 @@ export function summarizeDailyCost(
   plan: TripPlan,
   day: number = 1,
 ): DaySpendSummary {
-  const food = roundMoney(estimateMealCosts(activities, city, plan), city.currency);
-  const transport = roundMoney(transportCost, city.currency);
-  const activitiesCost = roundMoney(sumActivityCosts(activities), city.currency);
+  const line = costsFromDisplayedItems(activities, city.currency);
+  const hasTravelRows = activities.some((a) => a.type === "travel");
+  const food = line.food;
+  const transport = hasTravelRows
+    ? line.transport
+    : roundMoney(transportCost, city.currency);
+  const activitiesCost = line.activities;
   const total = roundMoney(food + transport + activitiesCost, city.currency);
 
   const landmarkNames = activities

@@ -168,6 +168,9 @@ function mergeEnrichedSchedule(
       slotKind: a.slotKind ?? base.slotKind,
       landmarkIntensity: a.landmarkIntensity ?? base.landmarkIntensity,
       interestTags: a.interestTags ?? base.interestTags,
+      dietaryFit: a.dietaryFit ?? base.dietaryFit,
+      allowShortVisit: a.allowShortVisit ?? base.allowShortVisit,
+      transportCovered: base.transportCovered,
       timeOfDay: getTimeOfDay(a.time) as TimeOfDay,
     };
   });
@@ -188,6 +191,8 @@ export function rescheduleEnrichedActivities(
     ...(a.slotKind ? { slotKind: a.slotKind } : {}),
     ...(a.landmarkIntensity ? { landmarkIntensity: a.landmarkIntensity } : {}),
     ...(a.interestTags?.length ? { interestTags: a.interestTags } : {}),
+    ...(a.dietaryFit ? { dietaryFit: a.dietaryFit } : {}),
+    ...(a.allowShortVisit ? { allowShortVisit: true } : {}),
   }));
   const travelGaps = travelGapsFromSegments(withoutTravel, segmentDurations, plan);
 

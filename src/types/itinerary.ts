@@ -24,6 +24,12 @@ export type ItineraryActivity = {
   slotKind?: import("@/lib/planning-engine/types").SlotKind;
   landmarkIntensity?: import("@/config/city-pricing").LandmarkIntensity;
   interestTags?: import("@/config/city-pricing").LandmarkInterestTag[];
+  /** How well a meal matches dietary needs — must survive scheduling and render. */
+  dietaryFit?: import("@/lib/planning-engine/restaurant-picker").DietaryFit;
+  /** When true, a short visit is intentional rather than a compressed leftover. */
+  allowShortVisit?: boolean;
+  /** Taxi/transit marked complementary — $0 is then valid. */
+  transportCovered?: boolean;
 };
 
 export type DayCostBreakdown = {

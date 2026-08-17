@@ -6,6 +6,7 @@ import {
   shouldCookDinnerAtHome,
 } from "@/lib/planning-engine/meal-planner";
 import { dinnerDefaultTime, lunchDefaultTime } from "@/lib/planning-engine/meal-timing";
+import { afternoonActivityDefaultTime } from "@/lib/schedule/family-rhythm";
 import { priorityForSlotKind } from "@/lib/planning-engine/day-intent";
 import { AdjustmentContext, intensityForDay } from "@/lib/planning-engine/day-adjustment";
 import { DayIntent } from "@/lib/planning-engine/types";
@@ -74,7 +75,7 @@ export function buildDaySkeleton(
     }
   } else if (intensity.includeAfternoonActivity) {
     // Post-lunch start — schedule fills theme parks through to dinner.
-    slots.push(intent("afternoon_activity", "13:15"));
+    slots.push(intent("afternoon_activity", afternoonActivityDefaultTime(plan)));
   }
 
   if (intensity.includeExtraActivity) {

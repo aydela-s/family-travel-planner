@@ -4,6 +4,7 @@ import {
   duplicateDayCategories,
   enforceDayCategoryUniqueness,
   mealDetoursForDay,
+  repairUncoveredSelectedInterests,
   validateItinerary,
 } from "@/lib/planning-engine/validate-itinerary";
 import {
@@ -286,6 +287,19 @@ describe("selected interests drive the plan", () => {
     ];
     const codes = validateItinerary(days, plan(), city).map((v) => v.code);
     expect(codes).not.toContain("uncovered_selected_interest");
+  });
+
+  it("swaps an off-interest filler for a nearby uncovered selected interest", () => {
+    const days = [day([activity("Local history exhibit", ["history"])])];
+    const repaired = repairUncoveredSelectedInterests(days, plan(), {
+      ...city,
+      landmarks: [
+        ...city.landmarks,
+        activityLandmark("Splash Factory", ["beaches"], 2),
+      ],
+    });
+    const tags = repaired[0]!.activities.flatMap((a) => a.interestTags ?? []);
+    expect(tags).toContain("beaches");
   });
 });
 

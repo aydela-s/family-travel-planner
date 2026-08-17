@@ -154,9 +154,11 @@ describe("per-route transport costs", () => {
     expect(legs[1]!.activityCost).toBe(priced[1]!.cost);
 
     const summary = summarizeDailyCost(withTravel, 33, city, plan());
-    // Travel costs must not inflate the Activities bucket.
+    // Travel costs must not inflate the Activities bucket. Transport header
+    // equals the sum of displayed travel rows, not a separate estimate.
     expect(summary.activities).toBe(50);
-    expect(summary.transport).toBe(33);
+    const travelSum = legs.reduce((s, a) => s + (a.activityCost ?? 0), 0);
+    expect(summary.transport).toBe(travelSum);
   });
 
   it("puts the public-transit day pass on the first billable leg only when a day pass wins", () => {

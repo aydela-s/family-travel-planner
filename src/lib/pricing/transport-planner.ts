@@ -260,7 +260,11 @@ export function injectTravelActivities(
     if (segment.distanceKm <= 0 && segment.cost <= 0) continue;
 
     const next = activities[nextIdx]!;
-    result.push(travelActivity(segment, plan, current.endTime ?? current.time, next));
+    const inboundMin = segment.durationMin + (segment.bufferMin ?? 0);
+    const travelStart = travelStartForArrival(next.time, inboundMin);
+    const afterCurrent = parseTimeToMinutes(current.endTime ?? current.time);
+    const startMin = Math.max(afterCurrent, parseTimeToMinutes(travelStart));
+    result.push(travelActivity(segment, plan, minutesToTime(startMin), next));
   }
 
   const lastLocated = [...activities].reverse().find((a) => a.location);
@@ -293,7 +297,7 @@ export function injectTravelActivities(
   return result;
 }
 
-function namesMatch(a: string, b: string): boolean {
+export function namesMatch(a: string, b: string): boolean {
   const norm = (s: string) =>
     s
       .toLowerCase()

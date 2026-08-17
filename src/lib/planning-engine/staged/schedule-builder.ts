@@ -61,7 +61,13 @@ function fillActivitySlot(
       const meal = intent
         ? labelForMealIntent(intent, plan, city, day.dayIndex, spot)
         : { title: `${slot.kind} near ${spot}`, notes: "" };
-      return tagged({ time: slot.defaultTime, title: meal.title, type, notes: meal.notes });
+      return tagged({
+        time: slot.defaultTime,
+        title: meal.title,
+        type,
+        notes: meal.notes,
+        ...(intent?.dietaryFit ? { dietaryFit: intent.dietaryFit } : {}),
+      });
     }
     case "morning_activity":
       return tagged(

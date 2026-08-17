@@ -22,12 +22,24 @@ import { getNapWindow, getRegularNapWindows, napDurationMin, shouldIncludeNaps }
 import { formatMeridiemTime } from "@/lib/planning-engine/nap-options";
 import { PACKED_EXTRA_MIN_DURATION_MIN } from "@/lib/schedule/travel-style";
 import {
+  canDropToProtectDuration,
+  chooseAfternoonPattern,
+  dinnerStartFromRhythm,
+  desiredActivityDuration,
+  earliestLeaveAfterNap,
+  minRealisticActivityDuration,
+  planMorningChainFromNap,
+  preferReturnHomeBeforeDinner,
+  type MorningChainPlan,
+} from "@/lib/schedule/family-rhythm";
+import {
   BREAKFAST_DURATION_MIN,
   defaultDurationMin,
   defaultTravelMin,
   GROCERY_DURATION_MIN,
   GROCERY_TO_DINNER_BUFFER_MIN,
   HIGH_INTENSITY_REST_BONUS_MIN,
+  isUnpaidTimelineActivity,
   itemDurationMin,
   MIN_DINNER_DURATION_MIN,
   minutesToTime,
@@ -44,6 +56,7 @@ type RawActivity = {
   slotKind?: SlotKind;
   landmarkIntensity?: LandmarkIntensity;
   interestTags?: LandmarkInterestTag[];
+  allowShortVisit?: boolean;
 };
 
 /** Takeout/delivery lunch at the stay starts this many minutes before a regular nap. */
@@ -626,6 +639,42 @@ function placeOptionalActivity<T extends RawActivity>(
   return null;
 }
 
+function stayDowntimeItem<T extends RawActivity>(
+  template: T | undefined,
+  start: number,
+  duration: number,
+  title: string,
+  notes: string,
+  slotKind: SlotKind,
+): T & { endTime: string } {
+  const span = scheduleSpan(start, duration);
+  const base = (template ?? {
+    time: span.time,
+    title,
+    type: "rest" as ActivityType,
+  }) as T;
+  return {
+    ...base,
+    ...span,
+    title,
+    type: "rest",
+    slotKind,
+    notes,
+  };
+}
+
+function isRealMorningStop(a: RawActivity): boolean {
+  if (a.slotKind === "morning_activity") return true;
+  return (
+    a.type === "activity" &&
+    !isGroceryActivity(a) &&
+    a.slotKind !== "afternoon_activity" &&
+    a.slotKind !== "extra_activity" &&
+    a.slotKind !== "calm_activity" &&
+    !isUnpaidTimelineActivity(a)
+  );
+}
+
 /**
  * Linear day scheduler — walks activities in list order (no nap-bucket drops).
  * Dinner and grocery are anchored to the evening; optional intents may be skipped.
@@ -692,6 +741,86 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
         })
       : null;
 
+  const morningStop = required.find(isRealMorningStop);
+  const morningIdx = required.findIndex(isRealMorningStop);
+  const lunchIdxForChain = required.findIndex((a) => isDaytimeMeal(a));
+  const napBeforeMorning = required.some(
+    (a, i) => a.type === "nap" && morningIdx >= 0 && i < morningIdx,
+  );
+  const lunchBeforeNapItem = lunchBeforeNap
+    ? required.slice(0, Math.max(napRequiredIdx, 0)).find((a) => isDaytimeMeal(a))
+    : undefined;
+  const lunchAnchor = lunchBeforeNapItem ?? required.find(isDaytimeMeal);
+  const lunchAtStay = Boolean(lunchAnchor && isTakeoutAtStayLunch(lunchAnchor));
+  const middayNap =
+    resolvedNapStart != null && resolvedNapStart >= 11 * 60;
+  const napAnchoredMorning = Boolean(middayNap && lunchBeforeNap && !napBeforeMorning);
+  const scheduledMorningMin = morningStop
+    ? parseTimeToMinutes(morningStop.time)
+    : 10 * 60;
+  const venueOpenMin =
+    scheduledMorningMin <= 10 * 60 ? scheduledMorningMin : 10 * 60;
+  const lunchWindow = lunchTimeWindow(plan);
+  const morningBeforeLunch =
+    morningIdx >= 0 && lunchIdxForChain > morningIdx && !napBeforeMorning;
+  const chainDuration = morningStop
+    ? (() => {
+        const desired = desiredActivityDuration(morningStop, plan);
+        const floor = minRealisticActivityDuration(morningStop, plan);
+        if (napAnchoredMorning) return desired;
+        const latestEnd = lunchWindow.defaultMin - defaultTravelMin(plan);
+        const room = latestEnd - venueOpenMin;
+        if (room >= desired) return desired;
+        return Math.max(floor, Math.min(desired, Math.max(room, floor)));
+      })()
+    : 0;
+  const morningChain: MorningChainPlan | null =
+    plan.travelStyle !== "packed" && morningStop && lunchAnchor && morningBeforeLunch
+      ? planMorningChainFromNap({
+          napStartMin: napAnchoredMorning ? resolvedNapStart! : undefined,
+          lunchStartMin: napAnchoredMorning ? undefined : lunchWindow.defaultMin,
+          activityDurationMin: chainDuration,
+          breakfast: required.some(isBreakfastMeal),
+          lunchAtStay,
+          travelMin: defaultTravelMin(plan),
+          venueOpenMin,
+          lunchDurationMin: lunchAnchor
+            ? isTakeoutAtStayLunch(lunchAnchor)
+              ? Math.max(MIN_LUNCH_DURATION_MIN, 45)
+              : MIN_LUNCH_DURATION_MIN
+            : 45,
+        })
+      : null;
+
+  const afternoonSlot = required.find(
+    (a) => a.slotKind === "afternoon_activity" || a.slotKind === "calm_activity",
+  );
+  const napEndMin =
+    napWindow != null
+      ? napWindow.endMin
+      : resolvedNapStart != null
+        ? resolvedNapStart + 90
+        : 14 * 60;
+  const afternoonPattern = chooseAfternoonPattern(plan, {
+    morningDurationMin: morningStop ? desiredActivityDuration(morningStop, plan) : 0,
+    hasAfternoonSlot: Boolean(afternoonSlot),
+    remainingAfterNapMin: Math.max(0, latestItemEnd - napEndMin),
+    dinnerAtStay: dinnerItems.some(
+      (d) =>
+        COOK_DINNER.test(d.title) ||
+        /takeout|delivery|cook dinner|dinner at your (rental|stay|airbnb|accommodation)/i.test(
+          d.title,
+        ),
+    ),
+  });
+  const postNapLeaveMin =
+    napWindow || resolvedNapStart != null
+      ? afternoonPattern === "immediate"
+        ? napEndMin + 15
+        : earliestLeaveAfterNap(plan, napEndMin)
+      : 0;
+  let postNapDowntimePlaced = false;
+
   const placeHomeboundGrocery = (travelIn: number) => {
     if (groceryPlaced || groceryItems.length === 0) return travelIn;
     const travel = travelIn;
@@ -709,6 +838,12 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
 
   for (let i = 0; i < required.length; i++) {
     const item = required[i];
+    if (
+      afternoonPattern === "no_afternoon" &&
+      (item.slotKind === "afternoon_activity" || item.slotKind === "calm_activity")
+    ) {
+      continue;
+    }
     let travel = result.length > 0 ? nextTravel() : 0;
     // Grocery on the way home before nap, then a short hop into the stay.
     if (item.type === "nap" && groceryBeforeNap && !groceryPlaced) {
@@ -721,6 +856,14 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
     ) {
       // Stay-home lunch → stay-home nap: no transit gap (was slipping 12:00 naps to 12:10).
       travel = 0;
+    } else     if (
+      morningChain &&
+      item === morningStop &&
+      result.length > 0 &&
+      isBreakfastMeal(result[result.length - 1]!)
+    ) {
+      // Breakfast is planned next to the morning venue — not a cross-town hop.
+      travel = NEAR_STOP_LUNCH_TRANSFER_MIN;
     }
     const lunchIdx = required.findIndex((a, j) => j > i && isDaytimeMeal(a));
     let start: number;
@@ -761,11 +904,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
     } else if (result.length === 0) {
       start = Math.max(cursor, parseTimeToMinutes(item.time));
       if (isBreakfastMeal(item)) {
-        const morning = required.find(
-          (a) =>
-            a.slotKind === "morning_activity" ||
-            (a.type === "activity" && !isGroceryActivity(a) && a !== item),
-        );
+        const morning = required.find((a) => a.slotKind === "morning_activity");
         const napItem = required.find((a) => a.type === "nap");
         const napStart =
           napItem != null
@@ -785,7 +924,61 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       start = cursor + travel;
     }
 
+    if (morningChain) {
+      if (isBreakfastMeal(item) && morningChain.breakfastStartMin != null) {
+        start = morningChain.breakfastStartMin;
+      } else if (item === morningStop) {
+        start = morningChain.activityStartMin;
+      } else if (isDaytimeMeal(item) && napAnchoredMorning && napRequiredIdx > i) {
+        start = morningChain.lunchStartMin;
+      }
+    }
+
+    const lastWasNap = result.length > 0 && result[result.length - 1]!.type === "nap";
+    const isAfternoonOuting =
+      item.slotKind === "afternoon_activity" ||
+      item.slotKind === "calm_activity" ||
+      item.slotKind === "extra_activity";
+    if (
+      lastWasNap &&
+      isAfternoonOuting &&
+      afternoonPattern !== "immediate" &&
+      postNapLeaveMin > 0
+    ) {
+      if (
+        !postNapDowntimePlaced &&
+        (afternoonPattern === "downtime_then_out" ||
+          afternoonPattern === "downtime_home_dinner")
+      ) {
+        const napEnd = parseTimeToMinutes(result[result.length - 1]!.endTime);
+        const restDur = Math.max(30, postNapLeaveMin - napEnd);
+        if (restDur >= 30) {
+          result.push(
+            stayDowntimeItem(
+              undefined,
+              napEnd,
+              restDur,
+              "Free time at your accommodation",
+              "Post-nap recovery at the stay — leaving is optional, not required.",
+              "afternoon_rest",
+            ),
+          );
+          cursor = napEnd + restDur;
+          postNapDowntimePlaced = true;
+          travel = 0;
+        }
+      }
+      start = Math.max(start, postNapLeaveMin);
+    }
+
     let duration = packedActivityDuration(item, plan, false);
+    if (morningChain && item === morningStop) {
+      duration = Math.max(
+        minRealisticActivityDuration(item, plan),
+        morningChain.activityEndMin - morningChain.activityStartMin,
+      );
+    }
+    let skipItem = false;
     if (
       needsRecoveryRest &&
       (item.type === "nap" ||
@@ -868,6 +1061,22 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
         if (start + duration > mustEndBy) {
           duration = Math.max(20, mustEndBy - start);
         }
+      } else if (morningChain && item === morningStop) {
+        // Morning was planned backward from lunch/nap — do not compress to a stub visit.
+        duration = Math.max(duration, minRealisticActivityDuration(item, plan));
+      } else if (isLengthenablePackedActivity(item)) {
+        const floor = minRealisticActivityDuration(item, plan);
+        const room = mustEndBy - start;
+        if (room >= floor) {
+          duration = Math.min(duration, room);
+        } else if (
+          canDropToProtectDuration(item, plan) &&
+          item.slotKind !== "morning_activity"
+        ) {
+          skipItem = true;
+        } else {
+          duration = Math.max(20, room);
+        }
       } else if (start < mustEndBy) {
         duration = Math.min(duration, Math.max(20, mustEndBy - start));
       } else {
@@ -896,7 +1105,22 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       if (start >= maxEnd) {
         start = Math.max(cursor + (result.length > 0 ? gap : 0), maxEnd - 20);
       }
-      duration = Math.min(duration, Math.max(20, maxEnd - start));
+      if (morningChain && item === morningStop) {
+        // Already fitted backward from lunch/nap.
+      } else if (isLengthenablePackedActivity(item)) {
+        const floor = minRealisticActivityDuration(item, plan);
+        const room = maxEnd - start;
+        if (room >= floor) {
+          duration = Math.min(duration, room);
+        } else if (
+          canDropToProtectDuration(item, plan) &&
+          item.slotKind !== "morning_activity"
+        ) {
+          skipItem = true;
+        } else {
+          duration = Math.max(20, room);
+        }
+      }
     }
 
     // Hard invariant: never start before the previous item ends (+ transfer).
@@ -913,7 +1137,12 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
           const prev = result[result.length - 1]!;
           const prevStart = parseTimeToMinutes(prev.time);
           const prevEndNeeded = targetStart - lunchTransfer;
-          if (prevEndNeeded >= prevStart + 20) {
+          const prevFloor = isLengthenablePackedActivity(prev)
+            ? plan.travelStyle === "packed"
+              ? 20
+              : minRealisticActivityDuration(prev, plan)
+            : 20;
+          if (prevEndNeeded >= prevStart + prevFloor) {
             const trimmed = {
               ...prev,
               ...scheduleSpan(prevStart, prevEndNeeded - prevStart),
@@ -924,8 +1153,11 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
             start = Math.min(start, lunchMax);
           } else {
             // Still keep lunch in-window when possible by ending prior ASAP.
-            const tightEnd = Math.max(prevStart + 15, Math.min(cursor, lunchMax - lunchTransfer));
-            if (tightEnd > prevStart) {
+            const tightEnd = Math.max(
+              prevStart + prevFloor,
+              Math.min(cursor, lunchMax - lunchTransfer),
+            );
+            if (tightEnd > prevStart && tightEnd - prevStart >= prevFloor) {
               result[result.length - 1] = {
                 ...prev,
                 ...scheduleSpan(prevStart, tightEnd - prevStart),
@@ -936,6 +1168,26 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
           }
         } else {
           start = earliest;
+        }
+      }
+    }
+
+    if (morningChain && item === morningStop) {
+      start = morningChain.activityStartMin;
+      duration = Math.max(
+        duration,
+        morningChain.activityEndMin - morningChain.activityStartMin,
+      );
+      if (result.length > 0) {
+        const prev = result[result.length - 1]!;
+        const prevStart = parseTimeToMinutes(prev.time);
+        const needEnd = start - (isBreakfastMeal(prev) ? NEAR_STOP_LUNCH_TRANSFER_MIN : 0);
+        if (parseTimeToMinutes(prev.endTime) > needEnd && needEnd > prevStart) {
+          result[result.length - 1] = {
+            ...prev,
+            ...scheduleSpan(prevStart, needEnd - prevStart),
+          };
+          cursor = needEnd;
         }
       }
     }
@@ -963,6 +1215,25 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
         start = Math.max(thisNapWindow.startMin, thisNapWindow.endMin - intended);
         duration = Math.max(20, thisNapWindow.endMin - start) + bonus;
       }
+    }
+
+    if (
+      isLengthenablePackedActivity(item) &&
+      duration < minRealisticActivityDuration(item, plan) &&
+      canDropToProtectDuration(item, plan) &&
+      item.slotKind !== "morning_activity"
+    ) {
+      skipItem = true;
+    }
+    if (
+      (item.slotKind === "afternoon_activity" || item.slotKind === "calm_activity") &&
+      start + minRealisticActivityDuration(item, plan) > latestItemEnd &&
+      plan.travelStyle !== "packed"
+    ) {
+      skipItem = true;
+    }
+    if (skipItem) {
+      continue;
     }
 
     const span = scheduleSpan(start, duration);
@@ -1009,7 +1280,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       last.type === "nap"
         ? 45
         : last.type === "activity" && isLengthenablePackedActivity(last)
-          ? 45
+          ? minRealisticActivityDuration(last, plan)
           : 20;
     const shortenedEnd = Math.max(lastStart + minDuration, latestItemEnd);
     if (shortenedEnd < parseTimeToMinutes(last.endTime)) {
@@ -1026,10 +1297,24 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       continue;
     }
 
-    // Last resort: force-trim the final stop to the dinner boundary (never extend).
+    // Last resort: drop a too-short paid stop rather than compressing it to a stub.
     const lastEnd = parseTimeToMinutes(last.endTime);
+    if (
+      last.type === "activity" &&
+      isLengthenablePackedActivity(last) &&
+      canDropToProtectDuration(last, plan) &&
+      latestItemEnd - lastStart < minRealisticActivityDuration(last, plan)
+    ) {
+      result.pop();
+      cursor =
+        result.length > 0 ? parseTimeToMinutes(result[result.length - 1].endTime) : 8 * 60;
+      continue;
+    }
     if (latestItemEnd > lastStart && latestItemEnd < lastEnd) {
-      const trimmed = scheduleSpan(lastStart, Math.max(15, latestItemEnd - lastStart));
+      const keep = isLengthenablePackedActivity(last)
+        ? minRealisticActivityDuration(last, plan)
+        : 20;
+      const trimmed = scheduleSpan(lastStart, Math.max(keep, latestItemEnd - lastStart));
       result[lastIdx] = { ...last, time: trimmed.time, endTime: trimmed.endTime };
       cursor = parseTimeToMinutes(trimmed.endTime);
     }
@@ -1056,7 +1341,10 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
         const lastStart = parseTimeToMinutes(last.time);
         const lastEnd = parseTimeToMinutes(last.endTime);
         if (latestItemEnd > lastStart && latestItemEnd < lastEnd) {
-          const trimmed = scheduleSpan(lastStart, Math.max(15, latestItemEnd - lastStart));
+          const keep = isLengthenablePackedActivity(last)
+            ? minRealisticActivityDuration(last, plan)
+            : 20;
+          const trimmed = scheduleSpan(lastStart, Math.max(keep, latestItemEnd - lastStart));
           result[lastIdx] = { ...last, time: trimmed.time, endTime: trimmed.endTime };
           cursor = parseTimeToMinutes(trimmed.endTime);
         }
@@ -1087,7 +1375,51 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
     endCursor = groceryEnd + groceryDinnerGap;
   }
 
-  let dinnerStart = Math.max(dinnerMin, Math.min(endCursor, latestDinnerStart));
+  const lastScheduled = result[result.length - 1];
+  const lastOutEnd =
+    lastScheduled != null ? parseTimeToMinutes(lastScheduled.endTime) : endCursor;
+  const dinnerAtStay = dinnerItems.some(
+    (d) =>
+      COOK_DINNER.test(d.title) ||
+      /takeout|delivery|cook dinner|dinner at your (rental|stay|airbnb|accommodation)/i.test(
+        d.title,
+      ),
+  );
+  let dinnerStart =
+    plan.travelStyle === "packed"
+      ? Math.max(dinnerMin, Math.min(endCursor, latestDinnerStart))
+      : dinnerStartFromRhythm(
+          plan,
+          lastOutEnd,
+          dinnerAtStay ? 0 : eveningTravel,
+          dinnerTimeWindow(plan),
+        );
+
+  if (
+    plan.travelStyle !== "packed" &&
+    lastScheduled &&
+    lastScheduled.type !== "rest" &&
+    lastScheduled.type !== "nap" &&
+    lastScheduled.slotKind !== "afternoon_rest" &&
+    lastScheduled.slotKind !== "return_home" &&
+    preferReturnHomeBeforeDinner(plan, lastOutEnd, dinnerStart, eveningTravel)
+  ) {
+    const restStart = lastOutEnd + eveningTravel;
+    const leaveForDinner = dinnerAtStay ? dinnerStart : dinnerStart - eveningTravel;
+    if (leaveForDinner - restStart >= 30) {
+      result.push(
+        stayDowntimeItem(
+          undefined,
+          restStart,
+          leaveForDinner - restStart,
+          "Free time at your accommodation",
+          "Head back to the stay rather than waiting at a restaurant before dinner.",
+          "return_home",
+        ),
+      );
+      endCursor = leaveForDinner;
+    }
+  }
 
   const dinnerSpan = scheduleSpan(dinnerStart, dinnerDuration);
   const anchoredDinners = dinnerItems.map((d) => ({
