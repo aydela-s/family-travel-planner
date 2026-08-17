@@ -494,6 +494,131 @@ export function repairUncoveredSelectedInterests(
   return next;
 }
 
+/**
+ * HARD RULE: the same attraction must not appear on two days. If enrich kept
+ * an old title after swapping the pin — or the planner reused a venue — align
+ * the title to the unique location, or replace/drop the later copy.
+ */
+export function repairReusedVenues(
+  days: ItineraryDay[],
+  plan: TripPlan,
+  city: CityConfig,
+): ItineraryDay[] {
+  const usedNames = new Set<string>();
+  const usedKeys = new Set<string>();
+  const normalize = (value: string) => value.replace(/\s+area$/i, "").trim().toLowerCase();
+
+  const keysOf = (activity: ItineraryActivity): string[] => {
+    const keys: string[] = [];
+    if (activity.location?.name) keys.push(normalize(activity.location.name));
+    const titled = extractLandmarkFromTitle(activity.title);
+    if (titled) keys.push(normalize(titled));
+    return keys.filter(Boolean);
+  };
+
+  const applyReplacement = (
+    activity: ItineraryActivity,
+    replacement: Landmark,
+  ): ItineraryActivity => ({
+    ...activity,
+    title: suggestActivityTitle(
+      replacement.name,
+      plan,
+      activity.timeOfDay === "morning" ? "morning" : "afternoon",
+      replacement.interestTags,
+    ),
+    location: { name: replacement.name, lat: replacement.lat, lng: replacement.lng },
+    placeId: replacement.placeId,
+    rating: replacement.rating,
+    reviewCount: replacement.reviewCount,
+    interestTags: replacement.interestTags,
+    landmarkIntensity: replacement.intensity,
+    activityCost: familyActivityCost(replacement, plan.adults, plan.children),
+  });
+
+  return days.map((day) => {
+    const takenCategories = new Set<string>();
+    const dayStops: Landmark[] = [];
+    const activities: ItineraryActivity[] = [];
+
+    for (const raw of day.activities) {
+      if (raw.type !== "activity" || isUnpaidTimelineActivity(raw) || isGroceryActivityLike(raw)) {
+        activities.push(raw);
+        continue;
+      }
+      if (!raw.interestTags?.length && !raw.location?.name) {
+        activities.push(raw);
+        continue;
+      }
+
+      const locKey = raw.location?.name ? normalize(raw.location.name) : "";
+      const titleKey = extractLandmarkFromTitle(raw.title);
+      const titleNorm = titleKey ? normalize(titleKey) : "";
+
+      if (locKey && !usedKeys.has(locKey)) {
+        if (titleNorm && titleNorm !== locKey) {
+          activities.push({
+            ...raw,
+            title: suggestActivityTitle(
+              raw.location!.name,
+              plan,
+              raw.timeOfDay === "morning" ? "morning" : "afternoon",
+              raw.interestTags,
+            ),
+          });
+        } else {
+          activities.push(raw);
+        }
+        usedKeys.add(locKey);
+        usedNames.add(raw.location!.name);
+        for (const c of categoriesForActivity(raw)) takenCategories.add(c);
+        dayStops.push(activityAsLandmark(raw));
+        continue;
+      }
+
+      const reused = keysOf(raw).some((key) => usedKeys.has(key));
+      if (!reused) {
+        for (const key of keysOf(raw)) usedKeys.add(key);
+        if (raw.location?.name) usedNames.add(raw.location.name);
+        for (const c of categoriesForActivity(raw)) takenCategories.add(c);
+        dayStops.push(activityAsLandmark(raw));
+        activities.push(raw);
+        continue;
+      }
+
+      const replacement =
+        findReplacementLandmark(city, plan, {
+          takenCategories,
+          usedNames,
+          dayStops,
+          preferTags: raw.interestTags ?? [...interestTagsFromPlan(plan.interests)],
+        }) ??
+        city.landmarks.find(
+          (l) =>
+            !usedNames.has(l.name) &&
+            !usedKeys.has(normalize(l.name)) &&
+            (raw.interestTags ?? []).some((t) => l.interestTags.includes(t)),
+        ) ??
+        city.landmarks.find(
+          (l) => !usedNames.has(l.name) && !usedKeys.has(normalize(l.name)),
+        );
+      if (!replacement) continue;
+
+      usedNames.add(replacement.name);
+      usedKeys.add(normalize(replacement.name));
+      for (const c of dayActivityCategories(replacement)) takenCategories.add(c);
+      dayStops.push(replacement);
+      activities.push(applyReplacement(raw, replacement));
+    }
+
+    return { ...day, activities };
+  });
+}
+
+function isGroceryActivityLike(activity: ItineraryActivity): boolean {
+  return /grocery|supermarket|stock your rental/i.test(activity.title);
+}
+
 function findReplacementLandmark(
   city: CityConfig,
   plan: TripPlan,

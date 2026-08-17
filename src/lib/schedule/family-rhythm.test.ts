@@ -220,7 +220,7 @@ describe("nap end is not an automatic activity start", () => {
       );
     }
     const downtime = scheduled.find((a) => /free time at your accommodation/i.test(a.title));
-    expect(downtime).toBeTruthy();
+    expect(downtime).toBeUndefined();
   });
 
   it("can schedule only one afternoon activity on a balanced day", () => {
@@ -354,6 +354,51 @@ describe("dinner timing and unused time", () => {
     expect(parseTimeToMinutes(dinner.time)).toBeGreaterThanOrEqual(17 * 60);
   });
 
+  it("starts dinner when the family arrives after the afternoon outing", () => {
+    const scheduled = rescheduleActivitiesWithMealAnchors(
+      [
+        {
+          time: "10:00",
+          title: "Explore the science museum",
+          type: "activity" as const,
+          slotKind: "morning_activity" as const,
+          interestTags: ["museums" as const],
+        },
+        {
+          time: "11:45",
+          title: "Takeout or delivery lunch at your stay",
+          type: "meal" as const,
+          slotKind: "lunch" as const,
+        },
+        {
+          time: "12:30",
+          title: "Nap & Quiet Time",
+          type: "nap" as const,
+        },
+        {
+          time: "15:30",
+          title: "Play at the splash pad",
+          type: "activity" as const,
+          slotKind: "afternoon_activity" as const,
+          interestTags: ["playgrounds" as const],
+        },
+        {
+          time: "18:00",
+          title: "Dinner at a restaurant",
+          type: "meal" as const,
+          slotKind: "dinner" as const,
+        },
+      ],
+      plan(),
+    );
+    const afternoon = scheduled.find((a) => a.slotKind === "afternoon_activity")!;
+    const dinner = scheduled.find((a) => a.slotKind === "dinner")!;
+    const gap =
+      parseTimeToMinutes(dinner.time) - parseTimeToMinutes(afternoon.endTime!);
+    expect(gap).toBeGreaterThan(0);
+    expect(gap).toBeLessThanOrEqual(45);
+  });
+
   it("can return the family to the accommodation before dinner", () => {
     expect(
       preferReturnHomeBeforeDinner(plan(), 15 * 60 + 45, 18 * 60, 15),
@@ -396,7 +441,13 @@ describe("dinner timing and unused time", () => {
       plan(),
     );
     const home = scheduled.filter((a) => /free time at your accommodation/i.test(a.title));
-    expect(home.length).toBeGreaterThan(0);
+    expect(home).toEqual([]);
+    const afternoon = scheduled.find((a) => a.slotKind === "afternoon_activity");
+    const dinner = scheduled.find((a) => a.slotKind === "dinner");
+    expect(afternoon && dinner).toBeTruthy();
+    expect(
+      parseTimeToMinutes(dinner!.time) - parseTimeToMinutes(afternoon!.endTime!),
+    ).toBeGreaterThan(0);
   });
 
   it("treats delivery at the stay as a valid dinner pattern", () => {

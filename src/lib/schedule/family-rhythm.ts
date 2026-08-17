@@ -12,7 +12,6 @@ import {
   isGroceryTitle,
   isUnpaidTimelineActivity,
   itemDurationMin,
-  MEAL_DURATION_MIN,
   minutesToTime,
 } from "@/lib/schedule/timeline";
 import type { LandmarkInterestTag } from "@/config/city-pricing";
@@ -239,18 +238,22 @@ export function preferReturnHomeBeforeDinner(
   return idleAtRestaurant >= 45;
 }
 
-/** Dinner belongs in the meal window — not at whatever time the last stop ended. */
+/** Dinner starts when the family arrives — not at a fixed 6:00 if they got there earlier. */
+export function dinnerStartOnArrival(
+  arrivalMin: number,
+  dinnerWindow: { minMin: number; maxMin: number },
+): number {
+  return Math.max(dinnerWindow.minMin, arrivalMin);
+}
+
+/** Dinner belongs in the meal window, starting when the family can actually sit down. */
 export function dinnerStartFromRhythm(
-  plan: TripPlan,
+  _plan: TripPlan,
   lastOutEndMin: number,
   travelMin: number,
   dinnerWindow: { minMin: number; maxMin: number; defaultMin: number },
 ): number {
-  const latestStart = dinnerWindow.maxMin - MEAL_DURATION_MIN;
-  const afterLast = lastOutEndMin + travelMin;
-  // Never pull dinner earlier than the window just to occupy idle time.
-  const start = Math.max(dinnerWindow.defaultMin, dinnerWindow.minMin, afterLast);
-  return Math.min(start, latestStart);
+  return dinnerStartOnArrival(lastOutEndMin + travelMin, dinnerWindow);
 }
 
 export function earliestLeaveAfterNap(plan: TripPlan, napEndMin: number): number {

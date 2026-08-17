@@ -22,6 +22,15 @@ export function snapMinutes(
   return Math.round(totalMinutes / step) * step;
 }
 
+/** Round later, never earlier — a 6-minute taxi at 12:00 displays as 12:00–12:15. */
+export function snapMinutesUp(
+  totalMinutes: number,
+  step: number = TIME_SNAP_MINUTES,
+): number {
+  if (step <= 1) return Math.ceil(totalMinutes);
+  return Math.ceil(totalMinutes / step) * step;
+}
+
 /** Format a clock time without snapping (use after start has already been snapped). */
 export function formatClockMinutes(totalMinutes: number): string {
   const clamped = Math.max(6 * 60, Math.min(22 * 60, Math.round(totalMinutes)));
@@ -49,6 +58,24 @@ export function scheduleSpan(
   if (end <= start) {
     end = start + TIME_SNAP_MINUTES;
   }
+  return {
+    time: formatClockMinutes(start),
+    endTime: formatClockMinutes(end),
+  };
+}
+
+/**
+ * Travel rows round the end *up* so a short ride never collapses to 12:00–12:00
+ * and never shows :06 / :07.
+ */
+export function travelSpan(
+  startMin: number,
+  durationMin: number,
+): { time: string; endTime: string } {
+  const start = snapMinutes(startMin);
+  const rawEnd = start + Math.max(1, durationMin);
+  let end = snapMinutesUp(rawEnd);
+  if (end <= start) end = start + TIME_SNAP_MINUTES;
   return {
     time: formatClockMinutes(start),
     endTime: formatClockMinutes(end),

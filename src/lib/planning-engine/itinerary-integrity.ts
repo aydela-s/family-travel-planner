@@ -2,19 +2,29 @@ import type { CityConfig } from "@/config/city-pricing";
 import { parseDietaryTags } from "@/lib/planning-engine/dietary";
 import { dietaryCheckNote } from "@/lib/planning-engine/staged/meal-planner";
 import {
+  repairReusedVenues,
   repairUncoveredSelectedInterests,
   scheduledAttractions,
   validateItinerary,
   type ItineraryViolation,
 } from "@/lib/planning-engine/validate-itinerary";
+import { dinnerTimeWindow } from "@/lib/planning-engine/meal-timing";
 import { costsFromDisplayedItems } from "@/lib/pricing/budget";
-import { namesMatch } from "@/lib/pricing/transport-planner";
+import { isStayLikeStop, namesMatch } from "@/lib/pricing/transport-planner";
 import {
+  dinnerStartOnArrival,
   isPaidAttraction,
   minRealisticActivityDuration,
 } from "@/lib/schedule/family-rhythm";
 import { validateDaySchedule } from "@/lib/schedule/schedule-invariants";
-import { isUnpaidTimelineActivity, parseTimeToMinutes } from "@/lib/schedule/timeline";
+import {
+  formatClockMinutes,
+  isUnpaidTimelineActivity,
+  MEAL_DURATION_MIN,
+  parseTimeToMinutes,
+  scheduleSpan,
+  travelSpan,
+} from "@/lib/schedule/timeline";
 import type { ItineraryActivity, ItineraryDay } from "@/types/itinerary";
 import type { TripPlan } from "@/types/trip-plan";
 
@@ -120,7 +130,7 @@ export function validateRealisticDurations(
       });
       continue;
     }
-    if (dur === 0 && a.type !== "travel") {
+    if (dur === 0) {
       out.push({
         code: "zero_duration",
         message: `"${a.title}" has zero duration.`,
@@ -253,30 +263,158 @@ export function validateItineraryIntegrity(
   return out;
 }
 
-function repairTransport(activities: ItineraryActivity[]): ItineraryActivity[] {
+function travelDurationMin(travel: ItineraryActivity): number {
+  const start = parseTimeToMinutes(travel.time);
+  const end = travel.endTime ? parseTimeToMinutes(travel.endTime) : start;
+  if (end > start) return end - start;
+  const noted = travel.notes?.match(/~(\d+)\s*min/);
+  if (noted) return Math.max(1, Number(noted[1]));
+  return 5;
+}
+
+function stopName(activity: ItineraryActivity): string {
+  return activity.location?.name ?? activity.title;
+}
+
+/**
+ * Keep at most one taxi between two real stops. Same-place hops are dropped.
+ * Leftover taxis to a removed venue are rewritten to the actual next stop and
+ * timed from the previous end (or to arrive, when leaving a stay-like stop).
+ */
+function isDinnerStop(activity: ItineraryActivity): boolean {
+  return activity.slotKind === "dinner" || /^dinner\b/i.test(activity.title);
+}
+
+function placeDinnerAtArrival(
+  dinner: ItineraryActivity,
+  arrivalMin: number,
+  plan: TripPlan,
+): ItineraryActivity {
+  const start = dinnerStartOnArrival(arrivalMin, dinnerTimeWindow(plan));
+  const currentDur = Math.max(
+    MEAL_DURATION_MIN,
+    parseTimeToMinutes(dinner.endTime ?? dinner.time) - parseTimeToMinutes(dinner.time),
+  );
+  const span = scheduleSpan(start, currentDur);
+  return { ...dinner, time: span.time, endTime: span.endTime };
+}
+
+function repairTransport(activities: ItineraryActivity[], plan: TripPlan): ItineraryActivity[] {
   const out: ItineraryActivity[] = [];
-  for (let i = 0; i < activities.length; i++) {
+  let i = 0;
+  while (i < activities.length) {
     const item = activities[i]!;
-    if (item.type !== "travel") {
+    if (item.type === "travel") {
+      i += 1;
+      continue;
+    }
+    const prevOut = out[out.length - 1];
+    if (
+      prevOut?.type === "travel" &&
+      isDinnerStop(item) &&
+      namesMatch(destinationFromTitle(prevOut.title), stopName(item))
+    ) {
+      out.push(
+        placeDinnerAtArrival(item, parseTimeToMinutes(prevOut.endTime ?? prevOut.time), plan),
+      );
+    } else {
       out.push(item);
+    }
+
+    const travels: ItineraryActivity[] = [];
+    let j = i + 1;
+    while (j < activities.length && activities[j]!.type === "travel") {
+      travels.push(activities[j]!);
+      j += 1;
+    }
+    const next = j < activities.length ? activities[j]! : undefined;
+    if (!next) {
+      i = j;
       continue;
     }
-    const next = nextNonTravel(activities, i);
-    if (!next) continue;
-    const nextName = next.location?.name ?? next.title;
-    const dest = destinationFromTitle(item.title);
-    if (nextName && dest && !namesMatch(dest, nextName)) {
-      const verb = item.title.match(/^(Taxi|Drive|Transit|Walk|Travel)/i)?.[1] ?? "Travel";
+
+    const fromName = stopName(item);
+    const toName = stopName(next);
+    if (namesMatch(fromName, toName)) {
+      i = j;
+      continue;
+    }
+
+    const matching = travels.find((t) =>
+      namesMatch(destinationFromTitle(t.title), toName),
+    );
+    const chosen = matching ?? travels[0];
+    if (chosen) {
+      const verb = chosen.title.match(/^(Taxi|Drive|Transit|Walk|Travel)/i)?.[1] ?? "Travel";
+      const destName = next.location?.name ?? destinationFromTitle(chosen.title) ?? toName;
+      const driveMin = Math.max(1, travelDurationMin(chosen));
+      const afterCurrent = parseTimeToMinutes(item.endTime ?? item.time);
+      const nextStart = parseTimeToMinutes(next.time);
+      const startMin = isStayLikeStop(item)
+        ? Math.max(afterCurrent, nextStart - driveMin)
+        : afterCurrent;
+      const span = travelSpan(startMin, driveMin);
       out.push({
-        ...item,
-        title: `${verb} to ${nextName}`,
-        location: next.location ?? item.location,
+        ...chosen,
+        title: `${verb} to ${destName}`,
+        time: span.time,
+        endTime: span.endTime,
+        location: next.location ?? chosen.location,
       });
-      continue;
     }
-    out.push(item);
+    i = j;
   }
   return out;
+}
+
+function dropVisibleStayFiller(activities: ItineraryActivity[]): ItineraryActivity[] {
+  return activities.filter(
+    (a) => !/free time at your accommodation/i.test(a.title),
+  );
+}
+
+function shiftClock(activity: ItineraryActivity, deltaMin: number): ItineraryActivity {
+  const start = parseTimeToMinutes(activity.time) + deltaMin;
+  const rawEnd = parseTimeToMinutes(activity.endTime ?? activity.time) + deltaMin;
+  return {
+    ...activity,
+    time: formatClockMinutes(start),
+    endTime: formatClockMinutes(Math.max(rawEnd, start + 1)),
+  };
+}
+
+function repairZeroDurations(
+  activities: ItineraryActivity[],
+  plan: TripPlan,
+): ItineraryActivity[] {
+  const items = activities.map((a) => ({ ...a }));
+  for (let i = 0; i < items.length; i++) {
+    const current = items[i]!;
+    const start = parseTimeToMinutes(current.time);
+    const end = current.endTime ? parseTimeToMinutes(current.endTime) : start;
+    if (end <= start) {
+      const minDur = current.type === "travel" ? Math.max(1, travelDurationMin(current)) : 15;
+      const span = current.type === "travel" ? travelSpan(start, minDur) : scheduleSpan(start, minDur);
+      items[i] = { ...current, time: span.time, endTime: span.endTime };
+    }
+    if (items[i]!.type !== "travel") continue;
+    const travelEnd = parseTimeToMinutes(items[i]!.endTime ?? items[i]!.time);
+    const next = items[i + 1];
+    if (!next || next.type === "nap") continue;
+    if (isDinnerStop(next)) {
+      items[i + 1] = placeDinnerAtArrival(next, travelEnd, plan);
+      continue;
+    }
+    const nextStart = parseTimeToMinutes(next.time);
+    if (travelEnd <= nextStart) continue;
+    const delta = travelEnd - nextStart;
+    for (let j = i + 1; j < items.length; j++) {
+      const hold = items[j]!;
+      if (hold.type === "nap" || isDinnerStop(hold)) break;
+      items[j] = shiftClock(hold, delta);
+    }
+  }
+  return items;
 }
 
 function repairTaxiCosts(
@@ -425,14 +563,21 @@ export function repairItineraryIntegrity(
   plan: TripPlan,
   city: CityConfig,
 ): { days: ItineraryDay[]; violations: IntegrityViolation[] } {
-  let next = repairUncoveredSelectedInterests(days, plan, city).map((day) => {
-    let activities = repairTransport(day.activities);
+  let next = repairReusedVenues(
+    repairUncoveredSelectedInterests(days, plan, city),
+    plan,
+    city,
+  ).map((day) => {
+    let activities = dropVisibleStayFiller(day.activities);
+    activities = repairTransport(activities, plan);
+    activities = repairZeroDurations(activities, plan);
     activities = repairTaxiCosts(activities, plan, day);
     const beforeDrop = activities;
     activities = dropUnrealisticAttractions(activities, plan);
     activities = reanchorStrandedStops(beforeDrop, activities);
     activities = restoreDietaryNotes(activities, plan);
-    activities = repairTransport(activities);
+    activities = repairTransport(activities, plan);
+    activities = repairZeroDurations(activities, plan);
     return applyCosts({ ...day, activities });
   });
 

@@ -9,6 +9,7 @@ import {
 } from "@/lib/planning-engine/itinerary-integrity";
 import { costsFromDisplayedItems } from "@/lib/pricing/budget";
 import { namesMatch } from "@/lib/pricing/transport-planner";
+import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import type { ItineraryActivity, ItineraryDay } from "@/types/itinerary";
 import type { TripPlan } from "@/types/trip-plan";
 
@@ -337,5 +338,258 @@ describe("duration and dietary integrity", () => {
     const dinner = days[0]!.activities.find((a) => a.type === "meal")!;
     expect(dinner.dietaryFit).toBe("options");
     expect(dinner.notes).toMatch(/vegan/i);
+  });
+});
+
+describe("timeline integrity repairs", () => {
+  it("drops visible free-time cards at the stay", () => {
+    const { days } = repairItineraryIntegrity(
+      [
+        day([
+          activity({
+            time: "14:00",
+            endTime: "15:30",
+            title: "Free time at your accommodation",
+            type: "rest",
+            location: { name: "Your stay", lat: 1, lng: 1 },
+          }),
+          activity({
+            time: "18:00",
+            endTime: "19:00",
+            title: "Dinner at Green Table",
+            type: "meal",
+            activityCost: 80,
+            dietaryFit: "options",
+          }),
+        ]),
+      ],
+      plan({ interests: [] }),
+      city,
+    );
+    expect(
+      days[0]!.activities.some((a) => /free time at your accommodation/i.test(a.title)),
+    ).toBe(false);
+  });
+
+  it("never leaves a 12:00–12:00 stop; overlapping lunch moves later", () => {
+    const { days } = repairItineraryIntegrity(
+      [
+        day([
+          activity({
+            time: "10:00",
+            endTime: "12:00",
+            title: "Explore Science Museum",
+            type: "activity",
+            location: { name: "Science Museum", lat: 1, lng: 1 },
+            interestTags: ["museums"],
+          }),
+          activity({
+            time: "12:00",
+            endTime: "12:00",
+            title: "Taxi to 2334 Hardwick St",
+            type: "travel",
+            activityCost: 9,
+            notes: "2.2 mi · ~6 min driving",
+            location: { name: "2334 Hardwick St", lat: 3, lng: 3 },
+          }),
+          activity({
+            time: "12:00",
+            endTime: "12:30",
+            title: "Takeout or delivery lunch at your stay",
+            type: "meal",
+            location: { name: "2334 Hardwick St", lat: 3, lng: 3 },
+            activityCost: 16,
+          }),
+        ]),
+      ],
+      plan({ interests: [] }),
+      city,
+    );
+    for (const a of days[0]!.activities) {
+      const start = parseTimeToMinutes(a.time);
+      const end = parseTimeToMinutes(a.endTime ?? a.time);
+      expect(end, a.title).toBeGreaterThan(start);
+    }
+    const taxi = days[0]!.activities.find((a) => a.type === "travel")!;
+    const lunch = days[0]!.activities.find((a) => a.type === "meal")!;
+    expect(taxi.time).toBe("12:00");
+    expect(taxi.endTime).toBe("12:15");
+    expect(parseTimeToMinutes(lunch.time)).toBeGreaterThanOrEqual(
+      parseTimeToMinutes(taxi.endTime!),
+    );
+  });
+
+  it("starts the dinner taxi when the afternoon outing ends, not 45 minutes later", () => {
+    const { days } = repairItineraryIntegrity(
+      [
+        day([
+          activity({
+            time: "15:30",
+            endTime: "17:00",
+            title: "Family time at Kids Empire",
+            type: "activity",
+            location: { name: "Kids Empire", lat: 1, lng: 1 },
+            interestTags: ["indoor-play"],
+            activityCost: 40,
+          }),
+          activity({
+            time: "17:45",
+            endTime: "18:00",
+            title: "Taxi to Vegan Food House",
+            type: "travel",
+            activityCost: 9,
+            notes: "2.6 mi · ~6 min driving",
+            location: { name: "Vegan Food House", lat: 2, lng: 2 },
+          }),
+          activity({
+            time: "18:00",
+            endTime: "19:00",
+            title: "Dinner at Vegan Food House",
+            type: "meal",
+            location: { name: "Vegan Food House", lat: 2, lng: 2 },
+            activityCost: 65,
+            dietaryFit: "options",
+            notes: "vegan options — check the current menu",
+          }),
+        ]),
+      ],
+      plan(),
+      city,
+    );
+    const taxi = days[0]!.activities.find((a) => a.type === "travel")!;
+    const dinner = days[0]!.activities.find((a) => /^dinner\b/i.test(a.title))!;
+    expect(taxi.time).toBe("17:00");
+    expect(taxi.endTime).toBe("17:15");
+    expect(dinner.time).toBe("17:15");
+  });
+
+  it("drops a phantom taxi from breakfast-near-X to the same venue", () => {
+    const { days } = repairItineraryIntegrity(
+      [
+        day([
+          activity({
+            time: "09:15",
+            endTime: "10:00",
+            title: "Breakfast near Science Museum",
+            type: "meal",
+            location: { name: "Science Museum area", lat: 1, lng: 1 },
+            activityCost: 16,
+          }),
+          activity({
+            time: "10:00",
+            endTime: "10:00",
+            title: "Taxi to Illusion Museum",
+            type: "travel",
+            activityCost: 0,
+            location: { name: "Illusion Museum", lat: 2, lng: 2 },
+          }),
+          activity({
+            time: "10:00",
+            endTime: "12:00",
+            title: "Explore Science Museum",
+            type: "activity",
+            location: { name: "Science Museum", lat: 1, lng: 1 },
+            interestTags: ["museums"],
+            activityCost: 40,
+          }),
+        ]),
+      ],
+      plan({ interests: [] }),
+      city,
+    );
+    expect(days[0]!.activities.filter((a) => a.type === "travel")).toHaveLength(0);
+  });
+
+  it("collapses two taxis to the same dinner into one ride", () => {
+    const { days } = repairItineraryIntegrity(
+      [
+        day([
+          activity({
+            time: "12:30",
+            endTime: "14:00",
+            title: "Nap & Quiet Time",
+            type: "nap",
+            location: { name: "Your stay", lat: 1, lng: 1 },
+          }),
+          activity({
+            time: "15:30",
+            endTime: "15:30",
+            title: "Taxi to True Food Kitchen",
+            type: "travel",
+            activityCost: 32,
+            notes: "~20 min driving",
+            location: { name: "True Food Kitchen", lat: 2, lng: 2 },
+          }),
+          activity({
+            time: "17:30",
+            endTime: "18:00",
+            title: "Taxi to True Food Kitchen",
+            type: "travel",
+            activityCost: 16,
+            notes: "~17 min driving",
+            location: { name: "True Food Kitchen", lat: 2, lng: 2 },
+          }),
+          activity({
+            time: "18:00",
+            endTime: "19:00",
+            title: "Dinner at True Food Kitchen",
+            type: "meal",
+            location: { name: "True Food Kitchen", lat: 2, lng: 2 },
+            activityCost: 65,
+            dietaryFit: "options",
+            notes: "vegan options",
+          }),
+        ]),
+      ],
+      plan({ interests: [] }),
+      city,
+    );
+    const taxis = days[0]!.activities.filter((a) => a.type === "travel");
+    expect(taxis).toHaveLength(1);
+    expect(taxis[0]!.title).toMatch(/True Food Kitchen/i);
+    expect(parseTimeToMinutes(taxis[0]!.endTime!)).toBeGreaterThan(
+      parseTimeToMinutes(taxis[0]!.time),
+    );
+  });
+
+  it("aligns a reused venue title to its unique location, or replaces a second copy", () => {
+    const first = city.landmarks.find((l) => l.interestTags.includes("museums")) ?? city.landmarks[0]!;
+    const second =
+      city.landmarks.find(
+        (l) => l.name !== first.name && l.interestTags.includes("museums"),
+      ) ?? city.landmarks.find((l) => l.name !== first.name)!;
+    const d1 = day([
+      activity({
+        time: "10:00",
+        endTime: "12:00",
+        title: `Explore ${first.name}`,
+        type: "activity",
+        location: { name: first.name, lat: first.lat, lng: first.lng },
+        interestTags: first.interestTags,
+        activityCost: 40,
+      }),
+    ]);
+    const d2 = day(
+      [
+        activity({
+          time: "10:00",
+          endTime: "12:00",
+          title: `Explore ${first.name}`,
+          type: "activity",
+          location: { name: second.name, lat: second.lat, lng: second.lng },
+          interestTags: second.interestTags,
+          activityCost: 40,
+        }),
+      ],
+      { day: 2, date: "2026-09-16" },
+    );
+    const { days } = repairItineraryIntegrity([d1, d2], plan(), city);
+    const morning1 = days[0]!.activities.find((a) => a.type === "activity")!;
+    const morning2 = days[1]!.activities.find((a) => a.type === "activity")!;
+    expect(morning1.title).toMatch(new RegExp(first.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
+    expect(morning2.title).not.toMatch(
+      new RegExp(`Explore ${first.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+    );
+    expect(morning2.location?.name).not.toBe(first.name);
   });
 });

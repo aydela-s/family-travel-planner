@@ -1,6 +1,15 @@
 import { CityConfig } from "@/config/city-pricing";
 import { formatMiles } from "@/lib/format-distance";
-import { minutesToTime, parseTimeToMinutes } from "@/lib/schedule/timeline";
+import { dinnerTimeWindow } from "@/lib/planning-engine/meal-timing";
+import { dinnerStartOnArrival } from "@/lib/schedule/family-rhythm";
+import {
+  formatClockMinutes,
+  MEAL_DURATION_MIN,
+  minutesToTime,
+  parseTimeToMinutes,
+  scheduleSpan,
+  travelSpan,
+} from "@/lib/schedule/timeline";
 import { TripPlan } from "@/types/trip-plan";
 import type { ItineraryActivity, RouteSegment } from "@/types/itinerary";
 
@@ -212,6 +221,64 @@ function travelTimeLabel(plan: TripPlan): string {
  * When route segments bookend the day with the stay (stay → first, last → stay),
  * those legs are inserted even though the stay is not a timeline activity.
  */
+export function isStayLikeStop(activity: ItineraryActivity): boolean {
+  if (activity.type === "nap" || activity.type === "rest") return true;
+  return /\b(takeout or delivery lunch at your stay|cook dinner at your rental|hotel breakfast|packed breakfast)\b/i.test(
+    activity.title,
+  );
+}
+
+function isDinnerStop(activity: ItineraryActivity): boolean {
+  return activity.slotKind === "dinner" || /^dinner\b/i.test(activity.title);
+}
+
+function placeDinnerAtArrival(dinner: ItineraryActivity, arrivalMin: number, plan: TripPlan): ItineraryActivity {
+  const start = dinnerStartOnArrival(arrivalMin, dinnerTimeWindow(plan));
+  const currentDur = Math.max(
+    MEAL_DURATION_MIN,
+    parseTimeToMinutes(dinner.endTime ?? dinner.time) - parseTimeToMinutes(dinner.time),
+  );
+  const span = scheduleSpan(start, currentDur);
+  return { ...dinner, time: span.time, endTime: span.endTime };
+}
+
+function shouldHoldClock(activity: ItineraryActivity): boolean {
+  return (
+    activity.type === "nap" ||
+    activity.slotKind === "dinner" ||
+    /^dinner\b/i.test(activity.title)
+  );
+}
+
+function shiftActivityClock(activity: ItineraryActivity, deltaMin: number): ItineraryActivity {
+  const start = parseTimeToMinutes(activity.time) + deltaMin;
+  const rawEnd = parseTimeToMinutes(activity.endTime ?? activity.time) + deltaMin;
+  return {
+    ...activity,
+    time: formatClockMinutes(start),
+    endTime: formatClockMinutes(Math.max(rawEnd, start + 1)),
+  };
+}
+
+function findHop(
+  segments: RouteSegment[],
+  fromName: string,
+  toName: string,
+): RouteSegment | undefined {
+  return segments.find(
+    (s) =>
+      namesMatch(s.from, fromName) &&
+      namesMatch(s.to, toName) &&
+      (s.distanceKm > 0 || s.cost > 0),
+  );
+}
+
+/**
+ * Insert travel between located stops by matching the actual previous→next
+ * venues — never by leftover segment index. A taxi never has zero duration:
+ * it starts when the family leaves, lasts the driving time, and if that
+ * overlaps the next stop the next stop moves later.
+ */
 export function injectTravelActivities(
   activities: ItineraryActivity[],
   segments: RouteSegment[],
@@ -220,78 +287,85 @@ export function injectTravelActivities(
 ): ItineraryActivity[] {
   if (segments.length === 0) return activities;
 
+  const items = activities.map((a) => ({ ...a }));
   const result: ItineraryActivity[] = [];
-  let segIdx = 0;
 
-  const firstLocated = activities.find((a) => a.location);
-  const firstSeg = segments[0];
-  if (
-    firstLocated &&
-    firstSeg &&
-    firstSeg.to &&
-    firstLocated.location &&
-    namesMatch(firstSeg.to, firstLocated.location.name) &&
-    !namesMatch(firstSeg.from, firstLocated.location.name) &&
-    (firstSeg.distanceKm > 0 || firstSeg.cost > 0)
-  ) {
-    const inboundMin = firstSeg.durationMin + (firstSeg.bufferMin ?? 0);
-    result.push(
-      travelActivity(
-        firstSeg,
-        plan,
-        travelStartForArrival(firstLocated.time, inboundMin),
-        firstLocated,
-      ),
-    );
-    segIdx = 1;
+  const firstLocated = items.find((a) => a.location);
+  const inbound = firstLocated?.location
+    ? segments.find(
+        (s) =>
+          namesMatch(s.to, firstLocated.location!.name) &&
+          !namesMatch(s.from, firstLocated.location!.name) &&
+          (s.distanceKm > 0 || s.cost > 0),
+      )
+    : undefined;
+  if (inbound && firstLocated) {
+    const inboundMin = Math.max(1, inbound.durationMin + (inbound.bufferMin ?? 0));
+    const start = travelStartForArrival(firstLocated.time, inboundMin);
+    const span = travelSpan(parseTimeToMinutes(start), inboundMin);
+    result.push(travelActivity(inbound, plan, span.time, span.endTime, firstLocated));
   }
 
-  for (let i = 0; i < activities.length; i++) {
-    const current = activities[i]!;
+  for (let i = 0; i < items.length; i++) {
+    const current = items[i]!;
     result.push(current);
     if (!current.location) continue;
 
     let nextIdx = i + 1;
-    while (nextIdx < activities.length && !activities[nextIdx]!.location) nextIdx += 1;
-    if (nextIdx >= activities.length) break;
+    while (nextIdx < items.length && !items[nextIdx]!.location) nextIdx += 1;
+    if (nextIdx >= items.length) break;
 
-    const segment = segments[segIdx++];
-    if (!segment) break;
-    if (segment.distanceKm <= 0 && segment.cost <= 0) continue;
+    const next = items[nextIdx]!;
+    if (namesMatch(current.location.name, next.location!.name)) continue;
 
-    const next = activities[nextIdx]!;
-    const inboundMin = segment.durationMin + (segment.bufferMin ?? 0);
-    const travelStart = travelStartForArrival(next.time, inboundMin);
+    const segment = findHop(segments, current.location.name, next.location!.name);
+    if (!segment) continue;
+
+    const driveMin = Math.max(1, segment.durationMin);
     const afterCurrent = parseTimeToMinutes(current.endTime ?? current.time);
-    const startMin = Math.max(afterCurrent, parseTimeToMinutes(travelStart));
-    result.push(travelActivity(segment, plan, minutesToTime(startMin), next));
+    const nextStart = parseTimeToMinutes(next.time);
+    const startMin = isStayLikeStop(current)
+      ? Math.max(afterCurrent, nextStart - driveMin)
+      : afterCurrent;
+    const span = travelSpan(startMin, driveMin);
+    const travelEnd = parseTimeToMinutes(span.endTime);
+    if (isDinnerStop(next) && !isStayLikeStop(current)) {
+      items[nextIdx] = placeDinnerAtArrival(items[nextIdx]!, travelEnd, plan);
+    } else if (travelEnd > nextStart && !shouldHoldClock(next)) {
+      const delta = travelEnd - nextStart;
+      for (let j = nextIdx; j < items.length; j++) {
+        if (shouldHoldClock(items[j]!)) break;
+        items[j] = shiftActivityClock(items[j]!, delta);
+      }
+    }
+    const dest = items[nextIdx]!;
+    result.push(travelActivity(segment, plan, span.time, span.endTime, dest));
   }
 
-  const lastLocated = [...activities].reverse().find((a) => a.location);
-  const remaining = segments.slice(segIdx);
-  const homeLeg = remaining.find(
-    (s) =>
-      lastLocated?.location &&
-      namesMatch(s.from, lastLocated.location.name) &&
-      !namesMatch(s.to, lastLocated.location.name) &&
-      (s.distanceKm > 0 || s.cost > 0),
-  );
-  if (homeLeg && lastLocated) {
-    const end = lastLocated.endTime ?? lastLocated.time;
-    result.push({
-      time: end,
-      endTime: end,
-      title: `${travelVerb(plan, homeLeg)} to ${homeLeg.to}`,
-      type: "travel",
-      timeOfDay: "evening",
-      notes: travelNotes(homeLeg, plan),
-      activityCost: homeLeg.cost,
-      location: {
-        name: homeLeg.to,
-        lat: lastLocated.location!.lat,
-        lng: lastLocated.location!.lng,
-      },
-    });
+  const lastLocated = [...items].reverse().find((a) => a.location);
+  const homeLeg = lastLocated?.location
+    ? segments.find(
+        (s) =>
+          namesMatch(s.from, lastLocated.location!.name) &&
+          !namesMatch(s.to, lastLocated.location!.name) &&
+          (s.distanceKm > 0 || s.cost > 0),
+      )
+    : undefined;
+  if (homeLeg && lastLocated?.location && !namesMatch(lastLocated.location.name, homeLeg.to)) {
+    const startMin = parseTimeToMinutes(lastLocated.endTime ?? lastLocated.time);
+    const driveMin = Math.max(1, homeLeg.durationMin);
+    const span = travelSpan(startMin, driveMin);
+    result.push(
+      travelActivity(homeLeg, plan, span.time, span.endTime, {
+        ...lastLocated,
+        timeOfDay: "evening",
+        location: {
+          name: homeLeg.to,
+          lat: lastLocated.location!.lat,
+          lng: lastLocated.location!.lng,
+        },
+      }),
+    );
   }
 
   return result;
@@ -327,11 +401,15 @@ function travelActivity(
   segment: RouteSegment,
   plan: TripPlan,
   startTime: string,
+  endTime: string,
   next: ItineraryActivity,
 ): ItineraryActivity {
+  const startMin = parseTimeToMinutes(startTime);
+  const requestedEnd = parseTimeToMinutes(endTime);
+  const span = travelSpan(startMin, Math.max(1, requestedEnd - startMin));
   return {
-    time: startTime,
-    endTime: next.time,
+    time: span.time,
+    endTime: span.endTime,
     title: `${travelVerb(plan, segment)} to ${segment.to}`,
     type: "travel",
     timeOfDay: next.timeOfDay,

@@ -36,6 +36,7 @@ import {
   validateEnrichedDay,
 } from "@/lib/schedule/fix-itinerary";
 import { classifyActivities } from "@/lib/schedule/classify-activity";
+import { suggestActivityTitle } from "@/lib/schedule/family-profile";
 import { adultPriceForPlace } from "@/lib/maps/places-city-config";
 import { itemDurationMin, isUnpaidTimelineActivity, parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { adjustmentRevisionKey } from "@/lib/schedule/adjust-day";
@@ -44,6 +45,7 @@ import { familyActivityCost } from "@/lib/pricing/activity-cost";
 import {
   allocateRouteSegmentCosts,
   injectTravelActivities,
+  namesMatch,
 } from "@/lib/pricing/transport-planner";
 import { TripPlan } from "@/types/trip-plan";
 import {
@@ -84,23 +86,31 @@ function pinMealsToNeighborStops(
   };
 
   return activities.map((act, i) => {
-    if (act.type !== "meal" || act.location) return act;
+    if (act.type !== "meal") return act;
     const next = neighbor(i, 1);
     const prev = neighbor(i, -1);
     const anchor = next ?? prev;
-    if (anchor?.location) {
-      return {
-        ...act,
-        location: {
-          name: `${anchor.location.name} area`,
-          lat: anchor.location.lat,
-          lng: anchor.location.lng,
-        },
-        placeId: anchor.placeId,
-      };
+    if (!anchor?.location) {
+      if (!act.location && home) return { ...act, location: home };
+      return act;
     }
-    if (home) return { ...act, location: home };
-    return act;
+    const isAreaMeal =
+      /\bnear\b/i.test(act.title) || / area$/i.test(act.location?.name ?? "");
+    if (act.location && !isAreaMeal) return act;
+    if (act.location && namesMatch(act.location.name, anchor.location.name)) return act;
+    const title = /\bnear\b/i.test(act.title)
+      ? act.title.replace(/\bnear\s+.+$/i, `near ${anchor.location.name}`)
+      : act.title;
+    return {
+      ...act,
+      title,
+      location: {
+        name: `${anchor.location.name} area`,
+        lat: anchor.location.lat,
+        lng: anchor.location.lng,
+      },
+      placeId: anchor.placeId,
+    };
   });
 }
 
@@ -227,7 +237,7 @@ async function enrichDay(
   const date = addDays(plan.startDate, dayIndex);
   const pickedLandmarks: Landmark[] = [];
 
-  const activities: ItineraryActivity[] = rawDay.activities.map((a) => {
+  const activities: ItineraryActivity[] = rawDay.activities.flatMap((a) => {
     const timeOfDay = getTimeOfDay(a.time);
     const act: ItineraryActivity = {
       ...a,
@@ -240,7 +250,7 @@ async function enrichDay(
       act.location = home;
       act.activityCost = 0;
       if (plan.stayPlaceId) act.placeId = plan.stayPlaceId;
-      return act;
+      return [act];
     }
 
     if (a.type === "activity") {
@@ -261,7 +271,7 @@ async function enrichDay(
         };
         act.activityCost = 0;
         if (named?.placeId) act.placeId = named.placeId;
-        return act;
+        return [act];
       }
       // Resolve landmarks from the planned title only — never re-pick a different POI
       // unless that POI was already used on an earlier day (HARD no-reuse rule).
@@ -274,8 +284,14 @@ async function enrichDay(
           (l) =>
             !tripExcludedLandmarks.has(l.name) &&
             l.interestTags.some((t) => (matched!.interestTags ?? []).includes(t)),
-        );
+        ) ?? city.landmarks.find((l) => !tripExcludedLandmarks.has(l.name));
+        if (!replacement) return [];
         matched = replacement;
+        const slot = timeOfDay === "morning" ? "morning" : "afternoon";
+        act.title = alignTitleWithTimeOfDay(
+          suggestActivityTitle(replacement.name, plan, slot, replacement.interestTags),
+          timeOfDay,
+        );
       }
       if (matched) {
         pickedLandmarks.push(matched);
@@ -343,7 +359,7 @@ async function enrichDay(
       act.activityCost = 0;
     }
 
-    return act;
+    return [act];
   });
 
   const home = stayHomeLocation(plan);

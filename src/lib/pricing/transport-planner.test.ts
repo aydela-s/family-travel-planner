@@ -7,8 +7,11 @@ import {
   estimateParkingCost,
   estimateTaxiDailyCost,
   familyTransitRiders,
+  injectTravelActivities,
 } from "@/lib/pricing/transport-planner";
+import { parseTimeToMinutes } from "@/lib/schedule/timeline";
 import { TripPlan } from "@/types/trip-plan";
+import type { ItineraryActivity, RouteSegment } from "@/types/itinerary";
 
 const SAN_DIEGO = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
 
@@ -91,5 +94,103 @@ describe("transport business rules", () => {
         Math.round((segmentA + segmentB) * 100) / 100,
       );
     });
+  });
+});
+
+describe("injectTravelActivities", () => {
+  const taxiPlan = plan({ transportationType: "taxis" });
+
+  function hop(from: string, to: string, durationMin: number, cost: number): RouteSegment {
+    return { from, to, distanceKm: 3, durationMin, cost };
+  }
+
+  it("starts the dinner taxi when the outing ends, not after an idle wait", () => {
+    const activities: ItineraryActivity[] = [
+      {
+        time: "15:30",
+        endTime: "17:00",
+        title: "Family time at Kids Empire",
+        type: "activity",
+        timeOfDay: "afternoon",
+        location: { name: "Kids Empire", lat: 1, lng: 1 },
+      },
+      {
+        time: "18:00",
+        endTime: "19:00",
+        title: "Dinner at Vegan Food House",
+        type: "meal",
+        timeOfDay: "evening",
+        location: { name: "Vegan Food House", lat: 2, lng: 2 },
+      },
+    ];
+    const withTravel = injectTravelActivities(
+      activities,
+      [hop("Kids Empire", "Vegan Food House", 6, 9)],
+      plan({ transportationType: "taxis", children: [4, 6] }),
+    );
+    const taxi = withTravel.find((a) => a.type === "travel")!;
+    const dinner = withTravel.find((a) => a.type === "meal")!;
+    expect(taxi.time).toBe("17:00");
+    expect(taxi.endTime).toBe("17:15");
+    expect(dinner.time).toBe("17:15");
+    expect(taxi.title).toMatch(/Vegan Food House/i);
+  });
+
+  it("never emits a zero-duration taxi; lunch moves later if the ride overlaps", () => {
+    const activities: ItineraryActivity[] = [
+      {
+        time: "10:00",
+        endTime: "12:00",
+        title: "Explore Science Museum",
+        type: "activity",
+        timeOfDay: "morning",
+        location: { name: "Science Museum", lat: 1, lng: 1 },
+      },
+      {
+        time: "12:00",
+        endTime: "12:30",
+        title: "Takeout or delivery lunch at your stay",
+        type: "meal",
+        timeOfDay: "afternoon",
+        location: { name: "2334 Hardwick St", lat: 3, lng: 3 },
+      },
+    ];
+    const withTravel = injectTravelActivities(
+      activities,
+      [hop("Science Museum", "2334 Hardwick St", 6, 9)],
+      taxiPlan,
+    );
+    const taxi = withTravel.find((a) => a.type === "travel")!;
+    const lunch = withTravel.find((a) => a.type === "meal")!;
+    expect(taxi.time).toBe("12:00");
+    expect(taxi.endTime).toBe("12:15");
+    expect(parseTimeToMinutes(lunch.time)).toBeGreaterThanOrEqual(parseTimeToMinutes(taxi.endTime!));
+  });
+
+  it("does not insert a taxi from breakfast-near-X to the same attraction", () => {
+    const activities: ItineraryActivity[] = [
+      {
+        time: "09:15",
+        endTime: "10:00",
+        title: "Breakfast near Science Museum",
+        type: "meal",
+        timeOfDay: "morning",
+        location: { name: "Science Museum area", lat: 1, lng: 1 },
+      },
+      {
+        time: "10:00",
+        endTime: "12:00",
+        title: "Explore Science Museum",
+        type: "activity",
+        timeOfDay: "morning",
+        location: { name: "Science Museum", lat: 1, lng: 1 },
+      },
+    ];
+    const withTravel = injectTravelActivities(
+      activities,
+      [hop("Science Museum area", "Science Museum", 5, 8)],
+      taxiPlan,
+    );
+    expect(withTravel.filter((a) => a.type === "travel")).toHaveLength(0);
   });
 });

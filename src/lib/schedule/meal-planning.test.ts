@@ -139,7 +139,10 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
         60,
       );
     } else {
-      expect(scheduled.some((a) => /free time at your accommodation/i.test(a.title))).toBe(true);
+      const napEnd = parseTimeToMinutes(nap!.endTime!);
+      const dinner = scheduled.find((a) => a.slotKind === "dinner");
+      expect(dinner).toBeDefined();
+      expect(parseTimeToMinutes(dinner!.time) - napEnd).toBeGreaterThan(0);
     }
   });
 

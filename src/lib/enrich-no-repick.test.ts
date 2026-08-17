@@ -121,4 +121,55 @@ describe("enrichItinerary never re-picks landmarks", () => {
     expect(mystery.location?.lat).toBe(fleet.lat);
     expect(mystery.location?.name).not.toBe(sanDiego.landmarks[0]!.name);
   });
+
+  it("updates the title when a reused landmark is replaced", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({}),
+      }),
+    );
+
+    const sanDiego = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
+    const fleet = sanDiego.landmarks.find((l) => l.name === "Fleet Science Center")!;
+
+    const enriched = await enrichItinerary(
+      {
+        days: [
+          {
+            day: 1,
+            activities: [
+              {
+                time: "10:00",
+                title: "Explore Fleet Science Center",
+                type: "activity",
+                slotKind: "morning_activity",
+              },
+            ],
+          },
+          {
+            day: 2,
+            activities: [
+              {
+                time: "10:00",
+                title: "Explore Fleet Science Center",
+                type: "activity",
+                slotKind: "morning_activity",
+              },
+            ],
+          },
+        ],
+      },
+      plan(),
+      { cityOverride: sanDiego },
+    );
+
+    const day1 = enriched.days[0]!.activities.find((a) => a.type === "activity")!;
+    const day2 = enriched.days[1]!.activities.find((a) => a.type === "activity")!;
+    expect(day1.location?.name).toBe(fleet.name);
+    expect(day2.location?.name).not.toBe(fleet.name);
+    expect(day2.title).not.toMatch(/Fleet Science Center/i);
+    expect(day2.title).toMatch(new RegExp(day2.location!.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  });
 });

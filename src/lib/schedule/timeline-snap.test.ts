@@ -3,7 +3,9 @@ import {
   minutesToTime,
   scheduleSpan,
   snapMinutes,
+  snapMinutesUp,
   TIME_SNAP_MINUTES,
+  travelSpan,
 } from "@/lib/schedule/timeline";
 
 describe("time snapping — FAM-12", () => {
@@ -24,5 +26,13 @@ describe("time snapping — FAM-12", () => {
     const span = scheduleSpan(8 * 60 + 30, 62);
     expect(span.time).toBe("08:30");
     expect(span.endTime).toBe("09:30");
+  });
+
+  it("rounds travel ends up so a 6-minute taxi is 12:00–12:15, never 12:00–12:00", () => {
+    expect(snapMinutesUp(12 * 60 + 6)).toBe(12 * 60 + 15);
+    const span = travelSpan(12 * 60, 6);
+    expect(span.time).toBe("12:00");
+    expect(span.endTime).toBe("12:15");
+    expect(span.endTime).not.toBe(span.time);
   });
 });

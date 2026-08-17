@@ -29,7 +29,6 @@ import {
   earliestLeaveAfterNap,
   minRealisticActivityDuration,
   planMorningChainFromNap,
-  preferReturnHomeBeforeDinner,
   type MorningChainPlan,
 } from "@/lib/schedule/family-rhythm";
 import {
@@ -639,30 +638,6 @@ function placeOptionalActivity<T extends RawActivity>(
   return null;
 }
 
-function stayDowntimeItem<T extends RawActivity>(
-  template: T | undefined,
-  start: number,
-  duration: number,
-  title: string,
-  notes: string,
-  slotKind: SlotKind,
-): T & { endTime: string } {
-  const span = scheduleSpan(start, duration);
-  const base = (template ?? {
-    time: span.time,
-    title,
-    type: "rest" as ActivityType,
-  }) as T;
-  return {
-    ...base,
-    ...span,
-    title,
-    type: "rest",
-    slotKind,
-    notes,
-  };
-}
-
 function isRealMorningStop(a: RawActivity): boolean {
   if (a.slotKind === "morning_activity") return true;
   return (
@@ -819,7 +794,6 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
         ? napEndMin + 15
         : earliestLeaveAfterNap(plan, napEndMin)
       : 0;
-  let postNapDowntimePlaced = false;
 
   const placeHomeboundGrocery = (travelIn: number) => {
     if (groceryPlaced || groceryItems.length === 0) return travelIn;
@@ -945,29 +919,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       afternoonPattern !== "immediate" &&
       postNapLeaveMin > 0
     ) {
-      if (
-        !postNapDowntimePlaced &&
-        (afternoonPattern === "downtime_then_out" ||
-          afternoonPattern === "downtime_home_dinner")
-      ) {
-        const napEnd = parseTimeToMinutes(result[result.length - 1]!.endTime);
-        const restDur = Math.max(30, postNapLeaveMin - napEnd);
-        if (restDur >= 30) {
-          result.push(
-            stayDowntimeItem(
-              undefined,
-              napEnd,
-              restDur,
-              "Free time at your accommodation",
-              "Post-nap recovery at the stay — leaving is optional, not required.",
-              "afternoon_rest",
-            ),
-          );
-          cursor = napEnd + restDur;
-          postNapDowntimePlaced = true;
-          travel = 0;
-        }
-      }
+      // Empty break after the nap — do not insert a visible "free time" stop.
       start = Math.max(start, postNapLeaveMin);
     }
 
@@ -1394,32 +1346,6 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
           dinnerAtStay ? 0 : eveningTravel,
           dinnerTimeWindow(plan),
         );
-
-  if (
-    plan.travelStyle !== "packed" &&
-    lastScheduled &&
-    lastScheduled.type !== "rest" &&
-    lastScheduled.type !== "nap" &&
-    lastScheduled.slotKind !== "afternoon_rest" &&
-    lastScheduled.slotKind !== "return_home" &&
-    preferReturnHomeBeforeDinner(plan, lastOutEnd, dinnerStart, eveningTravel)
-  ) {
-    const restStart = lastOutEnd + eveningTravel;
-    const leaveForDinner = dinnerAtStay ? dinnerStart : dinnerStart - eveningTravel;
-    if (leaveForDinner - restStart >= 30) {
-      result.push(
-        stayDowntimeItem(
-          undefined,
-          restStart,
-          leaveForDinner - restStart,
-          "Free time at your accommodation",
-          "Head back to the stay rather than waiting at a restaurant before dinner.",
-          "return_home",
-        ),
-      );
-      endCursor = leaveForDinner;
-    }
-  }
 
   const dinnerSpan = scheduleSpan(dinnerStart, dinnerDuration);
   const anchoredDinners = dinnerItems.map((d) => ({
