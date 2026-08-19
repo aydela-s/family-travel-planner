@@ -56,10 +56,12 @@ export default function ShareItineraryControls({
   itinerary,
   plan,
   disabled = false,
+  buttonClassName = actionBtnClassName,
 }: {
   itinerary: Itinerary;
   plan?: TripPlan;
   disabled?: boolean;
+  buttonClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -257,7 +259,7 @@ export default function ShareItineraryControls({
             setOpen(true);
             if (status === "sent") resetShareForm();
           }}
-          className={actionBtnClassName}
+          className={buttonClassName}
         >
           <ShareIcon />
           Share
@@ -266,7 +268,7 @@ export default function ShareItineraryControls({
           type="button"
           disabled={disabled}
           onClick={() => void onDownload()}
-          className={actionBtnClassName}
+          className={buttonClassName}
         >
           <DownloadIcon />
           Download

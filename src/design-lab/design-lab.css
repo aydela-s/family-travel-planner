@@ -1,0 +1,15 @@
+.lab-root {
+  font-synthesis: none;
+}
+
+[data-lab-concept="ledger"] {
+  font-family: var(--font-lab-plex), var(--font-poppins), system-ui, sans-serif;
+}
+
+[data-lab-concept="journal"] {
+  font-family: var(--font-poppins), system-ui, sans-serif;
+}
+
+[data-lab-concept="companion"] {
+  font-family: var(--font-lab-outfit), var(--font-poppins), system-ui, sans-serif;
+}
