@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BRAND } from "@/config/brand";
 import { LOADING_MESSAGES } from "@/types/generate";
 
 export default function LoadingScreen({ message }: { message?: string }) {
@@ -18,11 +19,9 @@ export default function LoadingScreen({ message }: { message?: string }) {
 
   return (
     <div className="flex min-h-[320px] flex-col items-center justify-center px-6 py-16 text-center">
-      <div className="relative mb-8">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-secondary-muted border-t-primary" />
-        <span className="absolute inset-0 flex items-center justify-center text-xl" aria-hidden>
-          ✈️
-        </span>
+      <div className="mb-8 h-20 w-20 animate-loading-pin-pulse" aria-hidden>
+        {/* eslint-disable-next-line @next/next/no-img-element -- static brand asset */}
+        <img src={BRAND.pinSrc} alt="" className="h-full w-full object-contain" />
       </div>
 
       <p

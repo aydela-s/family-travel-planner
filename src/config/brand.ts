@@ -9,5 +9,7 @@ export const BRAND = {
   logoSrc: "/familytravely-logo.png",
   /** Favicon mark used in top-left nav (home → dotted path → pin). */
   markSrc: "/familytravely-mark.png",
+  /** Heart pin cropped from the mark (favicon composition, mark resolution). */
+  pinSrc: "/familytravely-pin.png",
   faviconSrc: "/favicon.png",
 } as const;

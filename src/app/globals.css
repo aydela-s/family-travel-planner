@@ -130,6 +130,16 @@ body {
   }
 }
 
+@keyframes loading-pin-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.22);
+  }
+}
+
 .animate-fade-in {
   animation: fade-in 0.45s ease-out both;
 }
@@ -146,11 +156,16 @@ body {
   animation: pulse-soft 2.5s ease-in-out infinite;
 }
 
+.animate-loading-pin-pulse {
+  animation: loading-pin-pulse 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,
   .animate-step-forward,
   .animate-step-back,
-  .animate-pulse-soft {
+  .animate-pulse-soft,
+  .animate-loading-pin-pulse {
     animation: none;
   }
 }
