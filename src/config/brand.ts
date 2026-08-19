@@ -1,13 +1,13 @@
 /** Product brand identity — single source for name, slogan, and assets. */
 export const BRAND = {
-  name: "FamilyTravely",
+  name: "familyTravely",
   slogan: "travel planning for real families",
   /** Short line for metadata / social when a sentence is needed. */
   taglineSentence: "Travel planning for real families",
   /** Lowercase slug for filenames and similar user-facing identifiers. */
   slug: "familytravely",
-  logoSrc: "/tripnestly-logo.png",
+  logoSrc: "/familytravely-logo.png",
   /** Favicon mark used in top-left nav (home → dotted path → pin). */
-  markSrc: "/tripnestly-mark.png",
+  markSrc: "/familytravely-mark.png",
   faviconSrc: "/favicon.png",
 } as const;

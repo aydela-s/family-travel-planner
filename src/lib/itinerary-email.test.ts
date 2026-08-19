@@ -176,7 +176,7 @@ describe("itinerary email model — FAM-50", () => {
     expect(model.subject).toContain("Paris");
     expect(model.day1Title).toBe("Day 1");
     // Email clients can't fetch localhost — logo uses a public asset host.
-    expect(model.logoUrl).toMatch(/^https:\/\/.+\/tripnestly-logo\.png$/);
+    expect(model.logoUrl).toMatch(/^https:\/\/.+\/familytravely-logo\.png$/);
     expect(model.logoUrl).not.toMatch(/localhost/);
   });
 

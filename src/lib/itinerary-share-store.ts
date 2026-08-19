@@ -23,7 +23,7 @@ async function ensureDir(): Promise<string> {
     await fs.mkdir(dir, { recursive: true });
     return dir;
   } catch {
-    const fallback = path.join("/tmp", "tripnestly-itinerary-shares");
+    const fallback = path.join("/tmp", "familytravely-itinerary-shares");
     await fs.mkdir(fallback, { recursive: true });
     return fallback;
   }

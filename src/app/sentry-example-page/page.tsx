@@ -53,7 +53,7 @@ export default function Page() {
           <a
             target="_blank"
             rel="noopener"
-            href="https://tripnestly.sentry.io/issues/?project=4511796469170176"
+            href="https://familytravely.sentry.io/issues/?project=4511796469170176"
           >
             Issues Page
           </a>

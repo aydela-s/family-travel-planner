@@ -5,7 +5,7 @@ describe("public-urls — email assets & paths", () => {
   it("uses a non-localhost host for the email logo", () => {
     expect(emailAssetOrigin("http://localhost:3000")).not.toMatch(/localhost/);
     expect(emailLogoUrl("http://localhost:3000")).toMatch(
-      /^https:\/\/.+\/tripnestly-logo\.png$/,
+      /^https:\/\/.+\/familytravely-logo\.png$/,
     );
   });
 

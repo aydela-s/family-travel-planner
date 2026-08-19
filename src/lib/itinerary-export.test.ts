@@ -92,7 +92,7 @@ describe("itinerary export — FAM-50", () => {
     expect(cover.destination).toBe("Paris");
     expect(cover.dateRange).toBe("July 8 – 14");
     expect(cover.familyLines).toContain("Kids: 4 & 8");
-    expect(cover.generatedBy).toMatch(/FamilyTravely/);
+    expect(cover.generatedBy).toMatch(/familyTravely/);
   });
 
   it("formats compact expanded activity lines for export", () => {

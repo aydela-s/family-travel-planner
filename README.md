@@ -97,7 +97,7 @@ npm run test
 | GOOGLE_PLACES_API_KEY | Places API (New): Autocomplete, Details, Text Search. Falls back to `GOOGLE_MAPS_API_KEY` |
 | RESEND_API_KEY        | Send product feedback email (FAM-49)                                    |
 | FEEDBACK_TO_EMAIL     | Inbox that receives feedback                                            |
-| FEEDBACK_FROM_EMAIL   | Optional From header (default: `TripNestly Feedback <onboarding@resend.dev>` for local testing) |
+| FEEDBACK_FROM_EMAIL   | Optional From header (default: `familyTravely Feedback <onboarding@resend.dev>` for local testing) |
 
 ### Google Maps / Places setup
 
@@ -114,12 +114,12 @@ Places Text Search is billed per request. Results are cached in memory for 24 ho
 
 1. Sign up at [resend.com](https://resend.com) and create an API key.
 2. Put the key and your Resend account email into `.env.local` (see `.env.example`).
-3. Keep `FEEDBACK_FROM_EMAIL` as `onboarding@resend.dev` until you verify `tripnestly.app`.
+3. Keep `FEEDBACK_FROM_EMAIL` as `onboarding@resend.dev` until you verify `familytravely.app`.
 4. Run `npm run dev`, click **Feedback**, submit a note — it should arrive in that inbox.
 
 The same Resend keys power **Share by email** on the itinerary (FAM-50). **Download PDF** runs in the browser and does not need Resend.
 
-Resend’s free onboarding sender can only deliver to **the email on your Resend account**. After you buy/verify the domain, switch `FEEDBACK_FROM_EMAIL` to something like `TripNestly Feedback <feedback@tripnestly.app>` and you can send to any inbox.
+Resend’s free onboarding sender can only deliver to **the email on your Resend account**. After you buy/verify the domain, switch `FEEDBACK_FROM_EMAIL` to something like `familyTravely Feedback <feedback@familytravely.app>` and you can send to any inbox.
 
 
 ---

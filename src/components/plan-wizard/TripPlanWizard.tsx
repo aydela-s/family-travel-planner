@@ -8,7 +8,7 @@ import BackToTopButton from "@/components/BackToTopButton";
 import { useFeedbackVisibility } from "@/components/FeedbackVisibility";
 import { shouldAllowFeedbackLauncher } from "@/lib/feedback-visibility";
 import LoadingScreen from "@/components/LoadingScreen";
-import { TripNestlyLogo } from "@/components/TripNestlyLogo";
+import { FamilyTravelyLogo } from "@/components/FamilyTravelyLogo";
 import { BRAND } from "@/config/brand";
 import { Itinerary } from "@/types/itinerary";
 import { GenerateItineraryOptions } from "@/types/generate";
@@ -498,7 +498,7 @@ export default function TripPlanWizard() {
             href="/"
             className="mb-6 inline-flex items-center gap-2.5 text-primary transition hover:opacity-80"
           >
-            <TripNestlyLogo variant="mark" className="h-10 w-auto shrink-0" />
+            <FamilyTravelyLogo variant="mark" className="h-10 w-auto shrink-0" />
             <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
           </Link>
           <div className="rounded-[1.75rem] border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10">
@@ -517,7 +517,7 @@ export default function TripPlanWizard() {
             href="/"
             className="inline-flex items-center gap-2.5 text-primary transition hover:opacity-80"
           >
-            <TripNestlyLogo variant="mark" className="h-10 w-auto shrink-0" />
+            <FamilyTravelyLogo variant="mark" className="h-10 w-auto shrink-0" />
             <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
           </Link>
 

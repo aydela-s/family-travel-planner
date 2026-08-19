@@ -1,4 +1,4 @@
-# TripNestly — Interest Category Definitions
+# familyTravely — Interest Category Definitions
 
 Use this as the source of truth for what activity types belong under each interest tag. When generating itinerary activities, tag each suggested activity with one (or more, if it genuinely spans categories) of these interest IDs so filtering/personalization stays consistent.
 

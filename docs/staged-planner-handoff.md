@@ -1,6 +1,6 @@
 # Staged Planning Engine — Handoff Document
 
-**Audience:** Next AI coding assistant continuing the TripNestly planner redesign.  
+**Audience:** Next AI coding assistant continuing the familyTravely planner redesign.  
 **Repo:** `family-travel-planner`  
 **Date context:** July 2026  
 **Branch note:** Staged engine work is largely **uncommitted** under `src/lib/planning-engine/staged/` plus edits to `src/lib/planning-engine/index.ts` and `types.ts`. Do not confuse with unrelated local Sentry/`package.json` dirty files — leave those alone unless asked.

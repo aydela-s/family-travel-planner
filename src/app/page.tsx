@@ -1,7 +1,7 @@
 import BackToTopButton from "@/components/BackToTopButton";
 import PlanMyTripLink from "@/components/PlanMyTripLink";
 import PrefetchPlan from "@/components/PrefetchPlan";
-import { TripNestlyLogo } from "@/components/TripNestlyLogo";
+import { FamilyTravelyLogo } from "@/components/FamilyTravelyLogo";
 import { BRAND } from "@/config/brand";
 
 const HOW_IT_WORKS = [
@@ -85,7 +85,7 @@ export default function Home() {
 
       <section className="relative mx-auto flex min-h-[88svh] max-w-3xl flex-col items-center justify-center px-6 py-16 text-center">
         <div className="animate-fade-in">
-          <TripNestlyLogo className="mx-auto h-auto w-[min(100%,22rem)] sm:w-[26rem]" />
+          <FamilyTravelyLogo className="mx-auto h-auto w-[min(100%,22rem)] sm:w-[26rem]" />
         </div>
 
         <h1 className="animate-fade-in mt-8 max-w-2xl text-3xl font-semibold tracking-tight text-primary sm:text-4xl [animation-delay:120ms]">
