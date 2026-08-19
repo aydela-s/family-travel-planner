@@ -10,6 +10,7 @@ import {
   inputClassName,
   labelClassName,
 } from "@/components/plan-wizard/shared";
+import { BRAND } from "@/config/brand";
 import { trackFeedbackSubmitted } from "@/lib/analytics";
 
 type Status = "idle" | "sending" | "sent" | "error";
@@ -111,7 +112,7 @@ export default function FeedbackButton() {
               role="dialog"
               aria-modal="true"
               aria-labelledby={titleId}
-              className="w-full max-w-md rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6"
+              className="w-full max-w-md rounded-[1.75rem] border border-border bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -119,13 +120,13 @@ export default function FeedbackButton() {
                     Send feedback
                   </h2>
                   <p className="mt-1 text-sm leading-relaxed text-muted">
-                    Bugs, confusing steps, or ideas — we read every note.
+                    Bugs, confusing steps, or ideas. We read every note.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={close}
-                  className="rounded-xl px-2 py-1 text-sm font-semibold text-muted hover:bg-background hover:text-ink"
+                  className="rounded-full px-2 py-1 text-sm font-semibold text-muted hover:bg-background hover:text-ink"
                   aria-label="Close feedback"
                 >
                   ✕
@@ -134,8 +135,8 @@ export default function FeedbackButton() {
 
               {status === "sent" ? (
                 <div className="mt-5 space-y-4">
-                  <p className="rounded-2xl border border-primary/20 bg-primary-muted px-4 py-3.5 text-sm leading-relaxed text-ink">
-                    Thanks — your feedback is on its way.
+                  <p className="rounded-2xl border border-secondary/30 bg-secondary-muted px-4 py-3.5 text-sm leading-relaxed text-ink">
+                    Thanks. Your feedback is on its way.
                   </p>
                   <button type="button" onClick={close} className={btnPrimaryClassName}>
                     Done
@@ -150,7 +151,7 @@ export default function FeedbackButton() {
                       required
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      placeholder="What happened, or what would make TripNestly better?"
+                      placeholder={`What happened, or what would make ${BRAND.name} better?`}
                       className={`${inputClassName} min-h-[8rem] resize-y`}
                     />
                   </label>
@@ -202,7 +203,7 @@ export default function FeedbackButton() {
           setOpen(true);
           if (status === "sent") resetForm();
         }}
-        className="fixed bottom-6 left-6 z-30 rounded-2xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-ink shadow-soft transition hover:border-primary/40 hover:bg-primary-muted hover:text-primary"
+        className="fixed bottom-6 left-6 z-30 rounded-full border border-secondary/40 bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-soft transition hover:border-secondary hover:bg-secondary-muted"
       >
         Feedback
       </button>

@@ -2,7 +2,7 @@ import { ActivityLocation, ItineraryActivity } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
 const HOME_TITLE =
-  /\b(cook dinner at your rental|dinner with your hosts|return to|back to (your )?(rental|accommodation|stay|hotel|home)|hotel breakfast|packed breakfast|takeout or delivery lunch at your stay)\b/i;
+  /\b(cook dinner at your rental|dinner with your hosts|return to|back to (your )?(rental|accommodation|stay|hotel|home)|hotel breakfast|packed breakfast|delivery lunch at your stay|takeout or delivery lunch at your stay)\b/i;
 
 /** Stay address not required — plan around city center. */
 export function isStayNotBookedYet(plan: Pick<TripPlan, "accommodationType">): boolean {

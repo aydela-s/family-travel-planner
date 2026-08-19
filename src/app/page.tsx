@@ -8,12 +8,12 @@ const HOW_IT_WORKS = [
   {
     step: "1",
     title: "Tell us about your family",
-    body: "Kids’ ages, travel pace, food needs, and budget style — the details that actually change a day.",
+    body: "Kids’ ages, travel pace, food needs, and budget style. These are the details that actually change a day.",
   },
   {
     step: "2",
     title: "Get a day-by-day plan",
-    body: "Activities, meals, and downtime sequenced for real family energy — not a packed tourist checklist.",
+    body: "Activities, meals, and downtime sequenced for real family energy, not a packed tourist checklist.",
   },
   {
     step: "3",
@@ -22,10 +22,10 @@ const HOW_IT_WORKS = [
   },
 ] as const;
 
-const WHY_TRIPNESTLY = [
+const WHY_FAMILYTRAVELY = [
   {
     title: "Built around your kids",
-    body: "Ages, naps, and energy levels shape what we schedule — so the plan survives the afternoon.",
+    body: "Ages, naps, and energy levels shape what we schedule so the plan survives the afternoon.",
   },
   {
     title: "Your pace, not a checklist",
@@ -33,12 +33,12 @@ const WHY_TRIPNESTLY = [
   },
   {
     title: "Budget style that means something",
-    body: "Save, balanced, or splurge changes the kinds of activities and meals we pick — not a fake dollar target.",
+    body: "Save, comfortable, or splurge changes the kinds of activities and meals we pick, not a fake dollar target.",
   },
 ] as const;
 
 const tileClassName =
-  "flex h-full flex-col rounded-3xl border border-border bg-surface p-6 text-left shadow-[var(--shadow-card)] sm:p-7";
+  "flex h-full flex-col rounded-[1.75rem] border border-border bg-surface p-6 text-left shadow-[var(--shadow-card)] sm:p-7";
 
 function FlowArrow({ className = "" }: { className?: string }) {
   return (
@@ -93,22 +93,22 @@ export default function Home() {
         </h1>
 
         <p className="animate-fade-in mt-4 max-w-xl text-base leading-relaxed text-muted sm:text-lg [animation-delay:220ms]">
-          Personalized itineraries built around your kids, your pace, and your budget.
+          Personalized day-by-day itineraries built around your kids, your pace, and your budget without the hours of planning.
         </p>
 
-        <PlanMyTripLink className="animate-fade-in mt-8 [animation-delay:320ms]" />
-
-        <p className="animate-fade-in mt-4 max-w-md text-sm leading-relaxed text-muted sm:text-base [animation-delay:400ms]">
-          No more hours researching activities, meals, and schedules. Get a
-          family-friendly itinerary in minutes.
-        </p>
+        <div className="animate-fade-in mt-8 flex flex-col items-center [animation-delay:320ms]">
+          <PlanMyTripLink />
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
+            Start planning for free. No account needed.
+          </p>
+        </div>
 
         <p className="sr-only">{BRAND.slogan}</p>
       </section>
 
       <section
         aria-labelledby="how-it-works-heading"
-        className="relative border-t border-border/70 bg-surface/70"
+        className="relative border-t border-border/70 bg-secondary-muted/40"
       >
         <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
           <h2
@@ -128,7 +128,7 @@ export default function Home() {
                 className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-stretch"
               >
                 <div className={`${tileClassName} w-full`}>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-white">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
                     {item.step}
                   </span>
                   <h3 className="mt-4 text-lg font-semibold tracking-tight text-ink">
@@ -152,12 +152,12 @@ export default function Home() {
       </section>
 
       <section
-        aria-labelledby="why-tripnestly-heading"
+        aria-labelledby="why-familytravely-heading"
         className="relative border-t border-border/70"
       >
         <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
           <h2
-            id="why-tripnestly-heading"
+            id="why-familytravely-heading"
             className="text-center text-2xl font-semibold tracking-tight text-primary sm:text-3xl"
           >
             Why {BRAND.name}
@@ -168,9 +168,9 @@ export default function Home() {
           </p>
 
           <ul className="mt-12 grid gap-5 sm:grid-cols-3 sm:gap-6">
-            {WHY_TRIPNESTLY.map((item) => (
+            {WHY_FAMILYTRAVELY.map((item) => (
               <li key={item.title} className="min-w-0">
-                <div className="flex h-full flex-col rounded-3xl border border-border bg-surface p-6 text-left shadow-[var(--shadow-card)] sm:p-7">
+                <div className="flex h-full flex-col rounded-[1.75rem] border border-secondary/20 bg-secondary-muted/35 p-6 text-left sm:p-7">
                   <span
                     aria-hidden
                     className="mb-5 block h-1 w-10 rounded-full bg-accent"

@@ -13,7 +13,8 @@ type TripNestlyLogoProps = {
 };
 
 /**
- * TripNestly brand mark / wordmark.
+ * FamilyTravely brand mark / wordmark.
+ * Asset filenames still use the previous product name until new artwork lands.
  */
 export function TripNestlyLogo({
   className,

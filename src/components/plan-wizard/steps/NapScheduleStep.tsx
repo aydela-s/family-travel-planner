@@ -120,10 +120,12 @@ export default function NapScheduleStep({ formData, updateFormData }: StepProps)
   return (
     <div className="space-y-6">
       <StepIntro
-        emoji="😴"
-        title="Naps & food"
-        subtitle="Add nap windows if you need them, plus any dietary preferences for meal planning."
+        emoji="🍽️"
+        title="Food & naps"
+        subtitle="Dietary needs first, then nap windows if your little ones still need them."
       />
+
+      {foodSection}
 
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -204,8 +206,8 @@ export default function NapScheduleStep({ formData, updateFormData }: StepProps)
                   </div>
                   <FieldHint>
                     {nap.type === "stroller"
-                      ? "We’ll keep quiet, low-key stops during this window — no forced return to your stay."
-                      : "We’ll block stay time and skip attractions during this window."}
+                      ? "We’ll keep quiet, low-key stops during this window."
+                      : "We’ll skip attractions during this window."}
                   </FieldHint>
                 </div>
               </div>
@@ -233,8 +235,6 @@ export default function NapScheduleStep({ formData, updateFormData }: StepProps)
           </>
         )}
       </div>
-
-      {foodSection}
     </div>
   );
 }

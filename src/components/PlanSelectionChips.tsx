@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   BUDGET_STYLE_LABELS,
   getAccommodationLabel,
@@ -10,7 +10,6 @@ import {
   TRANSPORTATION_LABELS,
   TRAVEL_STYLE_LABELS,
 } from "@/lib/format-labels";
-import { formatCoverDateRange } from "@/lib/itinerary-export";
 import { formatNapsSummary, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { updatesForPlanChip, type PlanChipUpdateKey } from "@/lib/plan-selection-updates";
@@ -39,9 +38,9 @@ export type PlanChipKey =
 
 /** Wizard step index for fields edited in the wizard (not inline). */
 export const PLAN_CHIP_WIZARD_STEP: Partial<Record<PlanChipKey, number>> = {
-  stay: 3,
-  naps: 6,
-  interests: 8,
+  stay: 2,
+  naps: 4,
+  interests: 5,
 };
 
 const READ_ONLY_KEYS = new Set<PlanChipKey>([
@@ -56,69 +55,155 @@ type ChipDef = {
   label: string;
   value: string;
   editable: boolean;
+  icon: ReactNode;
   /** Inline pick list; omit to jump back to the wizard step when editable. */
   options?: { value: string; label: string; disabled?: boolean }[];
 };
 
-function travelersLabel(plan: TripPlan): string {
-  const adults = `${plan.adults} adult${plan.adults !== 1 ? "s" : ""}`;
-  if (plan.children.length === 0) return adults;
-  return `${adults}, ${plan.children.length} kid${plan.children.length !== 1 ? "s" : ""}`;
+function iconClassName(tone: "primary" | "accent" = "primary") {
+  return `block h-4 w-4 shrink-0 ${tone === "accent" ? "text-accent" : "text-primary"}`;
+}
+
+/** Gauge / intensity meter — reads as travel pace better than a moon. */
+function PaceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
+      <path
+        d="M4 16h3.5M10 16h3.5M16 16H20"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <path
+        d="M5.5 16V11M12 16V8M18.5 16V5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function WalletIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
+      <rect x="3.5" y="6" width="17" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M3.5 10h17" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="16.5" cy="14.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function StayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
+      <path
+        d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-7.5Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TransitChipIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
+      <rect x="6" y="4" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M8 16v3M16 16v3M6 9h12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function NapChipIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
+      <path
+        d="M12 4.5A6.5 6.5 0 1 0 18.2 14.2 5.25 5.25 0 0 1 12 4.5Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function DietaryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
+      <path
+        d="M8 3v8M8 11v10M6 3v5a2 2 0 0 0 4 0V3M16 3v7c0 1.5 1 2 2 2v9M16 3c0 3 0 5-2 7"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function InterestsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={iconClassName("accent")} fill="none" aria-hidden>
+      <path
+        d="M12 20s-6.5-4.2-8.5-8C2 9.2 3.2 6.5 6 5.8c1.8-.4 3.5.5 4.5 1.8C11.5 6.3 13.2 5.4 15 5.8c2.8.7 4 3.4 2.5 6.2C15.5 15.8 12 20 12 20Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 function stayLabel(plan: TripPlan): string {
-  const type = getAccommodationLabel(plan.accommodationType);
-  if (isStayNotBookedYet(plan)) return `${type} · city center`;
-  const address = (plan.stayAddress ?? "").trim();
-  if (!address) return type;
-  const short = address.length > 24 ? `${address.slice(0, 22)}…` : address;
-  return `${type} · ${short}`;
+  if (isStayNotBookedYet(plan) || plan.accommodationType === "dont_know_yet") {
+    return "Not booked";
+  }
+  switch (plan.accommodationType) {
+    case "hotel_breakfast_included":
+      return "Hotel + breakfast";
+    case "hotel_no_breakfast":
+      return "Hotel";
+    case "airbnb_with_kitchen":
+      return "Rental + kitchen";
+    case "airbnb_no_kitchen":
+      return "Rental";
+    case "staying_with_family_or_friends":
+      return "Family / friends";
+    default:
+      return getAccommodationLabel(plan.accommodationType);
+  }
 }
 
 function interestsLabel(plan: TripPlan): string {
-  if (plan.interests.length === 0) return "—";
-  if (plan.interests.length <= 2) return plan.interests.join(", ");
-  return `${plan.interests.slice(0, 2).join(", ")} +${plan.interests.length - 2}`;
+  if (plan.interests.length === 0) return "None";
+  if (plan.interests.length === 1) return plan.interests[0];
+  return `${plan.interests.length} interests`;
 }
 
 function buildChips(plan: TripPlan): ChipDef[] {
   const city = detectCityFromPlan(plan);
   const transitSelectable = isPublicTransitSelectable(city);
   const transportOptions = transportationOptionsForCity(city);
+  // Same order as wizard preference chips (Stay → Transit → Pace → Naps → Budget → Interests).
   const chips: ChipDef[] = [
-    {
-      key: "destination",
-      label: "Destination",
-      value: plan.destination || "—",
-      editable: false,
-    },
-    {
-      key: "dates",
-      label: "Dates",
-      value:
-        plan.startDate && plan.endDate
-          ? formatCoverDateRange(plan.startDate, plan.endDate) ||
-            `${plan.startDate} → ${plan.endDate}`
-          : "—",
-      editable: false,
-    },
-    {
-      key: "travelers",
-      label: "Travelers",
-      value: travelersLabel(plan),
-      editable: false,
-    },
     {
       key: "stay",
       label: "Stay",
       value: stayLabel(plan),
       editable: true,
+      icon: <StayIcon />,
     },
     {
       key: "transportation",
       label: "Transit",
-      value: getTransportationLabel(plan.transportationType),
+      value:
+        plan.transportationType === "public-transportation"
+          ? "Transit"
+          : getTransportationLabel(plan.transportationType),
       editable: true,
+      icon: <TransitChipIcon />,
       options: transportOptions.map((value) => ({
         value,
         label: TRANSPORTATION_LABELS[value],
@@ -130,6 +215,7 @@ function buildChips(plan: TripPlan): ChipDef[] {
       label: "Pace",
       value: getTravelStyleLabel(plan.travelStyle),
       editable: true,
+      icon: <PaceIcon />,
       options: (Object.keys(TRAVEL_STYLE_LABELS) as TravelStyle[]).map((value) => ({
         value,
         label: TRAVEL_STYLE_LABELS[value],
@@ -137,47 +223,61 @@ function buildChips(plan: TripPlan): ChipDef[] {
     },
   ];
 
-  if (shouldShowNapSection(plan)) {
+  if (shouldShowNapSection(plan) && (plan.naps?.length ?? 0) > 0) {
     chips.push({
       key: "naps",
       label: "Naps",
       value: formatNapsSummary(plan.naps),
       editable: true,
+      icon: <NapChipIcon />,
     });
   }
 
-  chips.push({
-    key: "dietary",
-    label: "Dietary",
-    value: plan.dietaryRestrictions?.trim() || "None",
-    editable: false,
-  });
+  const dietary = plan.dietaryRestrictions?.trim();
+  if (dietary) {
+    chips.push({
+      key: "dietary",
+      label: "Dietary",
+      value: dietary,
+      editable: false,
+      icon: <DietaryIcon />,
+    });
+  }
 
-  chips.push({
-    key: "budget",
-    label: "Budget",
-    value: getBudgetStyleLabelPlain(plan.budgetStyle),
-    editable: true,
-    options: (Object.keys(BUDGET_STYLE_LABELS) as BudgetStyle[]).map((value) => ({
-      value,
-      label: BUDGET_STYLE_LABELS[value].label,
-    })),
-  });
-
-  chips.push({
-    key: "interests",
-    label: "Interests",
-    value: interestsLabel(plan),
-    editable: true,
-  });
+  chips.push(
+    {
+      key: "budget",
+      label: "Budget",
+      value: getBudgetStyleLabelPlain(plan.budgetStyle),
+      editable: true,
+      icon: <WalletIcon />,
+      options: (Object.keys(BUDGET_STYLE_LABELS) as BudgetStyle[]).map((value) => ({
+        value,
+        label: BUDGET_STYLE_LABELS[value].label,
+      })),
+    },
+    {
+      key: "interests",
+      label: "Interests",
+      value: interestsLabel(plan),
+      editable: true,
+      icon: <InterestsIcon />,
+    },
+  );
 
   return chips;
 }
 
 function EditIcon() {
   return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5" aria-hidden>
-      <path d="M13.586 3.586a2 2 0 112.828 2.828l-8.5 8.5a2 2 0 01-.878.507l-3 0.75a.75.75 0 01-.908-.908l.75-3a2 2 0 01.507-.878l8.5-8.5z" />
+    <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" aria-hidden>
+      <path
+        d="M12.8 3.7a1.75 1.75 0 0 1 2.48 2.47l-8.2 8.2a1.5 1.5 0 0 1-.66.38l-2.7.68a.5.5 0 0 1-.6-.6l.68-2.7c.06-.25.19-.48.38-.66l8.2-8.2Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M11.6 4.9 15.1 8.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -237,22 +337,26 @@ export default function PlanSelectionChips({
   }
 
   return (
-    <div ref={rootRef} className="min-w-0 space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted">Your selections</p>
-      <ul className="flex w-full min-w-0 flex-wrap gap-2" aria-label="Trip plan selections">
+    <div ref={rootRef} className="min-w-0">
+      <ul
+        className="flex w-full flex-wrap items-center gap-1.5"
+        aria-label="Trip plan selections"
+      >
         {chips.map((chip) => {
           const isOpen = openKey === chip.key;
           const canEdit = chip.editable && !disabled;
 
           return (
-            <li key={chip.key} className="relative max-w-full min-w-0">
+            <li key={chip.key} className="relative max-w-full shrink-0">
               <div
-                className={`group flex w-fit max-w-full items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-ink transition ${
-                  isOpen ? "border-primary/40 bg-primary-muted/50" : canEdit ? "hover:border-primary/30" : ""
+                className={`group inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-secondary-muted/40 px-2.5 py-1.5 text-xs text-ink ${
+                  isOpen ? "border-secondary bg-secondary-muted" : ""
                 } ${disabled ? "opacity-60" : ""}`}
               >
-                <span className="shrink-0 text-xs font-semibold text-muted">{chip.label}</span>
-                <span className="min-w-0 truncate font-medium">{chip.value}</span>
+                <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden>
+                  {chip.icon}
+                </span>
+                <span className="min-w-0 truncate leading-snug font-medium">{chip.value}</span>
                 {chip.editable && (
                   <button
                     type="button"
@@ -261,11 +365,11 @@ export default function PlanSelectionChips({
                     aria-controls={chip.options ? `${listId}-${chip.key}` : undefined}
                     aria-label={`Edit ${chip.label}`}
                     onClick={() => handleEditClick(chip)}
-                    className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-primary transition ${
+                    className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary transition ${
                       isOpen
-                        ? "bg-primary text-white"
+                        ? "bg-accent text-white"
                         : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                    } hover:bg-primary-muted disabled:cursor-not-allowed`}
+                    } hover:bg-accent-muted hover:text-accent disabled:cursor-not-allowed`}
                   >
                     <EditIcon />
                   </button>
@@ -277,7 +381,7 @@ export default function PlanSelectionChips({
                   id={`${listId}-${chip.key}`}
                   role="listbox"
                   aria-label={`Change ${chip.label}`}
-                  className="absolute left-0 z-20 mt-2 w-max min-w-[12rem] max-w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-surface py-1 shadow-[var(--shadow-card)]"
+                  className="absolute left-0 z-20 mt-2 w-max max-w-[min(12rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface py-0.5 shadow-[var(--shadow-card)]"
                 >
                   {chip.options.map((option) => {
                     const selected =
@@ -301,17 +405,17 @@ export default function PlanSelectionChips({
                           if (optionDisabled) return;
                           handleOptionSelect(chip, option.value);
                         }}
-                        className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition ${
+                        className={`flex w-full items-center justify-between gap-2 whitespace-nowrap px-2.5 py-1.5 text-left text-xs transition ${
                           optionDisabled
                             ? "cursor-not-allowed text-muted opacity-60"
                             : selected
-                              ? "font-semibold text-primary hover:bg-primary-muted/60"
-                              : "text-ink hover:bg-primary-muted/60"
+                              ? "font-semibold text-primary hover:bg-secondary-muted"
+                              : "text-ink hover:bg-secondary-muted/70"
                         }`}
                       >
                         <span>
                           {option.label}
-                          {option.disabled ? " (unavailable)" : ""}
+                          {option.disabled ? " (n/a)" : ""}
                         </span>
                         {selected && !option.disabled && <span aria-hidden>✓</span>}
                       </button>

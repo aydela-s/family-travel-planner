@@ -30,8 +30,9 @@ import {
   trackPlannerStepViewed,
 } from "@/lib/analytics";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
+import { hasResolvedDestinationCenter } from "@/lib/city-detect";
 import StepTransition from "./StepTransition";
-import DestinationStep from "./steps/DestinationStep";
+import DestinationStep from "./steps/WhereWhenStep";
 import { WizardShell } from "./WizardShell";
 import {
   btnCtaClassName,
@@ -48,28 +49,20 @@ const ItineraryDisplay = dynamic(() => import("@/components/ItineraryDisplay"), 
 
 type StepLoader = () => Promise<{ default: ComponentType<StepProps> }>;
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 6;
 
-/** Explicit loaders — Destination is eager; others load on demand into a cache. */
+/** Explicit loaders — Where & when is eager; others load on demand into a cache. */
 const STEP_LOADERS: Array<StepLoader | null> = [
   null,
-  () => import("./steps/DatesStep"),
   () => import("./steps/TravelersStep"),
-  () => import("./steps/FoodPreferencesStep"),
-  () => import("./steps/TransportationStep"),
-  () => import("./steps/TravelStyleStep"),
+  () => import("./steps/StayTransitStep"),
+  () => import("./steps/PaceBudgetStep"),
   () => import("./steps/NapScheduleStep"),
-  () => import("./steps/BudgetStyleStep"),
   () => import("./steps/ActivityInterestsStep"),
-  () => import("./steps/SummaryStep"),
 ];
 
 const stepComponentCache: Array<ComponentType<StepProps> | null> = [
   DestinationStep,
-  null,
-  null,
-  null,
-  null,
   null,
   null,
   null,
@@ -110,7 +103,7 @@ function prefetchWizardAhead(fromIndex: number) {
   void ensureStepComponent(fromIndex + 1);
   void ensureStepComponent(fromIndex + 2);
 
-  if (fromIndex >= 2 && fromIndex <= 3) {
+  if (fromIndex >= 1 && fromIndex <= 2) {
     void import("@/lib/planning-engine/resolve-stay");
   }
   if (fromIndex >= TOTAL_STEPS - 2) {
@@ -226,7 +219,7 @@ export default function TripPlanWizard() {
     return () => setFeedbackAllowed(false);
   }, [itinerary, setFeedbackAllowed]);
 
-  // Never land on Summary (or past a required step) with gaps — send the user back.
+  // Never advance past an incomplete earlier step — send the user back.
   useEffect(() => {
     if (itinerary || isLoading) return;
     const incomplete = findFirstIncompleteWizardStep(formData);
@@ -293,19 +286,30 @@ export default function TripPlanWizard() {
     plan: TripPlan,
     title: WizardStepTitle = WIZARD_STEP_TITLES[stepIndex]!,
   ): string | null {
-    if (title === "Destination" && !isWizardStepComplete(plan, title)) {
-      return "Pick a city from the suggestions so we can plan in the right place.";
+    if (title === "Where & when") {
+      const datesError = getDatesValidationError(plan);
+      if (!hasResolvedDestinationCenter(plan)) {
+        return "Pick a city from the suggestions so we can plan in the right place.";
+      }
+      if (datesError) return datesError;
+      return null;
     }
-    if (title === "Dates") return getDatesValidationError(plan);
-    if (title === "Stay") {
+    if (title === "Stay & getting around") {
       if (plan.accommodationType === "") {
-        return "Choose how you’re staying so we can plan meals and groceries.";
+        return "Choose how you’re staying — and the hotel/rental detail if it asks — so we can plan meals and groceries.";
       }
       if (!isStayNotBookedYet(plan) && (plan.stayAddress ?? "").trim().length < 2) {
         return "Type your hotel name or stay address, or choose “I don’t know yet”.";
       }
+      if (plan.transportationType === "") {
+        return "Pick how you’ll get around between stops.";
+      }
     }
-    if (title === "Naps & Food" && !isWizardStepComplete(plan, title)) {
+    if (title === "Pace & spend") {
+      if (plan.travelStyle === "") return "Pick a day pace for your family.";
+      if (plan.budgetStyle === "") return "Pick how you’d like to spend on this trip.";
+    }
+    if (title === "Food & naps" && !isWizardStepComplete(plan, title)) {
       return "Add a nap window, or choose “No naps needed.”";
     }
     if (!isWizardStepComplete(plan, title)) {
@@ -327,7 +331,7 @@ export default function TripPlanWizard() {
     advancingRef.current = true;
     setIsAdvancing(true);
     try {
-      if (WIZARD_STEP_TITLES[fromIndex] === "Stay") {
+      if (WIZARD_STEP_TITLES[fromIndex] === "Stay & getting around") {
         setError("");
         const { resolveStayFromText } = await import("@/lib/planning-engine/resolve-stay");
         const resolved = await resolveStayFromText(formData);
@@ -497,7 +501,7 @@ export default function TripPlanWizard() {
             <TripNestlyLogo variant="mark" className="h-10 w-auto shrink-0" />
             <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
           </Link>
-          <div className="rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10">
+          <div className="rounded-[1.75rem] border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10">
             <LoadingScreen message={loadingMessage} />
           </div>
         </div>
@@ -517,7 +521,7 @@ export default function TripPlanWizard() {
             <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
           </Link>
 
-          <div className="relative mt-6 rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10">
+          <div className="relative mt-8">
             {error && (
               <p className="mb-4 rounded-2xl border border-error/20 bg-error-muted px-4 py-3.5 text-sm leading-relaxed text-error">
                 {error}

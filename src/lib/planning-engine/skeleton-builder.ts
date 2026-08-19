@@ -49,7 +49,7 @@ export function buildDaySkeleton(
   }
 
   slots.push(intent("morning_activity", morningActivityDefaultTime(plan)));
-  // Day-1 kitchen + nap-overlap: lunch rides with grocery / nap delivery — no early takeout stop.
+  // Day-1 kitchen + nap-overlap: lunch rides with grocery / nap delivery — no early delivery stop.
   if (!shouldFoldLunchIntoDay1Grocery(plan, day)) {
     slots.push(intent("lunch", lunchDefaultTime(plan)));
   }

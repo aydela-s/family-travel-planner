@@ -54,7 +54,7 @@ export default function BackToTopButton() {
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       aria-label="Back to top"
       title="Back to top"
-      className="animate-fade-in fixed bottom-6 right-6 z-30 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white shadow-soft transition hover:bg-primary-hover hover:shadow-md"
+      className="animate-fade-in fixed bottom-6 right-6 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white shadow-soft transition hover:bg-primary-hover hover:shadow-md"
     >
       <UpArrowIcon />
     </button>

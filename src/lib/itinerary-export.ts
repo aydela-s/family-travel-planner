@@ -85,7 +85,7 @@ export function formatCompactActivityLines(
   return { summary, details };
 }
 
-/** Cover date line like "July 8–14" (same year) or full range when years differ. */
+/** Cover date line like "July 8 – 14" (same year) or full range when years differ. */
 export function formatCoverDateRange(startIso: string, endIso: string): string {
   if (!startIso || !endIso) return "";
   const start = new Date(`${startIso}T12:00:00`);
@@ -102,14 +102,14 @@ export function formatCoverDateRange(startIso: string, endIso: string): string {
     ...(sameYear ? {} : { year: "numeric" }),
   });
   if (sameMonth) {
-    return `${startLabel}–${end.getDate()}`;
+    return `${startLabel} – ${end.getDate()}`;
   }
   const endLabel = end.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     ...(sameYear ? {} : { year: "numeric" }),
   });
-  return `${startLabel}–${endLabel}`;
+  return `${startLabel} – ${endLabel}`;
 }
 
 export function formatFamilyCoverLines(
@@ -190,7 +190,7 @@ export function itineraryPdfFilename(itinerary: Itinerary): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
   const start = itinerary.days[0]?.date ?? "trip";
-  return `tripnestly-${city || "trip"}-${start}.pdf`;
+  return `${BRAND.slug}-${city || "trip"}-${start}.pdf`;
 }
 
 export function isValidShareEmail(email: string): boolean {

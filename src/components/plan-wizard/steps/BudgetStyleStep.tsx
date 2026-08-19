@@ -1,27 +1,8 @@
 import { BudgetStyle, StepProps } from "@/types/trip-plan";
+import { BUDGET_STYLE_LABELS } from "@/lib/format-labels";
 import { OptionCard, StepIntro } from "../shared";
 
-const budgetStyleOptions: {
-  value: BudgetStyle;
-  emoji: string;
-  label: string;
-}[] = [
-  {
-    value: "save",
-    emoji: "💰",
-    label: "Save",
-  },
-  {
-    value: "balanced",
-    emoji: "⚖️",
-    label: "Balanced",
-  },
-  {
-    value: "splurge",
-    emoji: "✨",
-    label: "Splurge",
-  },
-];
+const budgetOrder: BudgetStyle[] = ["save", "balanced", "splurge"];
 
 export default function BudgetStyleStep({ formData, updateFormData }: StepProps) {
   return (
@@ -29,18 +10,21 @@ export default function BudgetStyleStep({ formData, updateFormData }: StepProps)
       <StepIntro
         emoji="💰"
         title="How would you like to spend on this trip?"
-        subtitle="This shapes the kinds of activities and restaurants we pick — not a dollar amount."
+        subtitle="This shapes the kinds of activities and restaurants we pick."
       />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        {budgetStyleOptions.map((option) => (
-          <OptionCard
-            key={option.value}
-            selected={formData.budgetStyle === option.value}
-            label={`${option.emoji} ${option.label}`}
-            onClick={() => updateFormData({ budgetStyle: option.value })}
-          />
-        ))}
+        {budgetOrder.map((value) => {
+          const meta = BUDGET_STYLE_LABELS[value];
+          return (
+            <OptionCard
+              key={value}
+              selected={formData.budgetStyle === value}
+              label={`${meta.emoji} ${meta.label}`}
+              onClick={() => updateFormData({ budgetStyle: value })}
+            />
+          );
+        })}
       </div>
     </div>
   );

@@ -41,12 +41,12 @@ describe("feedback validation — FAM-49", () => {
 
   it("builds a plain-text email body with context", () => {
     const email = buildFeedbackEmail({
-      brandName: "TripNestly",
+      brandName: "FamilyTravely",
       message: "Map was blank on day 2.",
       email: "a@b.co",
       pageUrl: "http://localhost:3000/plan",
     });
-    expect(email.subject).toBe("[TripNestly feedback]");
+    expect(email.subject).toBe("[FamilyTravely feedback]");
     expect(email.text).toContain("Map was blank on day 2.");
     expect(email.text).toContain("Reply-to: a@b.co");
     expect(email.text).toContain("http://localhost:3000/plan");

@@ -149,7 +149,7 @@ describe("injectTravelActivities", () => {
       {
         time: "12:00",
         endTime: "12:30",
-        title: "Takeout or delivery lunch at your stay",
+        title: "Delivery lunch at your stay",
         type: "meal",
         timeOfDay: "afternoon",
         location: { name: "2334 Hardwick St", lat: 3, lng: 3 },

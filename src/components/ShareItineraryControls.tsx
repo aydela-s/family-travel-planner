@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import {
   btnGhostClassName,
   btnPrimaryClassName,
-  btnSecondaryClassName,
   inputClassName,
   labelClassName,
 } from "@/components/plan-wizard/shared";
@@ -19,6 +18,39 @@ import { Itinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
 type Status = "idle" | "sending" | "sent" | "error";
+
+const actionBtnClassName =
+  "inline-flex items-center gap-1.5 rounded-full border border-secondary/40 bg-secondary-muted px-4 py-2 text-sm font-semibold text-primary transition hover:border-secondary hover:bg-secondary-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary disabled:opacity-50";
+
+function ShareIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" aria-hidden>
+      <circle cx="18" cy="5" r="2.25" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="6" cy="12" r="2.25" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="18" cy="19" r="2.25" stroke="currentColor" strokeWidth="1.75" />
+      <path
+        d="M8.1 10.9 15.9 6.1M8.1 13.1 15.9 17.9"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" aria-hidden>
+      <path
+        d="M12 4v11M7.5 11.5 12 16l4.5-4.5M5 19h14"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export default function ShareItineraryControls({
   itinerary,
@@ -140,7 +172,7 @@ export default function ShareItineraryControls({
               role="dialog"
               aria-modal="true"
               aria-labelledby={titleId}
-              className="w-full max-w-md rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6"
+              className="w-full max-w-md rounded-[1.75rem] border border-border bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6"
             >
               <div className="flex items-start justify-between gap-3">
                 <h2 id={titleId} className="text-lg font-semibold text-ink">
@@ -149,7 +181,7 @@ export default function ShareItineraryControls({
                 <button
                   type="button"
                   onClick={close}
-                  className="rounded-xl px-2 py-1 text-sm font-semibold text-muted hover:bg-background hover:text-ink"
+                  className="rounded-full px-2 py-1 text-sm font-semibold text-muted hover:bg-background hover:text-ink"
                   aria-label="Close share dialog"
                 >
                   ✕
@@ -158,8 +190,8 @@ export default function ShareItineraryControls({
 
               {status === "sent" ? (
                 <div className="mt-5 space-y-4">
-                  <p className="rounded-2xl border border-primary/20 bg-primary-muted px-4 py-3.5 text-sm leading-relaxed text-ink">
-                    Sent — they should see it in their inbox shortly.
+                  <p className="rounded-2xl border border-secondary/30 bg-secondary-muted px-4 py-3.5 text-sm leading-relaxed text-ink">
+                    Sent. They should see it in their inbox shortly.
                   </p>
                   <button type="button" onClick={close} className={btnPrimaryClassName}>
                     Done
@@ -217,7 +249,7 @@ export default function ShareItineraryControls({
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <button
           type="button"
           disabled={disabled}
@@ -225,21 +257,23 @@ export default function ShareItineraryControls({
             setOpen(true);
             if (status === "sent") resetShareForm();
           }}
-          className={btnSecondaryClassName}
+          className={actionBtnClassName}
         >
-          Share by email
+          <ShareIcon />
+          Share
         </button>
         <button
           type="button"
           disabled={disabled}
           onClick={() => void onDownload()}
-          className={btnPrimaryClassName}
+          className={actionBtnClassName}
         >
-          Download PDF
+          <DownloadIcon />
+          Download
         </button>
       </div>
       {downloadError && (
-        <p className="mt-2 text-sm text-error" role="alert">
+        <p className="mt-2 text-right text-sm text-error" role="alert">
           {downloadError}
         </p>
       )}

@@ -1,5 +1,5 @@
 import { WizardShell } from "@/components/plan-wizard/WizardShell";
-import { btnPrimaryClassName, StepIntro } from "@/components/plan-wizard/shared";
+import { btnPrimaryClassName, inputClassName, StepIntro } from "@/components/plan-wizard/shared";
 
 /**
  * Instant first paint for /plan — same layout as step 1 so navigation feels native.
@@ -31,7 +31,7 @@ export default function PlanLoading() {
             type="text"
             disabled
             placeholder="Start typing a city..."
-            className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3.5 text-ink shadow-sm outline-none placeholder:text-muted"
+            className={`${inputClassName} disabled:cursor-not-allowed`}
           />
         </div>
       </div>

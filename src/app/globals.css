@@ -13,9 +13,9 @@
   --secondary-muted: #e6f9fb;
 
   /* Surfaces */
-  --background: #fafbfc;
+  --background: #f7fbfc;
   --surface: #ffffff;
-  --border: #e5e7eb;
+  --border: #d9e8eb;
 
   /* Text */
   --text: #1f2937;
@@ -75,6 +75,7 @@
   --font-sans: var(--font-poppins);
   --shadow-card: 0 1px 2px rgb(31 41 55 / 0.04), 0 4px 16px rgb(31 41 55 / 0.06);
   --shadow-soft: 0 2px 8px rgb(1 109 118 / 0.14);
+  --shadow-accent: 0 2px 10px rgb(255 87 87 / 0.22);
 }
 
 body {

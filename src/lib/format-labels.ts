@@ -7,7 +7,7 @@ import {
 
 /**
  * Single source of truth for user-facing labels of these enums.
- * Wizard steps and the Summary review step must both read from here so
+ * Wizard steps and itinerary chips/emails must both read from here so
  * their wording can never drift apart again (see FAM-17).
  */
 export const TRAVEL_STYLE_LABELS: Record<TravelStyle, string> = {
@@ -47,7 +47,8 @@ export function getAccommodationLabel(type: AccommodationType | ""): string {
 
 export const BUDGET_STYLE_LABELS: Record<BudgetStyle, { emoji: string; label: string }> = {
   save: { emoji: "💰", label: "Save" },
-  balanced: { emoji: "⚖️", label: "Balanced" },
+  // Avoid "Balanced" — that word is reserved for travel pace.
+  balanced: { emoji: "🧘", label: "Comfortable" },
   splurge: { emoji: "✨", label: "Splurge" },
 };
 

@@ -58,8 +58,10 @@ type RawActivity = {
   allowShortVisit?: boolean;
 };
 
-/** Takeout/delivery lunch at the stay starts this many minutes before a regular nap. */
-export const TAKEOUT_BEFORE_NAP_MIN = 60;
+/** Delivery lunch at the stay starts this many minutes before a regular nap. */
+export const DELIVERY_BEFORE_NAP_MIN = 60;
+/** @deprecated Prefer DELIVERY_BEFORE_NAP_MIN — kept for existing imports. */
+export const TAKEOUT_BEFORE_NAP_MIN = DELIVERY_BEFORE_NAP_MIN;
 
 const GROCERY = /\bgrocery\b/i;
 const RESTAURANT =
@@ -67,7 +69,9 @@ const RESTAURANT =
 const COOK_DINNER = /\bcook dinner|dinner at your rental|cook at your|cook at accommodation\b/i;
 const PICNIC = /\bpicnic\b/i;
 const RETURN_HOME = /\breturn to|back to (your )?(rental|accommodation|stay|hotel|home)\b/i;
-const TAKEOUT_AT_STAY = /\btakeout or delivery lunch at your stay\b/i;
+/** Delivery lunch at stay (legacy takeout wording still matched for saved itineraries). */
+const DELIVERY_AT_STAY =
+  /\b(delivery lunch at your stay|takeout or delivery lunch at your stay)\b/i;
 
 /** Minimum lunch length when a nap follows later the same morning. */
 export const MIN_LUNCH_DURATION_MIN = 40;
@@ -313,9 +317,14 @@ export function isLunchMeal(a: RawActivity): boolean {
   return hour >= 11 * 60 && hour < 16 * 60;
 }
 
-/** Stay-home takeout/delivery lunch that should precede a regular nap by 1 hour. */
+/** Stay-home delivery lunch that should precede a regular nap by 1 hour. */
+export function isDeliveryAtStayLunch(a: Pick<RawActivity, "title" | "type">): boolean {
+  return a.type === "meal" && DELIVERY_AT_STAY.test(a.title);
+}
+
+/** @deprecated Prefer isDeliveryAtStayLunch. */
 export function isTakeoutAtStayLunch(a: Pick<RawActivity, "title" | "type">): boolean {
-  return a.type === "meal" && TAKEOUT_AT_STAY.test(a.title);
+  return isDeliveryAtStayLunch(a);
 }
 
 /** Lunch slot in the day skeleton — not breakfast or dinner. */
@@ -356,12 +365,12 @@ export function resolveGroceryMealConflicts(
       return parseTimeToMinutes(a.time) >= 15 * 60;
     });
 
-    // Day-1 kitchen + nap-overlap: never leave takeout/delivery lunch before grocery.
+    // Day-1 kitchen + nap-overlap: never leave delivery lunch before grocery.
     if (shouldAddTripStartGrocery(plan, day)) {
       result = result.filter(
         (a) =>
           !(
-            a.type === "meal" && TAKEOUT_AT_STAY.test(a.title)
+            a.type === "meal" && DELIVERY_AT_STAY.test(a.title)
           ),
       );
     }
@@ -726,7 +735,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
     ? required.slice(0, Math.max(napRequiredIdx, 0)).find((a) => isDaytimeMeal(a))
     : undefined;
   const lunchAnchor = lunchBeforeNapItem ?? required.find(isDaytimeMeal);
-  const lunchAtStay = Boolean(lunchAnchor && isTakeoutAtStayLunch(lunchAnchor));
+  const lunchAtStay = Boolean(lunchAnchor && isDeliveryAtStayLunch(lunchAnchor));
   const middayNap =
     resolvedNapStart != null && resolvedNapStart >= 11 * 60;
   const napAnchoredMorning = Boolean(middayNap && lunchBeforeNap && !napBeforeMorning);
@@ -760,7 +769,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
           travelMin: defaultTravelMin(plan),
           venueOpenMin,
           lunchDurationMin: lunchAnchor
-            ? isTakeoutAtStayLunch(lunchAnchor)
+            ? isDeliveryAtStayLunch(lunchAnchor)
               ? Math.max(MIN_LUNCH_DURATION_MIN, 45)
               : MIN_LUNCH_DURATION_MIN
             : 45,
@@ -825,7 +834,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
     } else if (
       item.type === "nap" &&
       result.length > 0 &&
-      (TAKEOUT_AT_STAY.test(result[result.length - 1]!.title) ||
+      (DELIVERY_AT_STAY.test(result[result.length - 1]!.title) ||
         /cook dinner at your rental/i.test(result[result.length - 1]!.title))
     ) {
       // Stay-home lunch → stay-home nap: no transit gap (was slipping 12:00 naps to 12:10).
@@ -859,9 +868,9 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       const { maxMin: lunchMax, minMin } = lunchTimeWindow(plan);
       const lunchTravel = transferIntoLunch(result[result.length - 1], travel);
       const natural = cursor + lunchTravel;
-      // Takeout/delivery at the stay: start exactly 1 hour before the nap.
-      if (isTakeoutAtStayLunch(item) && napRequiredIdx > i && resolvedNapStart != null) {
-        start = resolvedNapStart - TAKEOUT_BEFORE_NAP_MIN;
+      // Delivery at the stay: start exactly 1 hour before the nap.
+      if (isDeliveryAtStayLunch(item) && napRequiredIdx > i && resolvedNapStart != null) {
+        start = resolvedNapStart - DELIVERY_BEFORE_NAP_MIN;
       } else if (napRequiredIdx > i && resolvedNapStart != null) {
         // When nap follows, start lunch early enough for a full 40-minute meal —
         // allow a bit of early flex before the age window when needed.
@@ -978,11 +987,11 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       let mustEndBy = resolvedNapStart - gap;
       if (lunchIdx > i && lunchIdx < napRequiredIdx && !isDaytimeMeal(item)) {
         const lunchItem = required[lunchIdx]!;
-        if (isTakeoutAtStayLunch(lunchItem)) {
-          // Takeout starts 1 hour before nap at the stay — no travel gap into lunch.
+        if (isDeliveryAtStayLunch(lunchItem)) {
+          // Delivery starts 1 hour before nap at the stay — no travel gap into lunch.
           mustEndBy = Math.min(
             mustEndBy,
-            resolvedNapStart - TAKEOUT_BEFORE_NAP_MIN - transferIntoLunch(item, gap),
+            resolvedNapStart - DELIVERY_BEFORE_NAP_MIN - transferIntoLunch(item, gap),
           );
         } else {
           const lunchFloor = lunchFloorBeforeNap(plan);
@@ -1146,8 +1155,8 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
 
     // If lunch still sits before a nap, re-clamp duration after any start push/trim.
     if (isDaytimeMeal(item) && napRequiredIdx > i && resolvedNapStart != null) {
-      // Takeout at stay → nap: no transit; lunch may run until nap start.
-      const gap = isTakeoutAtStayLunch(item) ? 0 : defaultTravelMin(plan);
+      // Delivery at stay → nap: no transit; lunch may run until nap start.
+      const gap = isDeliveryAtStayLunch(item) ? 0 : defaultTravelMin(plan);
       const mustEndBy = resolvedNapStart - gap;
       if (start + duration > mustEndBy) {
         duration = Math.max(20, mustEndBy - start);

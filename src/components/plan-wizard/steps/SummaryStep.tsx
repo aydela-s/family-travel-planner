@@ -64,8 +64,7 @@ export default function SummaryStep({ formData }: StepProps) {
     <div className="space-y-6">
       <StepIntro
         emoji="🎉"
-        title="Looking good!"
-        subtitle="Give it a quick scan — then we'll cook up your family day plan."
+        title="Everything look good? Let’s build your trip."
       />
 
       <dl className="rounded-2xl border border-border bg-background px-5 shadow-sm">

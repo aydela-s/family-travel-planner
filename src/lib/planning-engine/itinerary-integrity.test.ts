@@ -84,7 +84,7 @@ describe("transport / activity consistency", () => {
       activity({
         time: "11:45",
         endTime: "12:30",
-        title: "Takeout or delivery lunch at your stay",
+        title: "Delivery lunch at your stay",
         type: "meal",
         location: { name: "Your stay", lat: 3, lng: 3 },
       }),
@@ -115,7 +115,7 @@ describe("transport / activity consistency", () => {
           activity({
             time: "11:45",
             endTime: "12:30",
-            title: "Takeout or delivery lunch at your stay",
+            title: "Delivery lunch at your stay",
             type: "meal",
             location: { name: "Your stay", lat: 3, lng: 3 },
             activityCost: 40,
@@ -395,7 +395,7 @@ describe("timeline integrity repairs", () => {
           activity({
             time: "12:00",
             endTime: "12:30",
-            title: "Takeout or delivery lunch at your stay",
+            title: "Delivery lunch at your stay",
             type: "meal",
             location: { name: "2334 Hardwick St", lat: 3, lng: 3 },
             activityCost: 16,

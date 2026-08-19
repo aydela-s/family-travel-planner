@@ -1,19 +1,28 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import PlanSelectionChips from "@/components/PlanSelectionChips";
 import ShareItineraryControls from "@/components/ShareItineraryControls";
 import {
-  formatMoney,
   formatPlaceRatingBadge,
   formatTime12h,
   formatTimeCompact,
   oneLineNote,
 } from "@/lib/format";
-import { getBudgetStyleLabelPlain, getTravelStyleLabel } from "@/lib/format-labels";
+import { formatCoverDateRange } from "@/lib/itinerary-export";
 import { interestSourceLabels } from "@/lib/schedule/interest-map";
-import { Itinerary, ItineraryActivity, ItineraryDay } from "@/types/itinerary";
-import { TripPlan } from "@/types/trip-plan";
+import { stayHomeLocation } from "@/lib/planning-engine/stay-home";
+import {
+  ActivityLocation,
+  Itinerary,
+  ItineraryActivity,
+  ItineraryDay,
+  RouteSegment,
+} from "@/types/itinerary";
+import { TransportationType, TripPlan } from "@/types/trip-plan";
+import { namesMatch } from "@/lib/pricing/transport-planner";
+import { formatMiles } from "@/lib/format-distance";
+import { getTransportationLabel } from "@/lib/format-labels";
 
 type TypeStyle = {
   icon: ReactNode;
@@ -104,6 +113,40 @@ function ExpandChevron() {
   );
 }
 
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" fill="none" aria-hidden>
+      <path
+        d="M12 21s7-4.8 7-10.5a7 7 0 1 0-14 0C5 16.2 12 21 12 21Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="10.5" r="2.25" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+function BudgetWalletIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5 text-secondary" fill="none" aria-hidden>
+      <rect x="3.5" y="6" width="17" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.75" />
+      <path d="M3.5 10h17" stroke="currentColor" strokeWidth="1.75" />
+      <circle cx="16.5" cy="14.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function dayTabSublabel(day: ItineraryDay): string {
+  const parsed = new Date(`${day.date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return day.weekday ? day.weekday.slice(0, 3) : "";
+  }
+  const dateNum = parsed.getDate();
+  const weekday = parsed.toLocaleDateString("en-US", { weekday: "short" });
+  return `${dateNum} ${weekday}`;
+}
+
 const typeStyle: Record<ItineraryActivity["type"], TypeStyle> = {
   meal: {
     icon: <MealIcon />,
@@ -181,6 +224,142 @@ function locationAlreadyInTitle(title: string, locationName: string): boolean {
   return stem.length > 3 && t.includes(stem);
 }
 
+function travelModeLabel(type: TransportationType | "" | undefined): string {
+  if (type === "car-rental") return "Drive";
+  if (type === "taxis") return "Taxi";
+  if (type === "public-transportation") return "Public transit";
+  if (type === "walking") return "Walk";
+  return type ? getTransportationLabel(type) : "Travel";
+}
+
+function mapsTravelMode(type: TransportationType | "" | undefined): string {
+  if (type === "walking") return "walking";
+  if (type === "public-transportation") return "transit";
+  return "driving";
+}
+
+function hasFiniteCoords(loc: ActivityLocation | null | undefined): loc is ActivityLocation {
+  return (
+    !!loc &&
+    typeof loc.lat === "number" &&
+    typeof loc.lng === "number" &&
+    Number.isFinite(loc.lat) &&
+    Number.isFinite(loc.lng)
+  );
+}
+
+/** Prefer lat/lng so Maps opens the real hop, not a wrong place-name match. */
+function directionsUrl(
+  from: ActivityLocation,
+  to: ActivityLocation,
+  transportationType: TransportationType | "" | undefined,
+): string {
+  const travelmode = mapsTravelMode(transportationType);
+  const origin = hasFiniteCoords(from)
+    ? `${from.lat},${from.lng}`
+    : encodeURIComponent(from.name);
+  const destination = hasFiniteCoords(to)
+    ? `${to.lat},${to.lng}`
+    : encodeURIComponent(to.name);
+  return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=${travelmode}`;
+}
+
+function findHopSegment(
+  segments: RouteSegment[],
+  fromName: string,
+  toName: string,
+): RouteSegment | undefined {
+  return segments.find(
+    (s) =>
+      namesMatch(s.from, fromName) &&
+      namesMatch(s.to, toName) &&
+      (s.distanceKm > 0 || s.cost > 0 || s.durationMin > 0),
+  );
+}
+
+function nearestLocated(
+  activities: ItineraryActivity[],
+  fromIndex: number,
+  direction: -1 | 1,
+): ActivityLocation | null {
+  for (let i = fromIndex + direction; i >= 0 && i < activities.length; i += direction) {
+    const a = activities[i]!;
+    if (a.type === "travel") continue;
+    if (a.location) return a.location;
+  }
+  return null;
+}
+
+function TravelLeg({
+  currencySymbol,
+  transportationType,
+  from,
+  to,
+  segment,
+  activity,
+}: {
+  currencySymbol: string;
+  transportationType?: TransportationType | "";
+  from: ActivityLocation | null;
+  to: ActivityLocation | null;
+  segment?: RouteSegment;
+  /** Optional injected travel row — used for cost / notes fallback. */
+  activity?: ItineraryActivity;
+}) {
+  const miles =
+    segment && segment.distanceKm > 0
+      ? formatMiles(segment.distanceKm)
+      : (activity?.notes?.match(/[\d.]+ mi/)?.[0] ?? null);
+  const duration =
+    segment && segment.durationMin > 0
+      ? `~${segment.durationMin} min`
+      : (activity?.notes?.match(/~\d+\s*min/)?.[0] ?? null);
+  const costAmount =
+    activity?.activityCost != null
+      ? activity.activityCost
+      : segment
+        ? segment.cost
+        : null;
+  const cost =
+    costAmount != null ? moneyWhole(costAmount, currencySymbol) : null;
+  const maps =
+    from && to ? directionsUrl(from, to, transportationType) : null;
+  const meta = [miles, duration].filter(Boolean).join(" · ");
+
+  return (
+    <div className="relative flex gap-3 border-b border-border/60 px-3 py-2.5 sm:gap-3.5 sm:px-4">
+      <div className="flex w-7 shrink-0 flex-col items-center self-stretch" aria-hidden>
+        <span className="w-px flex-1 border-l border-dashed border-muted/50" />
+        <span className="my-1 h-1.5 w-1.5 shrink-0 rounded-full bg-muted" />
+        <span className="w-px flex-1 border-l border-dashed border-muted/50" />
+      </div>
+      <div className="flex min-w-0 flex-1 items-start justify-between gap-3 py-0.5">
+        <div className="min-w-0 text-sm italic leading-relaxed text-muted">
+          <p className="not-italic font-semibold text-ink">{travelModeLabel(transportationType)}</p>
+          {meta && <p>{meta}</p>}
+          {maps && (
+            <p>
+              <a
+                href={maps}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="not-italic font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Open directions in Google Maps
+              </a>
+            </p>
+          )}
+        </div>
+        {cost && (
+          <span className="shrink-0 pt-0.5 text-sm font-semibold not-italic tabular-nums text-ink">
+            {cost}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TimelineItem({
   activity,
   currencySymbol,
@@ -193,9 +372,7 @@ function TimelineItem({
   const style = typeStyle[activity.type];
   const ratingBadge = formatPlaceRatingBadge(activity.rating, activity.reviewCount);
   const paid =
-    activity.type === "meal" ||
-    activity.type === "travel" ||
-    (activity.activityCost != null && activity.activityCost > 0)
+    activity.type === "meal" || (activity.activityCost != null && activity.activityCost > 0)
       ? moneyWhole(activity.activityCost ?? 0, currencySymbol)
       : null;
   const rawNote = activity.notes ? oneLineNote(activity.notes) : "";
@@ -233,7 +410,7 @@ function TimelineItem({
           <span className="shrink-0 text-sm font-semibold tabular-nums text-ink">{paid}</span>
         )}
         <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background text-ink shadow-sm transition group-open:rotate-180 group-open:border-primary group-open:bg-primary group-open:text-white"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background text-ink shadow-sm transition group-open:rotate-180 group-open:border-accent group-open:bg-accent group-open:text-white"
           aria-hidden
         >
           <ExpandChevron />
@@ -269,30 +446,140 @@ function TimelineItem({
   );
 }
 
-function DayCostTiles({ day, symbol }: { day: ItineraryDay; symbol: string }) {
-  const c = day.costBreakdown;
+function TripTotalBanner({
+  tripTotal,
+  activities,
+  food,
+  transport,
+  symbol,
+  disclaimer,
+}: {
+  tripTotal: number;
+  activities: number;
+  food: number;
+  transport: number;
+  symbol: string;
+  disclaimer: string;
+}) {
+  const segments = [
+    {
+      key: "activities",
+      label: "Activities",
+      amount: activities,
+      wrap: "border-primary/20 bg-primary-muted/70",
+      dot: "bg-itinerary-activity",
+    },
+    {
+      key: "food",
+      label: "Food",
+      amount: food,
+      wrap: "border-accent/25 bg-accent-muted/80",
+      dot: "bg-itinerary-meal",
+    },
+    {
+      key: "transport",
+      label: "Transport",
+      amount: transport,
+      wrap: "border-secondary/30 bg-secondary-muted",
+      dot: "bg-itinerary-rest",
+    },
+  ] as const;
 
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3">
-      {(
-        [
-          ["Food", c.food],
-          ["Transport", c.transport],
-          ["Activities", c.activities],
-        ] as const
-      ).map(([label, amount]) => (
-        <div
-          key={label}
-          className="rounded-xl border border-border bg-background px-2.5 py-2.5 text-center sm:px-3 sm:py-3"
-        >
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted sm:text-xs">
-            {label}
+    <section className="rounded-3xl border border-secondary/20 bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6">
+      <header className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary-muted">
+          <BudgetWalletIcon />
+        </span>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+            Estimated trip total
           </p>
-          <p className="mt-0.5 text-base font-bold tabular-nums text-ink sm:text-lg">
-            {moneyWhole(amount, symbol)}
+          <p className="mt-0.5 text-3xl font-bold tabular-nums tracking-tight text-ink">
+            {moneyWhole(tripTotal, symbol)}
           </p>
         </div>
-      ))}
+      </header>
+
+      <dl className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+        {segments.map((segment) => (
+          <div
+            key={segment.key}
+            className={`min-w-0 rounded-2xl border px-2.5 py-3 text-center sm:px-3.5 sm:text-left ${segment.wrap}`}
+          >
+            <dt className="flex items-center justify-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink/70 sm:justify-start">
+              <span className={`h-2 w-2 rounded-full ${segment.dot}`} aria-hidden />
+              {segment.label}
+            </dt>
+            <dd className="mt-1.5 text-base font-bold tabular-nums text-ink sm:text-lg">
+              {moneyWhole(segment.amount, symbol)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <p className="mt-4 text-xs leading-relaxed text-muted">{disclaimer}</p>
+    </section>
+  );
+}
+
+function DayTabs({
+  days,
+  selectedDay,
+  onSelect,
+  disabled = false,
+  tabsId,
+}: {
+  days: ItineraryDay[];
+  selectedDay: number;
+  onSelect: (day: number) => void;
+  disabled?: boolean;
+  tabsId: string;
+}) {
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    event.preventDefault();
+    const index = days.findIndex((day) => day.day === selectedDay);
+    if (index < 0) return;
+    const delta = event.key === "ArrowRight" ? 1 : -1;
+    const next = days[(index + delta + days.length) % days.length];
+    if (next) onSelect(next.day);
+  }
+
+  return (
+    <div
+      role="tablist"
+      aria-label="Trip days"
+      onKeyDown={onKeyDown}
+      className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1"
+    >
+      {days.map((day) => {
+        const selected = day.day === selectedDay;
+        return (
+          <button
+            key={day.day}
+            type="button"
+            role="tab"
+            id={`${tabsId}-tab-${day.day}`}
+            aria-selected={selected}
+            aria-controls={`${tabsId}-panel-${day.day}`}
+            tabIndex={selected ? 0 : -1}
+            disabled={disabled}
+            onClick={() => onSelect(day.day)}
+            className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full border text-center transition sm:h-[4.75rem] sm:w-[4.75rem] ${
+              selected
+                ? "border-primary bg-primary text-white shadow-soft"
+                : "border-secondary/35 bg-secondary-muted/40 text-ink hover:border-secondary hover:bg-secondary-muted"
+            } disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            <span className="text-xs font-semibold sm:text-sm">Day {day.day}</span>
+            <span className={`text-[10px] sm:text-xs ${selected ? "text-white/85" : "text-muted"}`}>
+              {dayTabSublabel(day)}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -300,38 +587,110 @@ function DayCostTiles({ day, symbol }: { day: ItineraryDay; symbol: string }) {
 function DayCard({
   day,
   symbol,
+  plan,
   planInterests = [],
+  panelId,
+  labelledBy,
 }: {
   day: ItineraryDay;
   symbol: string;
+  plan?: TripPlan;
   planInterests?: string[];
+  panelId?: string;
+  labelledBy?: string;
 }) {
-  const total = moneyWhole(day.costBreakdown.total, symbol);
+  const stay = plan ? stayHomeLocation(plan) : null;
+  const transportationType = plan?.transportationType;
+  const activities = day.activities;
+  const segments = day.routeSegments ?? [];
+
+  const firstStop = activities.find((a) => a.type !== "travel" && a.location)?.location ?? null;
+  const lastStop =
+    [...activities].reverse().find((a) => a.type !== "travel" && a.location)?.location ?? null;
+
+  const hasLeadingTravel = activities[0]?.type === "travel";
+  const hasTrailingTravel = activities[activities.length - 1]?.type === "travel";
+
+  const inboundSegment =
+    stay && firstStop ? findHopSegment(segments, stay.name, firstStop.name) : undefined;
+  const outboundSegment =
+    stay && lastStop ? findHopSegment(segments, lastStop.name, stay.name) : undefined;
+
+  function renderTravel(
+    key: string,
+    from: ActivityLocation | null,
+    to: ActivityLocation | null,
+    segment: RouteSegment | undefined,
+    activity?: ItineraryActivity,
+  ) {
+    if (!from || !to) return null;
+    return (
+      <TravelLeg
+        key={key}
+        currencySymbol={symbol}
+        transportationType={transportationType}
+        from={from}
+        to={to}
+        segment={segment}
+        activity={activity}
+      />
+    );
+  }
 
   return (
-    <section className="animate-fade-in overflow-hidden rounded-3xl border border-border bg-surface shadow-[var(--shadow-card)]">
-      <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-5 sm:px-6">
+    <section
+      id={panelId}
+      role="tabpanel"
+      aria-labelledby={labelledBy}
+      className="animate-fade-in overflow-hidden rounded-3xl border border-secondary/20 bg-surface shadow-[var(--shadow-card)]"
+    >
+      <header className="flex items-start justify-between gap-4 border-b border-secondary/15 bg-secondary-muted/30 px-5 py-4 sm:px-6">
         <div className="min-w-0">
-          <h3 className="text-xl font-bold text-ink sm:text-2xl">
-            Day {day.day} · {day.formattedDate}
+          <h3 className="text-lg font-bold text-ink sm:text-xl">
+            {day.displayTitle || `Day ${day.day}`}
           </h3>
+          <p className="mt-0.5 text-sm text-muted">{day.formattedDate}</p>
         </div>
-        <p className="shrink-0 text-2xl font-bold tabular-nums text-ink sm:text-3xl">{total}</p>
+        <p className="shrink-0 pt-0.5 text-lg font-bold tabular-nums tracking-tight text-ink sm:text-xl">
+          {moneyWhole(day.costBreakdown.total, symbol)}
+        </p>
       </header>
 
-      <div className="space-y-5 p-5 sm:p-6">
-        <DayCostTiles day={day} symbol={symbol} />
+      <div className="overflow-hidden">
+        {!hasLeadingTravel &&
+          inboundSegment &&
+          renderTravel("inbound-stay", stay, firstStop, inboundSegment)}
 
-        <div className="overflow-hidden rounded-2xl border border-border">
-          {day.activities.map((a) => (
+        {activities.map((a, index) => {
+          if (a.type === "travel") {
+            const prev = nearestLocated(activities, index, -1) ?? stay;
+            const next = nearestLocated(activities, index, 1) ?? stay;
+            const segment =
+              prev && next
+                ? findHopSegment(segments, prev.name, next.name)
+                : undefined;
+            return renderTravel(
+              `travel-${a.time}-${a.title}`,
+              prev,
+              next,
+              segment,
+              a,
+            );
+          }
+
+          return (
             <TimelineItem
               key={`${a.time}-${a.type}-${a.title}`}
               activity={a}
               currencySymbol={symbol}
               planInterests={planInterests}
             />
-          ))}
-        </div>
+          );
+        })}
+
+        {!hasTrailingTravel &&
+          outboundSegment &&
+          renderTravel("outbound-stay", lastStop, stay, outboundSegment)}
       </div>
     </section>
   );
@@ -355,14 +714,29 @@ export default function ItineraryDisplay({
   onPlanAnother?: () => void;
 }) {
   const tripTotal = itinerary.days.reduce((s, d) => s + d.costs.total, 0);
+  const tripActivities = itinerary.days.reduce((s, d) => s + d.costBreakdown.activities, 0);
+  const tripFood = itinerary.days.reduce((s, d) => s + d.costBreakdown.food, 0);
+  const tripTransport = itinerary.days.reduce((s, d) => s + d.costBreakdown.transport, 0);
   const symbol = itinerary.currencySymbol;
   const showSelectionChips = plan && onApplyPlanUpdate && onEditPlanInWizard;
+  const tabsId = useId();
+  const [selectedDay, setSelectedDay] = useState(itinerary.days[0]?.day ?? 1);
+
+  useEffect(() => {
+    const ids = itinerary.days.map((day) => day.day);
+    if (!ids.includes(selectedDay)) {
+      setSelectedDay(ids[0] ?? 1);
+    }
+  }, [itinerary.days, selectedDay]);
+
+  const activeDay =
+    itinerary.days.find((day) => day.day === selectedDay) ?? itinerary.days[0];
 
   return (
-    <div className="relative space-y-8 animate-fade-in">
+    <div className="relative space-y-6 animate-fade-in sm:space-y-8">
       {isLoading && (
         <div
-          className="absolute inset-0 z-30 flex items-start justify-center rounded-3xl bg-surface/70 pt-24 backdrop-blur-[1px]"
+          className="absolute inset-0 z-30 flex items-start justify-center rounded-3xl bg-background/70 pt-24 backdrop-blur-[1px]"
           role="status"
           aria-live="polite"
         >
@@ -384,19 +758,38 @@ export default function ItineraryDisplay({
         </div>
       )}
 
-      <header className="space-y-4 border-b border-border pb-6">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Your trip</p>
-          <p className="mt-1 text-sm text-muted">{itinerary.tripStartFormatted}</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-            {itinerary.destinationCity}
-          </h2>
-          <p className="mt-1 text-muted">
-            {itinerary.days.length} day{itinerary.days.length !== 1 ? "s" : ""} ·{" "}
-            {plan
-              ? `${getTravelStyleLabel(plan.travelStyle)} pace · ${getBudgetStyleLabelPlain(itinerary.budgetStyle)} budget`
-              : `${getBudgetStyleLabelPlain(itinerary.budgetStyle)} budget`}
-          </p>
+      <header className="space-y-4">
+        <div className="flex items-start justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2.5 text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+              <PinIcon />
+              <span>{itinerary.destinationCity || itinerary.destination}</span>
+            </h2>
+            <p className="mt-2 text-base text-muted sm:text-lg">
+              {plan
+                ? [
+                    plan.startDate && plan.endDate
+                      ? formatCoverDateRange(plan.startDate, plan.endDate) ||
+                        itinerary.tripStartFormatted
+                      : itinerary.tripStartFormatted,
+                    `${plan.adults} adult${plan.adults !== 1 ? "s" : ""}`,
+                    plan.children.length > 0
+                      ? `${plan.children.length} kid${plan.children.length !== 1 ? "s" : ""}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : itinerary.tripStartFormatted}
+            </p>
+          </div>
+
+          <div className="shrink-0">
+            <ShareItineraryControls
+              itinerary={itinerary}
+              plan={plan}
+              disabled={isLoading}
+            />
+          </div>
         </div>
 
         {showSelectionChips && (
@@ -407,33 +800,37 @@ export default function ItineraryDisplay({
             onEditInWizard={onEditPlanInWizard}
           />
         )}
-
-        <p className="rounded-xl border border-border bg-background px-3 py-2 text-xs leading-relaxed text-muted">
-          {itinerary.pricingDisclaimer}
-        </p>
-
-        <div className="rounded-2xl bg-primary px-5 py-4 text-white shadow-soft">
-          <p className="text-xs font-semibold uppercase tracking-wider opacity-90">Estimated trip total</p>
-          <p className="text-2xl font-bold">{formatMoney(tripTotal, itinerary.currency, symbol)}</p>
-        </div>
-
-        <ShareItineraryControls
-          itinerary={itinerary}
-          plan={plan}
-          disabled={isLoading}
-        />
       </header>
 
-      <div className="space-y-8">
-        {itinerary.days.map((day) => (
-          <DayCard
-            key={day.day}
-            day={day}
-            symbol={symbol}
-            planInterests={plan?.interests ?? []}
-          />
-        ))}
-      </div>
+      <TripTotalBanner
+        tripTotal={tripTotal}
+        activities={tripActivities}
+        food={tripFood}
+        transport={tripTransport}
+        symbol={symbol}
+        disclaimer={itinerary.pricingDisclaimer}
+      />
+
+      {itinerary.days.length > 0 && (
+        <DayTabs
+          days={itinerary.days}
+          selectedDay={activeDay?.day ?? selectedDay}
+          onSelect={setSelectedDay}
+          disabled={isLoading}
+          tabsId={tabsId}
+        />
+      )}
+
+      {activeDay && (
+        <DayCard
+          day={activeDay}
+          symbol={symbol}
+          plan={plan}
+          planInterests={plan?.interests ?? []}
+          panelId={`${tabsId}-panel-${activeDay.day}`}
+          labelledBy={`${tabsId}-tab-${activeDay.day}`}
+        />
+      )}
     </div>
   );
 }

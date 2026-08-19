@@ -68,13 +68,46 @@ describe("planMealsOnBlueprint", () => {
     expect(interactive?.anchor).toBeDefined();
     const lunch = interactive!.meals.find((m) => m.slot === "lunch");
     expect(lunch).toBeDefined();
-    // Nap takeout still records nearLandmarkName as the anchor for geo intent
+    // Nap delivery still records nearLandmarkName as the anchor for geo intent
     expect(lunch!.nearLandmarkName).toBe(interactive!.anchor!.landmarkName);
+  });
+
+  it("uses delivery_at_stay (not takeout) when nap overlaps lunch (FAM-82)", () => {
+    const plan = sdPlan();
+    const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
+    const withStops = commitStopsToBlueprint(themed, plan, city);
+    const withMeals = planMealsOnBlueprint(withStops, plan, city);
+
+    const lunches = withMeals.days.flatMap((d) => d.meals.filter((m) => m.slot === "lunch"));
+    expect(lunches.length).toBeGreaterThan(0);
+    expect(lunches.every((m) => m.mode === "delivery_at_stay")).toBe(true);
   });
 });
 
 describe("planTrip staged meals + schedule", () => {
   const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
+
+  it("emits delivery lunch at stay with no takeout wording (FAM-82)", () => {
+    const { raw } = planTrip(sdPlan(), { cityOverride: city, plannerEngine: "staged" });
+    const dayActivities = raw.days[0]!.activities;
+    const lunch = dayActivities.find((a) => a.type === "meal" && /lunch/i.test(a.title));
+    expect(lunch).toBeDefined();
+    expect(lunch!.title).toBe("Delivery lunch at your stay");
+    expect(`${lunch!.title} ${lunch!.notes ?? ""}`.toLowerCase()).not.toMatch(/takeout/);
+
+    const lunchIdx = dayActivities.findIndex((a) => a === lunch);
+    const napIdx = dayActivities.findIndex((a) => a.type === "nap");
+    expect(napIdx).toBeGreaterThan(lunchIdx);
+
+    // Family is at the stay for lunch (travel home lands before delivery meal when a hop exists).
+    const beforeLunch = dayActivities.slice(0, lunchIdx);
+    const travelHome = [...beforeLunch].reverse().find((a) => a.type === "travel");
+    if (travelHome) {
+      expect(parseTimeToMinutes(travelHome.endTime ?? travelHome.time)).toBeLessThanOrEqual(
+        parseTimeToMinutes(lunch!.time),
+      );
+    }
+  });
 
   it("keeps typed nap window in schedule without protected-downtime notes", () => {
     const { raw } = planTrip(sdPlan(), { cityOverride: city, plannerEngine: "staged" });

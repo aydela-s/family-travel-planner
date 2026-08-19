@@ -33,13 +33,16 @@ describe("nap + lunch coordination", () => {
     ).toBe(false);
   });
 
-  it("suggests takeout at the stay when nap overlaps lunch", () => {
+  it("suggests delivery at the stay when nap overlaps lunch", () => {
     const meal = lunchLabel(plan(), "Belmont Park");
-    expect(meal.title).toMatch(/takeout|delivery/i);
+    expect(meal.title).toBe("Delivery lunch at your stay");
+    expect(meal.title.toLowerCase()).not.toMatch(/takeout/);
     expect(meal.notes.toLowerCase()).toMatch(/nap/);
+    expect(meal.notes.toLowerCase()).toMatch(/delivery/);
+    expect(meal.notes.toLowerCase()).not.toMatch(/takeout|grab/);
   });
 
-  it("schedules takeout/delivery lunch 1 hour before nap", () => {
+  it("schedules delivery lunch 1 hour before nap", () => {
     const trip = plan({
       children: [4],
       naps: [{ startTime: "12:00 PM", endTime: "1:00 PM", type: "regular" }],
@@ -54,7 +57,7 @@ describe("nap + lunch coordination", () => {
         },
         {
           time: "12:00",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },
@@ -74,7 +77,7 @@ describe("nap + lunch coordination", () => {
       [20, 0, 20],
     );
 
-    const lunch = scheduled.find((a) => /takeout or delivery lunch/i.test(a.title))!;
+    const lunch = scheduled.find((a) => /delivery lunch at your stay/i.test(a.title))!;
     const nap = scheduled.find((a) => a.type === "nap")!;
     expect(parseTimeToMinutes(lunch.time)).toBe(parseTimeToMinutes(nap.time) - 60);
   });
@@ -94,7 +97,7 @@ describe("nap + lunch coordination", () => {
         },
         {
           time: "12:00",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },
@@ -139,7 +142,7 @@ describe("nap + lunch coordination", () => {
         },
         {
           time: "12:00",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },

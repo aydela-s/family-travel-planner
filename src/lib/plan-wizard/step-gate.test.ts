@@ -30,34 +30,45 @@ function filledThroughInterests(overrides: Partial<TripPlan> = {}): TripPlan {
 }
 
 describe("wizard step gate", () => {
-  it("requires a Places-resolved destination center before leaving Destination", () => {
+  it("requires a Places-resolved destination before leaving Where & when", () => {
     const typedOnly = filledThroughInterests({
       destination: "Boise",
       destinationPlaceId: "",
       destinationLat: null,
       destinationLng: null,
     });
-    expect(isWizardStepComplete(typedOnly, "Destination")).toBe(false);
+    expect(isWizardStepComplete(typedOnly, "Where & when")).toBe(false);
     expect(findFirstIncompleteWizardStep(typedOnly)).toBe(0);
   });
 
-  it("keeps Getting Around incomplete until transportation is chosen", () => {
+  it("keeps Stay & getting around incomplete until transportation is chosen", () => {
     const plan = filledThroughInterests({ transportationType: "" });
-    expect(isWizardStepComplete(plan, "Getting Around")).toBe(false);
+    expect(isWizardStepComplete(plan, "Stay & getting around")).toBe(false);
     expect(findFirstIncompleteWizardStep(plan)).toBe(
-      WIZARD_STEP_TITLES.indexOf("Getting Around"),
+      WIZARD_STEP_TITLES.indexOf("Stay & getting around"),
     );
   });
 
-  it("does not treat Summary as reachable while Getting Around is empty", () => {
-    const plan = filledThroughInterests({ transportationType: "" });
-    const incomplete = findFirstIncompleteWizardStep(plan);
-    expect(incomplete).not.toBeNull();
-    expect(WIZARD_STEP_TITLES[incomplete!]).toBe("Getting Around");
-    expect(WIZARD_STEP_TITLES[incomplete!]).not.toBe("Summary");
+  it("keeps Stay & getting around incomplete until hotel/rental detail is chosen", () => {
+    const plan = filledThroughInterests({ accommodationType: "" });
+    expect(isWizardStepComplete(plan, "Stay & getting around")).toBe(false);
   });
 
-  it("returns null when every step before Summary is complete", () => {
+  it("requires both pace and spend on Pace & spend", () => {
+    expect(
+      isWizardStepComplete(filledThroughInterests({ budgetStyle: "" }), "Pace & spend"),
+    ).toBe(false);
+    expect(
+      isWizardStepComplete(filledThroughInterests({ travelStyle: "" }), "Pace & spend"),
+    ).toBe(false);
+  });
+
+  it("returns null when every step including Interests is complete", () => {
     expect(findFirstIncompleteWizardStep(filledThroughInterests())).toBeNull();
+  });
+
+  it("exposes six consolidated steps and no Summary", () => {
+    expect(WIZARD_STEP_TITLES).toHaveLength(6);
+    expect(WIZARD_STEP_TITLES).not.toContain("Summary");
   });
 });

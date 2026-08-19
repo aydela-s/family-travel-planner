@@ -10,6 +10,7 @@ import {
   linkOrigin,
   sharedTripViewPath,
 } from "@/lib/public-urls";
+import { BRAND } from "@/config/brand";
 import { Itinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
 
     const apiKey = process.env.RESEND_API_KEY?.trim();
     const from =
-      process.env.FEEDBACK_FROM_EMAIL?.trim() || "TripNestly <onboarding@resend.dev>";
+      process.env.FEEDBACK_FROM_EMAIL?.trim() || `${BRAND.name} <onboarding@resend.dev>`;
 
     if (!apiKey) {
       return NextResponse.json(

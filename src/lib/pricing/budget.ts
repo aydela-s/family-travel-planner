@@ -83,12 +83,6 @@ function mealTierFromActivity(activity: ItineraryActivity): keyof typeof MEAL_TI
   if (t.includes("picnic") || t.includes("sandwich")) return "picnic";
   if (t.includes("supermarket") || t.includes("ready-meal")) return "supermarket";
   if (
-    (t.includes("takeout") || t.includes("delivery")) &&
-    t.includes("lunch")
-  ) {
-    return "picnic";
-  }
-  if (
     t.includes("pastries") ||
     t.includes("bakery") ||
     t.includes("takeaway") ||
@@ -105,6 +99,84 @@ function mealTierFromActivity(activity: ItineraryActivity): keyof typeof MEAL_TI
   return "restaurant";
 }
 
+/** True for nap-window “Delivery lunch at your stay” (and legacy takeout wording). */
+export function isDeliveryLunchActivity(
+  activity: Pick<ItineraryActivity, "title" | "notes" | "type">,
+): boolean {
+  if (activity.type !== "meal") return false;
+  const t = `${activity.title} ${activity.notes ?? ""}`.toLowerCase();
+  return t.includes("delivery") && t.includes("lunch");
+}
+
+export type FoodDeliveryFees = {
+  fee: number;
+  serviceFee: number;
+  tipRate: number;
+};
+
+/** US-style app defaults when a city omits `food.delivery`. */
+export const DEFAULT_FOOD_DELIVERY_FEES: FoodDeliveryFees = {
+  fee: 4.99,
+  serviceFee: 2.99,
+  tipRate: 0.15,
+};
+
+/** Resolve delivery fee model for a city (JPY defaults: fees, no tip estimate). */
+export function deliveryFeesForCity(city: CityConfig): FoodDeliveryFees {
+  const override = city.food.delivery;
+  if (override) {
+    return {
+      fee: override.fee,
+      serviceFee: override.serviceFee,
+      tipRate: override.tipRate,
+    };
+  }
+  if (city.currency === "JPY") {
+    return { fee: 300, serviceFee: 200, tipRate: 0 };
+  }
+  return DEFAULT_FOOD_DELIVERY_FEES;
+}
+
+export type DeliveryLunchCostBreakdown = {
+  food: number;
+  deliveryFee: number;
+  serviceFee: number;
+  tip: number;
+  total: number;
+  party: MealPartyCost;
+};
+
+/**
+ * Stay delivery lunch = age-aware restaurant food + delivery fee + service fee + tip.
+ * Food uses full restaurant lunch (not picnic); kids use childMealShare, not headcount × adult.
+ */
+export function estimateDeliveryLunchCost(
+  activity: ItineraryActivity,
+  city: CityConfig,
+  plan: TripPlan,
+): DeliveryLunchCostBreakdown {
+  const round = (amount: number) => roundMoney(amount, city.currency);
+  const hour = parseInt(activity.time.split(":")[0] ?? "12", 10);
+  const perAdult =
+    city.food.lunch *
+    accommodationMealMultiplier(plan.accommodationType, hour, MEAL_TIERS.restaurant) *
+    budgetStyleFoodFactor(plan.budgetStyle);
+  const party = estimateMealPartyCost(perAdult, plan, round);
+  const fees = deliveryFeesForCity(city);
+  const deliveryFee = round(fees.fee);
+  const serviceFee = round(fees.serviceFee);
+  const tip = round(party.total * fees.tipRate);
+  const total = round(party.total + deliveryFee + serviceFee + tip);
+  return {
+    food: party.total,
+    deliveryFee,
+    serviceFee,
+    tip,
+    total,
+    party,
+  };
+}
+
 /**
  * One meal, priced for the actual party: an adult price for this meal (city
  * base × accommodation × tier × budget style), then adults and children summed
@@ -118,6 +190,22 @@ export function estimateMealPartyCostForActivity(
   if (activity.type !== "meal") {
     return { adults: 0, children: 0, total: 0, detail: "" };
   }
+
+  if (isDeliveryLunchActivity(activity)) {
+    const d = estimateDeliveryLunchCost(activity, city, plan);
+    const feeBits = [
+      `delivery ${Math.round(d.deliveryFee)}`,
+      `service ${Math.round(d.serviceFee)}`,
+    ];
+    if (d.tip > 0) feeBits.push(`tip ${Math.round(d.tip)}`);
+    return {
+      adults: d.party.adults,
+      children: d.party.children,
+      total: d.total,
+      detail: `${d.party.detail} + ${feeBits.join(" + ")}`,
+    };
+  }
+
   const hour = parseInt(activity.time.split(":")[0] ?? "12", 10);
   const base =
     hour < 11 ? city.food.breakfast : hour < 16 ? city.food.lunch : city.food.dinner;

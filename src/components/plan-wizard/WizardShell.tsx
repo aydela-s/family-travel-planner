@@ -33,15 +33,15 @@ export function WizardShell({
           <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
         </Link>
 
-        <div className="mt-6 rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10">
+        <div className="mt-6 rounded-[1.75rem] border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-10">
           <div className="mb-8">
             <div className="flex items-center justify-between text-sm text-muted">
               <span className="font-medium">
                 {stepIndex + 1} of {totalSteps}
               </span>
-              <span className="font-semibold text-accent">{stepTitle}</span>
+              <span className="font-semibold text-primary">{stepTitle}</span>
             </div>
-            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-border/60">
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary-muted">
               <div
                 className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
                 style={{ width: `${progress}%` }}

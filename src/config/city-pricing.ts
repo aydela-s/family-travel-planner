@@ -119,11 +119,27 @@ export type CityConfig = {
    * Price for ONE ADULT at a normal sit-down family restaurant, tax and tip
    * included. Children are priced off this by age (childMealShare), never at
    * the adult rate; accommodation type and meal tier scale it further.
+   *
+   * For stay delivery lunch, `lunch` is the adult food estimate only; app
+   * delivery fee, service fee, and tip are layered on via `delivery` (or
+   * currency defaults) — see estimateDeliveryLunchCost.
    */
   food: {
     breakfast: number;
     lunch: number;
     dinner: number;
+    /**
+     * App delivery extras for “Delivery lunch at your stay”.
+     * Omitted → currency defaults (US: fees + tip; JPY: fees, tipRate 0).
+     */
+    delivery?: {
+      /** Flat courier / delivery fee. */
+      fee: number;
+      /** Flat platform service fee. */
+      serviceFee: number;
+      /** Tip as a fraction of the food subtotal (0 = do not estimate tip). */
+      tipRate: number;
+    };
   };
   landmarks: Landmark[];
   /** Places-backed restaurant pool for non-curated cities (FAM-58). */

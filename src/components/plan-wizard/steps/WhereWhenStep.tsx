@@ -1,4 +1,5 @@
 import { StepProps, TripPlan } from "@/types/trip-plan";
+import DestinationAutocomplete from "@/components/DestinationAutocomplete";
 import { getTripDayCount } from "@/lib/itinerary";
 import {
   MAX_TRIP_DAYS,
@@ -11,7 +12,11 @@ import { DynamicHint, labelClassName, StepIntro } from "../shared";
 const dateInputClassName =
   "w-full rounded-2xl border border-border bg-surface px-3 py-3 text-ink shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary-muted";
 
-export default function DatesStep({ formData, updateFormData }: StepProps) {
+export default function WhereWhenStep({
+  formData,
+  updateFormData,
+  setStepBusy,
+}: StepProps) {
   const today = todayIso();
   const startInPast = formData.startDate !== "" && formData.startDate < today;
   const endBeforeStart =
@@ -32,12 +37,38 @@ export default function DatesStep({ formData, updateFormData }: StepProps) {
       : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <StepIntro
-        emoji="📅"
-        title="When are you traveling?"
-        subtitle={`Pick your first and last day — up to ${MAX_TRIP_DAYS} days.`}
+        emoji="🌍"
+        title="Where and when?"
+        subtitle={`Pick a city, then your first and last day — up to ${MAX_TRIP_DAYS} days.`}
       />
+
+      <div>
+        <p className={labelClassName}>Destination</p>
+        <div className="mt-2">
+          <DestinationAutocomplete
+            value={formData.destination}
+            onChange={(destination) =>
+              updateFormData({
+                destination,
+                destinationPlaceId: "",
+                destinationLat: null,
+                destinationLng: null,
+              })
+            }
+            onSelect={(selection) =>
+              updateFormData({
+                destination: selection.destination,
+                destinationPlaceId: selection.placeId,
+                destinationLat: selection.lat,
+                destinationLng: selection.lng,
+              })
+            }
+            onResolvingChange={setStepBusy}
+          />
+        </div>
+      </div>
 
       <div>
         <p className={labelClassName}>Trip dates</p>

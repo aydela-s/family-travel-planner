@@ -19,7 +19,7 @@ export default function LoadingScreen({ message }: { message?: string }) {
   return (
     <div className="flex min-h-[320px] flex-col items-center justify-center px-6 py-16 text-center">
       <div className="relative mb-8">
-        <div className="h-16 w-16 animate-spin rounded-full border-4 border-primary-muted border-t-primary" />
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-secondary-muted border-t-primary" />
         <span className="absolute inset-0 flex items-center justify-center text-xl" aria-hidden>
           ✈️
         </span>
@@ -33,7 +33,7 @@ export default function LoadingScreen({ message }: { message?: string }) {
       </p>
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted">
         {message
-          ? "Hang tight — this won’t take long."
+          ? "Hang tight. This won’t take long."
           : "Building a plan your whole family can actually enjoy..."}
       </p>
 

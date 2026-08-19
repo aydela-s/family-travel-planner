@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const apiKey = process.env.RESEND_API_KEY?.trim();
     const to = process.env.FEEDBACK_TO_EMAIL?.trim();
     const from =
-      process.env.FEEDBACK_FROM_EMAIL?.trim() || "TripNestly Feedback <onboarding@resend.dev>";
+      process.env.FEEDBACK_FROM_EMAIL?.trim() || `${BRAND.name} Feedback <onboarding@resend.dev>`;
 
     if (!apiKey || !to) {
       console.error("Feedback API missing RESEND_API_KEY or FEEDBACK_TO_EMAIL");

@@ -137,7 +137,7 @@ function planSlotMeal(
   if (slot === "lunch" && napOverlapsLunchWindow(plan)) {
     return {
       slot,
-      mode: "takeout_at_stay",
+      mode: "delivery_at_stay",
       nearLandmarkName: near?.name,
     };
   }

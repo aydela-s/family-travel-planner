@@ -67,8 +67,8 @@ function sampleItinerary(): Itinerary {
 }
 
 describe("itinerary export — FAM-50", () => {
-  it("formats cover date ranges like July 8–14", () => {
-    expect(formatCoverDateRange("2026-07-08", "2026-07-14")).toBe("July 8–14");
+  it("formats cover date ranges like July 8 – 14", () => {
+    expect(formatCoverDateRange("2026-07-08", "2026-07-14")).toBe("July 8 – 14");
   });
 
   it("formats family cover lines with kids ages", () => {
@@ -90,9 +90,9 @@ describe("itinerary export — FAM-50", () => {
       },
     });
     expect(cover.destination).toBe("Paris");
-    expect(cover.dateRange).toBe("July 8–14");
+    expect(cover.dateRange).toBe("July 8 – 14");
     expect(cover.familyLines).toContain("Kids: 4 & 8");
-    expect(cover.generatedBy).toMatch(/TripNestly/);
+    expect(cover.generatedBy).toMatch(/FamilyTravely/);
   });
 
   it("formats compact expanded activity lines for export", () => {
@@ -146,7 +146,7 @@ describe("itinerary export — FAM-50", () => {
     expect(isValidShareEmail("a@b.co")).toBe(true);
     expect(isValidShareEmail("nope")).toBe(false);
     expect(itineraryPdfFilename(sampleItinerary())).toBe(
-      "tripnestly-paris-2026-07-08.pdf",
+      "familytravely-paris-2026-07-08.pdf",
     );
   });
 });

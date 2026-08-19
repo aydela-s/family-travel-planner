@@ -40,7 +40,7 @@ export default function TransportationStep({ formData, updateFormData }: StepPro
       <StepIntro
         emoji="🚗"
         title="How will you get around?"
-        subtitle="Pick how you'll move between stops — we'll keep routes realistic."
+        subtitle="Pick how you'll move between stops."
       />
 
       <div className="grid gap-3 sm:grid-cols-3">

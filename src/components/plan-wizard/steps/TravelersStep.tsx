@@ -3,7 +3,6 @@ import { DEFAULT_NAP_ENTRY, shouldShowNapSection } from "@/lib/planning-engine/n
 import {
   CounterControl,
   DynamicHint,
-  FieldHint,
   getTravelerHints,
   labelClassName,
   SelectChip,
@@ -53,7 +52,6 @@ export default function TravelersStep({ formData, updateFormData }: StepProps) {
       <div className="grid gap-4 sm:grid-cols-2">
         <CounterControl
           label="Adults"
-          hint="Parents, grandparents, caregivers — anyone 18+."
           value={formData.adults}
           min={1}
           max={12}
@@ -61,7 +59,6 @@ export default function TravelersStep({ formData, updateFormData }: StepProps) {
         />
         <CounterControl
           label="Kids"
-          hint="Anyone under 18. We'll ask ages next."
           value={formData.children.length}
           min={0}
           max={10}
@@ -73,7 +70,6 @@ export default function TravelersStep({ formData, updateFormData }: StepProps) {
         <div className="space-y-4">
           <div>
             <p className={labelClassName}>How old is each kiddo?</p>
-            <FieldHint>Tap their age — little ones change everything in the best way.</FieldHint>
           </div>
 
           {formData.children.map((age, index) => (

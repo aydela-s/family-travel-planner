@@ -118,5 +118,5 @@ export function limitedTransitWarning(city: CityConfig): string | null {
 /** Shown when Public transit is grayed out (transitQuality none). */
 export function unavailableTransitNote(city: CityConfig): string | null {
   if (city.transitQuality !== "none") return null;
-  return `Public transit isn’t available for planning in ${city.name} — we don’t have reliable coverage data for this destination yet. Choose car or taxis instead.`;
+  return `Public transit isn’t available for planning in ${city.name}. Choose car or taxi instead.`;
 }

@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 function warmPlanWizard() {
   void import("@/components/plan-wizard/TripPlanWizard");
-  void import("@/components/plan-wizard/steps/DestinationStep");
+  void import("@/components/plan-wizard/steps/WhereWhenStep");
   void import("@/components/DestinationAutocomplete");
   void import("@/components/plan-wizard/steps/DatesStep");
 }

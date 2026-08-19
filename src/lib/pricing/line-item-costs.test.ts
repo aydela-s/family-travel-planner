@@ -78,11 +78,11 @@ describe("per-meal food costs", () => {
     expect(summary.activities).toBe(40);
   });
 
-  it("prices takeout lunch cheaper than a named restaurant lunch", () => {
-    const takeout = estimateMealCostForActivity(
+  it("prices delivery lunch above sit-down food because of app fees and tip", () => {
+    const delivery = estimateMealCostForActivity(
       {
         time: "12:30",
-        title: "Takeout or delivery lunch at your stay",
+        title: "Delivery lunch at your stay",
         type: "meal",
         timeOfDay: "afternoon",
       },
@@ -99,7 +99,7 @@ describe("per-meal food costs", () => {
       city,
       plan(),
     );
-    expect(takeout).toBeLessThan(restaurant);
+    expect(delivery).toBeGreaterThan(restaurant);
   });
 });
 

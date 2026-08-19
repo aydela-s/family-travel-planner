@@ -93,7 +93,7 @@ describe("scheduler applies family-rhythm mornings", () => {
         },
         {
           time: "11:45",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },
@@ -186,7 +186,7 @@ describe("nap end is not an automatic activity start", () => {
         },
         {
           time: "11:45",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },
@@ -235,7 +235,7 @@ describe("nap end is not an automatic activity start", () => {
         },
         {
           time: "11:45",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },
@@ -289,7 +289,7 @@ describe("nap end is not an automatic activity start", () => {
         },
         {
           time: "11:45",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },
@@ -325,7 +325,7 @@ describe("dinner timing and unused time", () => {
         },
         {
           time: "11:45",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },
@@ -366,7 +366,7 @@ describe("dinner timing and unused time", () => {
         },
         {
           time: "11:45",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },
@@ -415,7 +415,7 @@ describe("dinner timing and unused time", () => {
         },
         {
           time: "11:45",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },
@@ -472,7 +472,7 @@ describe("dinner timing and unused time", () => {
         },
         {
           time: "11:45",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },
@@ -524,7 +524,7 @@ describe("minimum realistic activity duration", () => {
         },
         {
           time: "11:45",
-          title: "Takeout or delivery lunch at your stay",
+          title: "Delivery lunch at your stay",
           type: "meal" as const,
           slotKind: "lunch" as const,
         },

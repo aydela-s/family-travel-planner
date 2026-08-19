@@ -1,5 +1,5 @@
 import { StepProps } from "@/types/trip-plan";
-import { activityInterestOptions, DynamicHint, FieldHint, SelectChip, StepIntro } from "../shared";
+import { activityInterestOptions, DynamicHint, SelectChip, StepIntro } from "../shared";
 
 export default function ActivityInterestsStep({ formData, updateFormData }: StepProps) {
   function toggleInterest(interest: string) {
@@ -14,10 +14,8 @@ export default function ActivityInterestsStep({ formData, updateFormData }: Step
       <StepIntro
         emoji="❤️"
         title="What sounds fun to your crew?"
-        subtitle="Pick everything that gets a 'yes!' — we'll blend them into one great day."
+        subtitle="Pick everything that gets a 'yes!' and we'll blend them into one great day."
       />
-
-      <FieldHint>Select all that apply. The more we know, the better the plan.</FieldHint>
 
       <div className="flex flex-wrap gap-2">
         {activityInterestOptions.map(({ label, emoji }) => {

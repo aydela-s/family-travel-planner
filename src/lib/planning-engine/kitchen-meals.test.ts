@@ -147,7 +147,7 @@ describe("FAM-75 — one trip-start grocery shop", () => {
     expect(dinnerIdx).toBeGreaterThan(groceryIdx);
   });
 
-  it("folds day-1 nap-overlap lunch into grocery instead of takeout before it", () => {
+  it("folds day-1 nap-overlap lunch into grocery instead of delivery before it", () => {
     const napLunch = plan({
       children: [3],
       naps: [{ startTime: "12:00 PM", endTime: "1:30 PM", type: "regular" }],
@@ -156,8 +156,8 @@ describe("FAM-75 — one trip-start grocery shop", () => {
 
     const { raw } = planTrip(napLunch, { plannerEngine: "staged" });
     const day1 = raw.days[0]!.activities;
-    const takeout = day1.find((a) => /takeout or delivery lunch/i.test(a.title));
-    expect(takeout).toBeUndefined();
+    const deliveryLunch = day1.find((a) => /delivery lunch at your stay/i.test(a.title));
+    expect(deliveryLunch).toBeUndefined();
     const grocery = day1.find(isTripStartGroceryActivity);
     expect(grocery).toBeDefined();
     expect(grocery!.notes?.toLowerCase()).toMatch(/grab lunch|order delivery/);

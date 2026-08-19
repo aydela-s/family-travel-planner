@@ -59,16 +59,16 @@ export default function FeedbackPage() {
           <span className="text-lg font-semibold tracking-tight">{BRAND.name}</span>
         </Link>
 
-        <div className="mt-6 rounded-3xl border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-8">
-          <h1 className="text-2xl font-bold tracking-tight text-ink">Send feedback</h1>
+        <div className="mt-6 rounded-[1.75rem] border border-border bg-surface p-6 shadow-[var(--shadow-card)] sm:p-8">
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Send feedback</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            Bugs, confusing steps, or ideas — we read every note.
+            Bugs, confusing steps, or ideas. We read every note.
           </p>
 
           {status === "sent" ? (
             <div className="mt-6 space-y-4">
-              <p className="rounded-2xl border border-primary/20 bg-primary-muted px-4 py-3.5 text-sm leading-relaxed text-ink">
-                Thanks — your feedback is on its way.
+              <p className="rounded-2xl border border-secondary/30 bg-secondary-muted px-4 py-3.5 text-sm leading-relaxed text-ink">
+                Thanks. Your feedback is on its way.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link href="/" className={btnPrimaryClassName}>
@@ -88,7 +88,7 @@ export default function FeedbackPage() {
                   rows={6}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="What happened, or what would make TripNestly better?"
+                  placeholder={`What happened, or what would make ${BRAND.name} better?`}
                   className={`${inputClassName} min-h-[9rem] resize-y`}
                 />
               </label>

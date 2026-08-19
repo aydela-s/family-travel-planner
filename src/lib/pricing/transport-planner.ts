@@ -12,6 +12,7 @@ import {
 } from "@/lib/schedule/timeline";
 import { TripPlan } from "@/types/trip-plan";
 import type { ItineraryActivity, RouteSegment } from "@/types/itinerary";
+import { stayHomeLocation } from "@/lib/planning-engine/stay-home";
 
 /**
  * Driving cost is exactly two things, and both are always shown separately:
@@ -223,7 +224,7 @@ function travelTimeLabel(plan: TripPlan): string {
  */
 export function isStayLikeStop(activity: ItineraryActivity): boolean {
   if (activity.type === "nap" || activity.type === "rest") return true;
-  return /\b(takeout or delivery lunch at your stay|cook dinner at your rental|hotel breakfast|packed breakfast)\b/i.test(
+  return /\b(delivery lunch at your stay|takeout or delivery lunch at your stay|cook dinner at your rental|hotel breakfast|packed breakfast)\b/i.test(
     activity.title,
   );
 }
@@ -355,14 +356,15 @@ export function injectTravelActivities(
     const startMin = parseTimeToMinutes(lastLocated.endTime ?? lastLocated.time);
     const driveMin = Math.max(1, homeLeg.durationMin);
     const span = travelSpan(startMin, driveMin);
+    const stay = stayHomeLocation(plan);
     result.push(
       travelActivity(homeLeg, plan, span.time, span.endTime, {
         ...lastLocated,
         timeOfDay: "evening",
         location: {
           name: homeLeg.to,
-          lat: lastLocated.location!.lat,
-          lng: lastLocated.location!.lng,
+          lat: stay?.lat ?? lastLocated.location!.lat,
+          lng: stay?.lng ?? lastLocated.location!.lng,
         },
       }),
     );

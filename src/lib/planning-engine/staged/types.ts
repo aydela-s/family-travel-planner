@@ -156,7 +156,7 @@ export type CommittedStop = {
 
 export type MealIntent = {
   slot: MealSlotKind;
-  mode: "named_restaurant" | "on_site" | "picnic" | "takeout_at_stay" | "cook_at_home" | "bakery_casual";
+  mode: "named_restaurant" | "on_site" | "picnic" | "delivery_at_stay" | "cook_at_home" | "bakery_casual";
   restaurantName?: string;
   nearLandmarkName?: string;
   notes?: string;

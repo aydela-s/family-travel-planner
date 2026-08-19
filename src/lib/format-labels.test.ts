@@ -1,23 +1,27 @@
 import { describe, expect, it } from "vitest";
 import {
   ACCOMMODATION_LABELS,
+  BUDGET_STYLE_LABELS,
   getAccommodationLabel,
+  getBudgetStyleLabelPlain,
   getTransportationLabel,
   getTravelStyleLabel,
   TRANSPORTATION_LABELS,
   TRAVEL_STYLE_LABELS,
 } from "@/lib/format-labels";
-import { AccommodationType, TransportationType, TravelStyle } from "@/types/trip-plan";
+import {
+  AccommodationType,
+  BudgetStyle,
+  TransportationType,
+  TravelStyle,
+} from "@/types/trip-plan";
 
 /**
- * Regression coverage for FAM-17 ("Summary page doesn't use same
- * terminology as wizard steps"). Wizard steps and the Summary step both
- * read from these maps, so wording can't literally diverge between them
- * anymore — but nothing stops someone from adding a new enum value without
- * a label, or reverting the locked-in wording. This guards both.
+ * Regression coverage for FAM-17 (wizard and display labels stay aligned).
  */
 
 const ALL_TRAVEL_STYLES: TravelStyle[] = ["relaxed", "balanced", "packed"];
+const ALL_BUDGET_STYLES: BudgetStyle[] = ["save", "balanced", "splurge"];
 
 const ALL_TRANSPORTATION_TYPES: TransportationType[] = [
   "walking",
@@ -41,6 +45,14 @@ describe("format-labels — exhaustiveness (FAM-17)", () => {
     (style) => {
       expect(TRAVEL_STYLE_LABELS[style]).toBeTruthy();
       expect(getTravelStyleLabel(style)).toBe(TRAVEL_STYLE_LABELS[style]);
+    },
+  );
+
+  it.each(ALL_BUDGET_STYLES)(
+    "every BudgetStyle has a non-empty label — %s",
+    (style) => {
+      expect(BUDGET_STYLE_LABELS[style].label).toBeTruthy();
+      expect(getBudgetStyleLabelPlain(style)).toBe(BUDGET_STYLE_LABELS[style].label);
     },
   );
 
@@ -84,5 +96,10 @@ describe("format-labels — locked wording (FAM-17)", () => {
     for (const type of ALL_ACCOMMODATION_TYPES) {
       expect(ACCOMMODATION_LABELS[type].toLowerCase()).not.toContain("airbnb");
     }
+  });
+
+  it("budget mid tier is Comfortable, not Balanced (pace already uses Balanced)", () => {
+    expect(BUDGET_STYLE_LABELS.balanced.label).toBe("Comfortable");
+    expect(TRAVEL_STYLE_LABELS.balanced).toBe("Balanced");
   });
 });

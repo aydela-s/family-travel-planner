@@ -32,7 +32,7 @@ export const TRIP_START_GROCERY_WITH_LUNCH_NOTES =
   "Stock the rental on the way home — grab lunch here, or order delivery.";
 
 /**
- * Day-1 kitchen + regular nap overlapping lunch: do not schedule takeout before
+ * Day-1 kitchen + regular nap overlapping lunch: do not schedule delivery lunch before
  * grocery. Lunch is covered by the grocery run or delivery during nap (FAM-75).
  */
 export function shouldFoldLunchIntoDay1Grocery(plan: TripPlan, day: number): boolean {
@@ -249,11 +249,11 @@ export function lunchLabel(
   spot: string,
   restaurant?: CityRestaurant | null,
 ): { title: string; notes: string } {
-  // Nap during lunch hours → eat at the stay (takeout/delivery) instead of a restaurant hop.
+  // Nap during lunch hours → delivery at the stay instead of a restaurant hop.
   if (napOverlapsLunchWindow(plan)) {
     return {
-      title: "Takeout or delivery lunch at your stay",
-      notes: "Nap overlaps lunch — order delivery or grab takeout to eat where you're resting.",
+      title: "Delivery lunch at your stay",
+      notes: "Nap overlaps lunch — order delivery to eat at your stay before rest time.",
     };
   }
 
