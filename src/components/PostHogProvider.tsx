@@ -32,6 +32,7 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
 
     posthog.init(key, {
       api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+      ui_host: process.env.NEXT_PUBLIC_POSTHOG_UI_HOST,
       // App Router soft navigations need manual $pageview capture.
       capture_pageview: false,
       capture_pageleave: true,

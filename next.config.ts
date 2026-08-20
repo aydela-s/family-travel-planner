@@ -1,7 +1,23 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  // Route browser requests to PostHog through a Next.js rewrite to circumvent ad-blockers.
+  async rewrites() {
+    return [
+      {
+        source: "/ingest/static/:path*",
+        destination: "https://us-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/ingest/:path*",
+        destination: "https://us.i.posthog.com/:path*",
+      },
+    ];
+  },
+  // Required for the PostHog rewrites above to work.
+  skipTrailingSlashRedirect: true,
+};
 
 export default withSentryConfig(nextConfig, {
   // For all available options, see:
