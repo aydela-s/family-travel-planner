@@ -8,10 +8,9 @@ export type GenerateItineraryOptions = {
 };
 
 export const LOADING_MESSAGES = [
-  "Finding great places nearby...",
-  "Planning rest breaks...",
-  "Optimizing your day...",
-  "Checking walking distances...",
-  "Picking restaurants...",
-  "Adding buffer time between stops...",
+  "Getting to know your destination...",
+  "Fitting the trip to your crew...",
+  "Planning around where you’re staying...",
+  "Keeping the pace comfortable...",
+  "Picking places that match your interests...",
 ] as const;
