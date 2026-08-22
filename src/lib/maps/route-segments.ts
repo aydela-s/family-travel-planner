@@ -41,6 +41,7 @@ function isStayLocation(loc: ActivityLocation, stay: ActivityLocation | null): b
 /**
  * Build map directions for the day, including the hop from the stay to the
  * first stop and the hop from the last stop back home when a stay pin exists.
+ * Legs are fetched in parallel (same API call count, lower wall-clock).
  */
 export async function buildRouteSegments(
   activities: ItineraryActivity[],
@@ -66,38 +67,50 @@ export async function buildRouteSegments(
     stops.push(stay);
   }
 
+  const bufferMin = familyTravelBufferMin(plan);
+  const providerCount = Math.max(1, city.taxiProviders.length);
+
+  const legResults = await Promise.all(
+    Array.from({ length: Math.max(0, stops.length - 1) }, async (_, i) => {
+      const from = stops[i]!;
+      const to = stops[i + 1]!;
+      // Picnic / break / explore at the same venue must not bill a separate Uber.
+      const sameVenue =
+        sameVenueName(from.name, to.name) ||
+        haversineKm(from.lat, from.lng, to.lat, to.lng) < SAME_PLACE_KM;
+      const dir = sameVenue
+        ? {
+            distanceKm: 0,
+            durationMin: 0,
+            cost: 0,
+            provider: "Walk",
+            source: "estimated" as const,
+          }
+        : await getDirections(
+            city,
+            from,
+            to,
+            plan.transportationType,
+            i % providerCount,
+          );
+      return {
+        from: from.name,
+        to: to.name,
+        dir,
+      };
+    }),
+  );
+
   const routeSegments: RouteSegment[] = [];
   const segmentCosts: number[] = [];
   let totalKm = 0;
-  const bufferMin = familyTravelBufferMin(plan);
 
-  for (let i = 0; i < stops.length - 1; i++) {
-    const from = stops[i]!;
-    const to = stops[i + 1]!;
-    // Picnic / break / explore at the same venue must not bill a separate Uber.
-    const sameVenue =
-      sameVenueName(from.name, to.name) ||
-      haversineKm(from.lat, from.lng, to.lat, to.lng) < SAME_PLACE_KM;
-    const dir = sameVenue
-      ? {
-          distanceKm: 0,
-          durationMin: 0,
-          cost: 0,
-          provider: "Walk",
-          source: "estimated" as const,
-        }
-      : await getDirections(
-          city,
-          from,
-          to,
-          plan.transportationType,
-          i % Math.max(1, city.taxiProviders.length),
-        );
+  for (const { from, to, dir } of legResults) {
     totalKm += dir.distanceKm;
     segmentCosts.push(plan.transportationType === "taxis" ? dir.cost : 0);
     routeSegments.push({
-      from: from.name,
-      to: to.name,
+      from,
+      to,
       distanceKm: dir.distanceKm,
       durationMin: dir.durationMin,
       bufferMin: dir.distanceKm > 0 || dir.durationMin > 0 ? bufferMin : 0,
@@ -123,6 +136,5 @@ function sameVenueName(a: string, b: string): boolean {
       .trim();
   const left = norm(a);
   const right = norm(b);
-  if (!left || !right) return false;
   return left === right || left.includes(right) || right.includes(left);
 }
