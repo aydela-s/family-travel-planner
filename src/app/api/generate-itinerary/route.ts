@@ -44,7 +44,12 @@ function toRawItinerary(itinerary: Itinerary): RawItinerary {
   };
 }
 
+function stageMs(started: number) {
+  return Math.round(performance.now() - started);
+}
+
 export async function POST(request: Request) {
+  const totalStarted = performance.now();
   try {
     const body = (await request.json()) as GenerateRequest;
 
@@ -56,13 +61,22 @@ export async function POST(request: Request) {
     if (!plan.accommodationType) {
       plan.accommodationType = "";
     }
-    plan = await applyDestinationCenter(plan);
-    plan = await resolveStayOntoPlan(plan);
 
+    let t = performance.now();
+    plan = await applyDestinationCenter(plan);
+    const destinationMs = stageMs(t);
+
+    t = performance.now();
+    plan = await resolveStayOntoPlan(plan);
+    const stayMs = stageMs(t);
+
+    t = performance.now();
     const city = await resolvePlanningCity(plan);
+    const cityMs = stageMs(t);
 
     const enrichedDay = body.existingItinerary?.days.find((d) => d.day === body.adjustDay);
 
+    t = performance.now();
     const { raw, plan: effectivePlan, transportNote, blueprint, conflicts } = planTrip(plan, {
       relaxed: body.relaxed,
       adjustDay: body.adjustDay,
@@ -74,9 +88,11 @@ export async function POST(request: Request) {
       enrichedDay,
       cityOverride: city,
     });
+    const planMs = stageMs(t);
 
     const normalized = normalizeRawItinerary(raw, effectivePlan);
 
+    t = performance.now();
     let enriched = await enrichItinerary(normalized, effectivePlan, {
       adjustDay: body.adjustDay,
       adjustAction: body.adjustAction,
@@ -85,8 +101,20 @@ export async function POST(request: Request) {
       cityOverride: city,
       conflicts,
     });
+    const enrichMs = stageMs(t);
 
     enriched = applyFallbackDisplayTitles(enriched, blueprint);
+
+    console.info("[generate-itinerary] timing", {
+      destinationMs,
+      stayMs,
+      cityMs,
+      planMs,
+      enrichMs,
+      totalMs: stageMs(totalStarted),
+      days: enriched.days.length,
+      cityId: city.id,
+    });
 
     return NextResponse.json({
       ...enriched,
