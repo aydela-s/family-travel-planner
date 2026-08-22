@@ -1,6 +1,6 @@
 import type { CityConfig, Landmark } from "@/config/city-pricing";
 import { getTripDayCount } from "@/lib/itinerary";
-import { getAdjustmentContext, activityTitlePrefix } from "@/lib/planning-engine/day-adjustment";
+import { getAdjustmentContext, activityTitlePrefix, type AdjustmentContext } from "@/lib/planning-engine/day-adjustment";
 import {
   labelForMealIntent,
 } from "@/lib/planning-engine/staged/meal-planner";

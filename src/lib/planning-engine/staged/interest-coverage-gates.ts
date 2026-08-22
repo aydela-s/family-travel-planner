@@ -6,8 +6,8 @@ import { isEligibleStop } from "@/lib/planning-engine/staged/eligibility";
 import {
   awaitingFirstCoverageTags,
   uncoveredSelectedTags,
-  type ExperienceCoverage,
 } from "@/lib/planning-engine/staged/experience-coverage";
+import type { ExperienceCoverage } from "@/lib/planning-engine/staged/types";
 import type { TripPlan } from "@/types/trip-plan";
 
 export function selectedTagsOnLandmark(

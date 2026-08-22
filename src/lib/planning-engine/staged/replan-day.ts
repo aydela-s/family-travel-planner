@@ -77,10 +77,14 @@ export function replanStagedDayWithNote(
 
   const dayWithStops: DayBlueprint = {
     ...day,
-    anchor: toCommittedStop(anchor),
-    support: support.map(toCommittedStop),
+    anchor: toCommittedStop(anchor, "anchor"),
+    support: support.map((s) => toCommittedStop(s, "support")),
     meals: planMealsForDay(
-      { ...day, anchor: toCommittedStop(anchor), support: support.map(toCommittedStop) },
+      {
+        ...day,
+        anchor: toCommittedStop(anchor, "anchor"),
+        support: support.map((s) => toCommittedStop(s, "support")),
+      },
       plan,
       city,
       usedRestaurants,

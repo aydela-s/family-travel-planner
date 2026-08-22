@@ -114,6 +114,8 @@ export type RawItinerary = {
       slotKind?: import("@/lib/planning-engine/types").SlotKind;
       landmarkIntensity?: import("@/config/city-pricing").LandmarkIntensity;
       interestTags?: import("@/config/city-pricing").LandmarkInterestTag[];
+      dietaryFit?: import("@/lib/planning-engine/restaurant-picker").DietaryFit;
+      allowShortVisit?: boolean;
     }[];
   }[];
 };

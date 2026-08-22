@@ -244,14 +244,16 @@ function mapsTravelMode(type: TransportationType | "" | undefined): string {
   return "driving";
 }
 
-function hasFiniteCoords(loc: ActivityLocation | null | undefined): loc is ActivityLocation {
-  return (
-    !!loc &&
+function mapPointLabel(loc: ActivityLocation): string {
+  if (
     typeof loc.lat === "number" &&
     typeof loc.lng === "number" &&
     Number.isFinite(loc.lat) &&
     Number.isFinite(loc.lng)
-  );
+  ) {
+    return `${loc.lat},${loc.lng}`;
+  }
+  return encodeURIComponent(loc.name);
 }
 
 /** Prefer lat/lng so Maps opens the real hop, not a wrong place-name match. */
@@ -261,12 +263,8 @@ function directionsUrl(
   transportationType: TransportationType | "" | undefined,
 ): string {
   const travelmode = mapsTravelMode(transportationType);
-  const origin = hasFiniteCoords(from)
-    ? `${from.lat},${from.lng}`
-    : encodeURIComponent(from.name);
-  const destination = hasFiniteCoords(to)
-    ? `${to.lat},${to.lng}`
-    : encodeURIComponent(to.name);
+  const origin = mapPointLabel(from);
+  const destination = mapPointLabel(to);
   return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=${travelmode}`;
 }
 

@@ -7,7 +7,7 @@ import {
   isHighValueAttraction,
   travelFrictionScore,
 } from "@/lib/maps/travel-estimate";
-import { compileTripConstraints } from "@/lib/planning-engine/constraints";
+import { compileTripConstraints, type TripConstraints } from "@/lib/planning-engine/constraints";
 import { filterScoreLandmarkCandidates } from "@/lib/planning-engine/score-hard-rules";
 import type { ExperienceCoverage } from "@/lib/planning-engine/staged/types";
 import { landmarksForStyle } from "@/lib/pricing/budget-style";

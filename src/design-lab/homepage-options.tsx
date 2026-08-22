@@ -197,11 +197,7 @@ function ItineraryMock({ compact = false, snapshot = false }: { compact?: boolea
               </div>
               <div
                 className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-                  item.kind === "meal"
-                    ? "bg-accent"
-                    : item.kind === "rest"
-                      ? "bg-secondary"
-                      : "bg-primary"
+                  item.kind === "meal" ? "bg-accent" : "bg-primary"
                 }`}
                 aria-hidden
               />

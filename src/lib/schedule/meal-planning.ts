@@ -1347,7 +1347,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
         d.title,
       ),
   );
-  let dinnerStart =
+  const dinnerStart =
     plan.travelStyle === "packed"
       ? Math.max(dinnerMin, Math.min(endCursor, latestDinnerStart))
       : dinnerStartFromRhythm(

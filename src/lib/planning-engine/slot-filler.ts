@@ -133,7 +133,6 @@ export function buildLandmarkContext(
     visitWindow: morningWindow,
     preferBand: nextPreferBand(profile, [], day, 0),
     anchorToStay: true,
-    excludeNames: usedLandmarks,
     strollerQuiet: overlapsStrollerNap(plan, morningWindow.startMin, morningWindow.endMin),
     ...hardRuleBase,
     slotIndex: 0,
@@ -144,7 +143,6 @@ export function buildLandmarkContext(
   const afternoon = pickLandmarkForFamily(city, plan, offset, 1, [morning], {
     visitWindow: afternoonWindow,
     preferBand: nextPreferBand(profile, [morning], day, 1),
-    excludeNames: usedLandmarks,
     strollerQuiet: overlapsStrollerNap(plan, afternoonWindow.startMin, afternoonWindow.endMin),
     ...hardRuleBase,
     slotIndex: 1,
@@ -160,7 +158,6 @@ export function buildLandmarkContext(
     : pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon], {
         visitWindow: extraWindow,
         preferBand: nextPreferBand(profile, [morning, afternoon], day, 2),
-        excludeNames: usedLandmarks,
         strollerQuiet: overlapsStrollerNap(plan, extraWindow.startMin, extraWindow.endMin),
         ...hardRuleBase,
         slotIndex: 2,

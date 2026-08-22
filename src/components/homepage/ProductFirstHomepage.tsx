@@ -72,7 +72,7 @@ function ItineraryPreviewMock({ snapshot = false }: { snapshot?: boolean }) {
               </div>
               <div
                 className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-                  item.kind === "meal" ? "bg-accent" : item.kind === "rest" ? "bg-secondary" : "bg-primary"
+                  item.kind === "meal" ? "bg-accent" : "bg-primary"
                 }`}
                 aria-hidden
               />
@@ -153,27 +153,29 @@ function StepFlowArrow({ layout = "horizontal" }: { layout?: "horizontal" | "ver
 function MobileHero() {
   return (
     <div className="lg:hidden">
-      <section className="px-4 pb-4 pt-5 sm:px-6">
-        <FamilyTravelyLogo className="h-auto w-32" />
+      <div className="mx-auto w-full max-w-md px-5 pb-4 pt-5">
+        <FamilyTravelyLogo className="h-auto w-44" />
         <h1 className="mt-5 text-[1.65rem] font-semibold leading-tight tracking-tight text-primary">{HERO_HEADLINE}</h1>
         <p className="mt-3 text-base font-medium italic leading-snug text-ink">{HERO_TAGLINE}</p>
-      </section>
+      </div>
 
-      <section className="relative px-3 pb-2 pt-1 sm:px-5">
-        <div
-          aria-hidden
-          className="absolute inset-x-2 top-2 bottom-2 rounded-[1.25rem] bg-gradient-to-br from-primary-muted via-secondary-muted/80 to-primary-muted/40"
-        />
+      <div className="mx-auto w-full max-w-md px-5 pb-2 pt-1">
         <div className="relative">
-          <ItineraryPreviewMock snapshot />
+          <div
+            aria-hidden
+            className="absolute -inset-2 rounded-[1.5rem] bg-gradient-to-br from-primary-muted via-secondary-muted/80 to-primary-muted/40 sm:-inset-2.5"
+          />
+          <div className="relative">
+            <ItineraryPreviewMock snapshot />
+          </div>
         </div>
-      </section>
+      </div>
 
-      <section className="px-4 py-5 sm:px-6">
+      <div className="mx-auto flex w-full max-w-md flex-col items-center px-5 py-5 text-center">
         <p className="text-sm leading-relaxed text-muted">{HERO_BODY}</p>
-        <PlanMyTripLink className="mt-4 w-full" />
+        <PlanMyTripLink className="mt-4" />
         <ReassurancePill className="mt-3" />
-      </section>
+      </div>
     </div>
   );
 }
@@ -182,7 +184,7 @@ function DesktopHero() {
   return (
     <div className="mx-auto hidden max-w-6xl grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] items-center gap-10 px-6 py-12 sm:px-10 lg:grid lg:gap-12 lg:py-16">
       <section>
-        <FamilyTravelyLogo className="h-auto w-44" />
+        <FamilyTravelyLogo className="h-auto w-56" />
         <h1 className="mt-8 max-w-xl text-3xl font-semibold tracking-tight text-primary sm:text-4xl lg:text-[2.75rem] lg:leading-[1.15]">
           {HERO_HEADLINE}
         </h1>
@@ -208,53 +210,59 @@ function DesktopHero() {
 function MobileBelowFold() {
   return (
     <div className="lg:hidden">
-      <section aria-labelledby="mobile-how-heading" className="border-t border-border bg-primary-muted/50 px-4 py-6 sm:px-6">
-        <h2 id="mobile-how-heading" className="text-base font-semibold tracking-tight text-primary">
-          How it works
-        </h2>
-        <ol className="mt-3 flex flex-col">
-          {PRODUCT_HOW_STEPS.flatMap((step, i) => {
-            const card = (
-              <li key={step.step} className="flex gap-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-border/60">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-muted text-xs font-bold tabular-nums text-primary">
-                  {step.step}
-                </span>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-ink">{step.title}</h3>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted">{step.body}</p>
-                </div>
+      <section aria-labelledby="mobile-how-heading" className="border-t border-border bg-primary-muted/50">
+        <div className="mx-auto w-full max-w-md px-5 py-6">
+          <h2 id="mobile-how-heading" className="text-base font-semibold tracking-tight text-primary">
+            How it works
+          </h2>
+          <ol className="mt-3 flex flex-col">
+            {PRODUCT_HOW_STEPS.flatMap((step, i) => {
+              const card = (
+                <li key={step.step} className="flex gap-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-border/60">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-muted text-xs font-bold tabular-nums text-primary">
+                    {step.step}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-ink">{step.title}</h3>
+                    <p className="mt-0.5 text-xs leading-relaxed text-muted">{step.body}</p>
+                  </div>
+                </li>
+              );
+
+              if (i === PRODUCT_HOW_STEPS.length - 1) return [card];
+
+              return [
+                card,
+                <li key={`${step.step}-arrow`} aria-hidden className="list-none">
+                  <StepFlowArrow layout="vertical" />
+                </li>,
+              ];
+            })}
+          </ol>
+        </div>
+      </section>
+
+      <section aria-labelledby="mobile-why-heading" className="border-t border-border bg-background">
+        <div className="mx-auto w-full max-w-md px-5 py-6">
+          <h2 id="mobile-why-heading" className="text-base font-semibold tracking-tight text-primary">
+            Why {BRAND.name}
+          </h2>
+          <ul className="mt-3 space-y-2.5">
+            {MOBILE_WHY_PICK.map((card) => (
+              <li key={card.title} className="rounded-xl border border-primary/25 bg-white p-3">
+                <span aria-hidden className="mb-1.5 block h-1 w-6 rounded-full bg-accent" />
+                <h3 className="text-sm font-semibold text-ink">{card.title}</h3>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted">{card.body}</p>
               </li>
-            );
-
-            if (i === PRODUCT_HOW_STEPS.length - 1) return [card];
-
-            return [
-              card,
-              <li key={`${step.step}-arrow`} aria-hidden className="list-none">
-                <StepFlowArrow layout="vertical" />
-              </li>,
-            ];
-          })}
-        </ol>
+            ))}
+          </ul>
+        </div>
       </section>
 
-      <section aria-labelledby="mobile-why-heading" className="border-t border-border bg-background px-4 py-6 sm:px-6">
-        <h2 id="mobile-why-heading" className="text-base font-semibold tracking-tight text-primary">
-          Why {BRAND.name}
-        </h2>
-        <ul className="mt-3 space-y-2.5">
-          {MOBILE_WHY_PICK.map((card) => (
-            <li key={card.title} className="rounded-xl border border-primary/25 bg-white p-3">
-              <span aria-hidden className="mb-1.5 block h-1 w-6 rounded-full bg-accent" />
-              <h3 className="text-sm font-semibold text-ink">{card.title}</h3>
-              <p className="mt-0.5 text-xs leading-relaxed text-muted">{card.body}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="border-t border-border bg-background px-4 py-6 sm:px-6">
-        <PlanMyTripLink variant="outline" className="w-full" />
+      <section className="border-t border-border bg-background">
+        <div className="mx-auto flex w-full max-w-md justify-center px-5 py-6">
+          <PlanMyTripLink />
+        </div>
       </section>
     </div>
   );

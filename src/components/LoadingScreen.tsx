@@ -45,7 +45,7 @@ export default function LoadingScreen({ message, destinationLabel }: LoadingScre
 
     const durationMs = 3800;
     let frame = 0;
-    let start = performance.now();
+    const start = performance.now();
 
     const easeInOut = (t: number) =>
       t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
