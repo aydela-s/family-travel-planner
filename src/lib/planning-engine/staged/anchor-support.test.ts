@@ -47,7 +47,7 @@ function sdPlan(overrides: Partial<TripPlan> = {}): TripPlan {
     naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
     budgetStyle: "balanced",
     interests: [
-      "Playgrounds & Indoor Play",
+      "Indoor & Outdoor Play",
       "Interactive Museums",
       "Beaches & Waterfronts",
       "Shows & Entertainment",
@@ -225,7 +225,7 @@ describe("commitStopsToBlueprint", () => {
     };
     const plan = sdPlan({
       destination: "Dallas, TX",
-      interests: ["Playgrounds & Indoor Play", "Zoos & Aquariums", "Museums & Art", "Parks & Gardens"],
+      interests: ["Indoor & Outdoor Play", "Zoos & Aquariums", "Museums & Art", "Parks & Gardens"],
     });
     const themed = applyDailyThemes(buildTripStrategy(plan, { city: tinyCity }), plan, tinyCity);
     const committed = commitStopsToBlueprint(themed, plan, tinyCity);
@@ -293,7 +293,7 @@ describe("commitStopsToBlueprint", () => {
     };
     const plan = sdPlan({
       destination: "Dallas, TX",
-      interests: ["Playgrounds & Indoor Play", "Parks & Gardens"],
+      interests: ["Indoor & Outdoor Play", "Parks & Gardens"],
       children: [4, 6],
     });
     const themed = applyDailyThemes(buildTripStrategy(plan, { city: tinyCity }), plan, tinyCity);
@@ -441,7 +441,7 @@ describe("planTrip staged engine", () => {
       interests: [
         "Zoos & Animals",
         "Shows & Entertainment",
-        "Playgrounds & Indoor Play",
+        "Indoor & Outdoor Play",
         "Interactive Museums",
         "Beaches & Waterfronts",
       ],
@@ -464,7 +464,7 @@ describe("planTrip staged engine", () => {
 
   it("never schedules two indoor-play stops on the same day", () => {
     const plan = sdPlan({
-      interests: ["Playgrounds & Indoor Play", "Beaches & Waterfronts", "Parks & Gardens"],
+      interests: ["Indoor & Outdoor Play", "Beaches & Waterfronts", "Parks & Gardens"],
     });
     const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
     const committed = commitStopsToBlueprint(themed, plan, city);
@@ -501,7 +501,7 @@ describe("planTrip staged engine", () => {
     const plan = sdPlan({
       interests: [
         "Theme Parks",
-        "Playgrounds & Indoor Play",
+        "Indoor & Outdoor Play",
         "Beaches & Waterfronts",
         "Parks & Gardens",
       ],
@@ -512,50 +512,5 @@ describe("planTrip staged engine", () => {
     const anchor = city.landmarks.find((l) => l.name === departure.anchor!.landmarkName)!;
     expect(anchor.interestTags).not.toContain("theme-parks");
     expect(departure.support).toHaveLength(0);
-  });
-
-  it("keeps theme parks exclusive — no companion stop with Belmont Park", () => {
-    const plan = sdPlan({
-      interests: [
-        "Shows & Entertainment",
-        "Interactive Museums",
-        "Playgrounds & Indoor Play",
-        "Beaches & Waterfronts",
-      ],
-    });
-    const belmont = city.landmarks.find((l) => l.name === "Belmont Park")!;
-    const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
-    const entertainmentDay = {
-      ...themed.days[1]!,
-      role: "full" as const,
-      theme: {
-        id: "theme_park" as const,
-        label: "Theme park",
-        primaryTags: ["theme-parks" as const],
-        secondaryTags: ["entertainment" as const],
-        preferredExperienceTypes: ["theme-parks" as const, "entertainment" as const],
-      },
-      constraints: [
-        {
-          type: "anchor_primary_tags" as const,
-          tags: ["theme-parks" as const],
-          mode: "any" as const,
-        },
-        { type: "require_half_day_window" as const },
-        { type: "max_activities" as const, n: 1 },
-      ],
-      dayBudgetIntent: "paid" as const,
-      support: [],
-      meals: [],
-    };
-    const ledgerNames = new Set(
-      city.landmarks.map((l) => l.name).filter((n) => n !== belmont.name),
-    );
-    const support = selectSupportForDay(city, plan, entertainmentDay, belmont, {
-      ledgerNames,
-      alreadyToday: [belmont],
-    });
-
-    expect(support).toHaveLength(0);
   });
 });

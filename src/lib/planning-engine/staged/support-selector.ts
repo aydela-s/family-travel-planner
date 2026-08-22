@@ -16,7 +16,9 @@ import {
   dayAlreadyHasHeavyLandmark,
   exceedsBudgetStyleTicket,
   fitsBudgetStyle,
+  isChillDayCompanion,
   isHeavyDayLandmark,
+  isLongShoppingExperience,
   isOutdoorPlayground,
   isThemeParkExperience,
   LOW_FRICTION_PREFERRED_KM,
@@ -43,10 +45,20 @@ export type SelectSupportOptions = {
   constraints?: TripConstraints;
 };
 
+function wantsChillCompanion(day: DayBlueprint, anchor: Landmark): boolean {
+  return (
+    day.theme.id === "theme_park" ||
+    day.theme.id === "shopping" ||
+    isThemeParkExperience(anchor) ||
+    isLongShoppingExperience(anchor)
+  );
+}
+
 function maxSupport(day: DayBlueprint, anchor?: Landmark): number {
   if (day.role === "departure" || day.role === "recovery") return 0;
-  if (day.theme.id === "theme_park") return 0;
-  if (anchor && isThemeParkExperience(anchor)) return 0;
+  if (anchor && wantsChillCompanion(day, anchor)) {
+    return Math.min(1, day.capacity.maxSupportStops);
+  }
   const capped = day.constraints.find((c) => c.type === "max_activities");
   if (capped && capped.type === "max_activities" && capped.n <= 1) return 0;
   if (day.constraints.some((c) => c.type === "require_half_day_window")) {
@@ -140,8 +152,10 @@ export function scoreSupportCandidate(
   if (sharesHeavyDayLoad(landmark, anchor)) score -= 120;
   if (exceedsBudgetStyleTicket(landmark, plan.budgetStyle)) score -= 80;
 
-  // Theme parks are exclusive — never score companions.
-  if (isThemeParkExperience(anchor) || isThemeParkExperience(landmark)) {
+  if (wantsChillCompanion(day, anchor)) {
+    if (isChillDayCompanion(landmark)) score += 90;
+    else score -= 200;
+  } else if (isThemeParkExperience(anchor) || isThemeParkExperience(landmark)) {
     score -= 200;
   }
 
@@ -211,9 +225,14 @@ export function selectSupportForDay(
   pool = pool.filter((l) => pairingAllowedForDay(anchor, l));
   pool = pool.filter((l) => fitsBudgetStyle(l, plan.budgetStyle));
 
+  if (wantsChillCompanion(day, anchor)) {
+    const chill = pool.filter((l) => isChillDayCompanion(l));
+    if (chill.length > 0) pool = chill;
+  }
+
   // Shopping stops only belong on shopping days (and never as arrival companions).
   if (day.theme.id === "shopping") {
-    // Shopping day is single-activity via max_activities — support usually empty.
+    // Mall is the anchor; support must stay low-key (filtered above).
   } else {
     pool = pool.filter((l) => !l.interestTags.includes("shopping"));
   }
@@ -339,7 +358,9 @@ export function selectSupportForDay(
     // Arrival light playground companions stay exempt — they are deliberately near-stay fillers.
     // Uncovered selected interests also skip the load gate so coverage is not abandoned.
     const skipLoadGate =
-      coversUncovered || (day.role === "arrival" && isLightArrivalSupport(row.lm));
+      coversUncovered ||
+      (day.role === "arrival" && isLightArrivalSupport(row.lm)) ||
+      (wantsChillCompanion(day, anchor) && isChillDayCompanion(row.lm));
     if (!skipLoadGate) {
       const hopMin = estimateDurationMin(
         picked.length > 0 ? picked[picked.length - 1]! : anchor,

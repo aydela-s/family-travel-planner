@@ -13,6 +13,7 @@ import {
   travelFrictionScore,
 } from "@/lib/maps/travel-estimate";
 import { applyDailyThemes, buildTripStrategy } from "@/lib/planning-engine/staged";
+import { emptyPlanningRules } from "@/lib/planning-engine/staged/blueprint";
 import { selectSupportForDay } from "@/lib/planning-engine/staged/support-selector";
 import { TripPlan } from "@/types/trip-plan";
 
@@ -32,7 +33,7 @@ function plan(overrides: Partial<TripPlan> = {}): TripPlan {
     dietaryRestrictions: "",
     naps: [],
     budgetStyle: "balanced",
-    interests: ["Shows & Entertainment", "Beaches & Waterfronts", "Playgrounds & Indoor Play"],
+    interests: ["Shows & Entertainment", "Beaches & Waterfronts", "Indoor & Outdoor Play"],
     ...overrides,
   };
 }
@@ -166,36 +167,56 @@ describe("taxi fare for walkable hops", () => {
 });
 
 describe("taxi same-day support stays inside the time budget", () => {
-  const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
-
-  it("keeps theme parks exclusive (no same-day companion hop)", () => {
+  it("allows a near-stay chill companion on theme park days within the taxi budget", () => {
     const trip = plan({ transportationType: "taxis" });
-    const belmont = city.landmarks.find((l) => l.name === "Belmont Park")!;
-    const themed = applyDailyThemes(buildTripStrategy(trip, { city }), trip, city);
+    const belmont = {
+      name: "Test Theme Park",
+      lat: 32.78,
+      lng: -117.12,
+      adultPrice: 45,
+      openingHours: { open: "10:00", close: "22:00" },
+      intensity: "high" as const,
+      ageTags: ["child", "tween"] as const,
+      interestTags: ["theme-parks"] as const,
+      indoor: false,
+    };
+    const nearPlayground = {
+      name: "Stay-Adjacent Playground",
+      lat: trip.stayLat! + 0.003,
+      lng: trip.stayLng!,
+      adultPrice: 0,
+      openingHours: { open: "08:00", close: "20:00" },
+      intensity: "low" as const,
+      ageTags: ["child"] as const,
+      interestTags: ["playgrounds"] as const,
+      indoor: false,
+    };
+    const city = {
+      ...CITY_CONFIGS.find((c) => c.id === "san-diego")!,
+      landmarks: [belmont, nearPlayground],
+    };
+    const rules = emptyPlanningRules(trip);
     const day = {
-      ...themed.days[1]!,
+      dayIndex: 2,
       role: "full" as const,
       theme: {
         id: "theme_park" as const,
         label: "Theme park",
         primaryTags: ["theme-parks" as const],
-        secondaryTags: ["entertainment" as const],
-        preferredExperienceTypes: ["theme-parks" as const, "entertainment" as const],
+        secondaryTags: [] as const,
+        preferredExperienceTypes: ["theme-parks" as const],
       },
-      constraints: [
-        { type: "require_half_day_window" as const },
-        { type: "max_activities" as const, n: 1 },
-      ],
+      constraints: [{ type: "require_half_day_window" as const }],
+      goals: [{ type: "keep_energy_low" as const }],
       dayBudgetIntent: "paid" as const,
+      capacity: rules.capacity,
       support: [],
       meals: [],
     };
     const support = selectSupportForDay(city, trip, day, belmont, {
-      ledgerNames: new Set(
-        city.landmarks.map((l) => l.name).filter((n) => n !== belmont.name),
-      ),
+      ledgerNames: new Set([belmont.name]),
       alreadyToday: [belmont],
     });
-    expect(support).toHaveLength(0);
+    expect(support.map((l) => l.name)).toEqual(["Stay-Adjacent Playground"]);
   });
 });

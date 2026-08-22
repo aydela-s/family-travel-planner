@@ -37,10 +37,10 @@ describe("heavy day load", () => {
   });
 });
 
-describe("theme park exclusivity", () => {
+describe("theme park + low-key pairing (FAM-84)", () => {
   const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
 
-  it("does not allow any companion stop with Belmont Park", () => {
+  it("allows a chill companion with Belmont Park but not a second heavy stop", () => {
     const belmont = city.landmarks.find((l) => l.name === "Belmont Park")!;
     const museum = city.landmarks.find((l) => l.name === "The New Children's Museum")!;
     const boardwalk = city.landmarks.find((l) => l.name === "Mission Beach Boardwalk")!;
@@ -48,7 +48,7 @@ describe("theme park exclusivity", () => {
     expect(isThemeParkExperience(belmont)).toBe(true);
     expect(isChillDayCompanion(boardwalk)).toBe(true);
     expect(pairingAllowedForDay(belmont, museum)).toBe(false);
-    expect(pairingAllowedForDay(belmont, boardwalk)).toBe(false);
+    expect(pairingAllowedForDay(belmont, boardwalk)).toBe(true);
   });
 });
 

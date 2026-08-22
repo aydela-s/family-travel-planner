@@ -14,6 +14,7 @@ import {
 import { selectSupportForDay } from "@/lib/planning-engine/staged/support-selector";
 import { markExperienceCompletedByKeys } from "@/lib/planning-engine/staged/experience-coverage";
 import {
+  isChillDayCompanion,
   isIndoorPlayExperience,
   isOutdoorPlayground,
   isBeachThemeAnchor,
@@ -296,12 +297,25 @@ export function placementFromDayBlueprint(
   let extra: Landmark | undefined;
 
   if (halfDay) {
-    // Theme parks (and other exclusive half-day heroes): no morning companion.
-    if (isThemeParkExperience(anchor) || day.theme.id === "theme_park") {
-      morning = anchor;
-      afternoon = anchor;
-      extra = undefined;
-      dropSlotKinds.push("extra_activity", "morning_activity");
+    const chillCompanionDay =
+      isThemeParkExperience(anchor) ||
+      day.theme.id === "theme_park" ||
+      day.theme.id === "shopping";
+
+    if (chillCompanionDay) {
+      const morningStop =
+        support.find((s) => isChillDayCompanion(s)) ?? support[0];
+      if (morningStop && morningStop.name !== anchor.name) {
+        morning = morningStop;
+        afternoon = anchor;
+        extra = undefined;
+        dropSlotKinds.push("extra_activity");
+      } else {
+        morning = anchor;
+        afternoon = anchor;
+        extra = undefined;
+        dropSlotKinds.push("extra_activity", "morning_activity");
+      }
     } else {
       morning =
         support[0] ??

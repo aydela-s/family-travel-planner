@@ -256,7 +256,8 @@ export function themeGoalsAndConstraints(
   }
 
   if (theme.id === "shopping") {
-    constraints.push({ type: "max_activities", n: 1 });
+    // Morning low-key stop, then the mall as the main anchor (FAM-84).
+    goals.push({ type: "keep_energy_low" });
     constraints.push({
       type: "discourage_anchor_tags",
       tags: ["museums", "interactive", "theme-parks"],
@@ -264,11 +265,11 @@ export function themeGoalsAndConstraints(
   }
 
   if (theme.id === "theme_park") {
-    // Long afternoon window after nap, but no companion stop — parks are the whole day.
+    // Low-key morning near stay, theme park as the long afternoon anchor (FAM-84).
     goals.push({ type: "half_day_anchor" });
+    goals.push({ type: "keep_energy_low" });
     constraints.push({ type: "require_half_day_window" });
     constraints.push({ type: "prefer_paid_anchor" });
-    constraints.push({ type: "max_activities", n: 1 });
   }
 
   if (theme.id === "recovery" || theme.id === "nature" || theme.id === "nature_parks" || theme.id === "scenic") {

@@ -5,8 +5,10 @@ import { stayTravelMin } from "@/lib/maps/travel-estimate";
 import { travelDayBudget } from "@/config/travel-times";
 import {
   exceedsBudgetStyleTicket,
+  isChillDayCompanion,
   isHeavyDayLandmark,
   isIndoorPlayExperience,
+  isLongShoppingExperience,
   isOutdoorPlayground,
   isBeachThemeAnchor,
   isThemeParkExperience,
@@ -132,12 +134,30 @@ function validateDay(
   }
 
   if (isThemeParkExperience(anchor) && supportLandmarks.length > 0) {
-    out.push({
-      code: "theme_park_not_exclusive",
-      message: `Theme park day "${anchor.name}" must be the only activity — drop "${supportLandmarks.map((l) => l.name).join(", ")}".`,
-      day: day.dayIndex,
-      repairHint: "regenerate_support",
-    });
+    const nonChill = supportLandmarks.filter((s) => !isChillDayCompanion(s));
+    if (nonChill.length > 0) {
+      out.push({
+        code: "theme_park_not_exclusive",
+        message: `Theme park day "${anchor.name}" may only pair with a low-key stop — drop "${nonChill.map((l) => l.name).join(", ")}".`,
+        day: day.dayIndex,
+        repairHint: "regenerate_support",
+      });
+    }
+  }
+
+  if (
+    (day.theme.id === "shopping" || isLongShoppingExperience(anchor)) &&
+    supportLandmarks.length > 0
+  ) {
+    const nonChill = supportLandmarks.filter((s) => !isChillDayCompanion(s));
+    if (nonChill.length > 0) {
+      out.push({
+        code: "shopping_heavy_companion",
+        message: `Shopping day "${anchor.name}" may only pair with a low-key stop — drop "${nonChill.map((l) => l.name).join(", ")}".`,
+        day: day.dayIndex,
+        repairHint: "regenerate_support",
+      });
+    }
   }
 
   for (let i = 0; i < dayStops.length; i++) {

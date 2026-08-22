@@ -1,4 +1,5 @@
 import type { Landmark, LandmarkInterestTag } from "@/config/city-pricing";
+import { looksLikeDestinationShoppingName } from "@/lib/maps/shopping-places";
 import type { BudgetStyle } from "@/types/trip-plan";
 
 /** ~20–30 min urban drive — prefer stays inside this for arrival/departure. */
@@ -181,6 +182,13 @@ export function isThemeParkExperience(landmark: Landmark): boolean {
   return landmark.interestTags.includes("theme-parks");
 }
 
+/** Destination mall / outlet — warrants a low-key morning companion (FAM-84). */
+export function isLongShoppingExperience(landmark: Landmark): boolean {
+  if (!landmark.interestTags.includes("shopping")) return false;
+  if (landmark.intensity === "high") return true;
+  return looksLikeDestinationShoppingName(landmark.name);
+}
+
 /**
  * Low-key complement for a theme-park or heavy day — outdoor, flexible, not another ticketed venue.
  */
@@ -207,11 +215,17 @@ export function isChillDayCompanion(landmark: Landmark): boolean {
 
 /**
  * Whether two stops belong on the same day.
- * Theme parks are exclusive (exhausting with little kids) — no second activity.
+ * Theme parks and long shopping pair only with a low-key companion (FAM-84).
  */
 export function pairingAllowedForDay(a: Landmark, b: Landmark): boolean {
+  if (isThemeParkExperience(a) && isChillDayCompanion(b)) return true;
+  if (isThemeParkExperience(b) && isChillDayCompanion(a)) return true;
+  if (isLongShoppingExperience(a) && isChillDayCompanion(b)) return true;
+  if (isLongShoppingExperience(b) && isChillDayCompanion(a)) return true;
+
   if (sharesHeavyDayLoad(a, b)) return false;
   if (isThemeParkExperience(a) || isThemeParkExperience(b)) return false;
+  if (isLongShoppingExperience(a) || isLongShoppingExperience(b)) return false;
   // Two soft-play / indoor adventure centers is too much for one day.
   if (isIndoorPlayExperience(a) && isIndoorPlayExperience(b)) return false;
   if (sharesDayActivityCategory(a, b)) return false;
