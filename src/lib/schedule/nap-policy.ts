@@ -185,7 +185,7 @@ export function napDurationMin(plan: TripPlan, window?: NapWindow | null): numbe
 export function createNapActivity(window: NapWindow): RawActivity {
   return {
     time: minutesToTime(window.startMin),
-    title: "Nap & Quiet Time",
+    title: "Nap",
     type: "nap",
   };
 }

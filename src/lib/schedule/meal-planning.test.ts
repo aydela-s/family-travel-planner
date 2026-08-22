@@ -163,7 +163,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
     expect(parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(
       13 * 60 + 30 + HIGH_INTENSITY_REST_BONUS_MIN,
     );
-    expect(nap!.title).toBe("Nap & Quiet Time");
+    expect(nap!.title).toBe("Nap");
     const lunchDur =
       parseTimeToMinutes(lunch!.endTime!) - parseTimeToMinutes(lunch!.time);
     expect(lunchDur).toBeGreaterThanOrEqual(MIN_LUNCH_DURATION_MIN);
@@ -230,7 +230,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
       },
       {
         time: "12:00",
-        title: "Nap & Quiet Time",
+        title: "Nap",
         type: "nap" as ActivityType,
       },
       {

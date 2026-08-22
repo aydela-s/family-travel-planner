@@ -63,7 +63,7 @@ describe("nap + lunch coordination", () => {
         },
         {
           time: "12:00",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
         },
         {
@@ -103,7 +103,7 @@ describe("nap + lunch coordination", () => {
         },
         {
           time: "12:00",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
           notes: "Protected downtime 12:00 PM–1:00 PM.",
         },
@@ -148,7 +148,7 @@ describe("nap + lunch coordination", () => {
         },
         {
           time: "12:00",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
           notes: "Protected downtime 12:00 PM–1:30 PM.",
         },

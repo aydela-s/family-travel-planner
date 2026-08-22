@@ -99,7 +99,7 @@ describe("scheduler applies family-rhythm mornings", () => {
         },
         {
           time: "12:30",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
         },
         {
@@ -192,7 +192,7 @@ describe("nap end is not an automatic activity start", () => {
         },
         {
           time: "12:30",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
         },
         {
@@ -241,7 +241,7 @@ describe("nap end is not an automatic activity start", () => {
         },
         {
           time: "12:30",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
         },
         {
@@ -295,7 +295,7 @@ describe("nap end is not an automatic activity start", () => {
         },
         {
           time: "12:30",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
         },
         {
@@ -331,7 +331,7 @@ describe("dinner timing and unused time", () => {
         },
         {
           time: "12:30",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
         },
         {
@@ -372,7 +372,7 @@ describe("dinner timing and unused time", () => {
         },
         {
           time: "12:30",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
         },
         {
@@ -421,7 +421,7 @@ describe("dinner timing and unused time", () => {
         },
         {
           time: "12:30",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
         },
         {
@@ -478,7 +478,7 @@ describe("dinner timing and unused time", () => {
         },
         {
           time: "12:30",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
         },
         {
@@ -530,7 +530,7 @@ describe("minimum realistic activity duration", () => {
         },
         {
           time: "12:30",
-          title: "Nap & Quiet Time",
+          title: "Nap",
           type: "nap" as const,
         },
         {
