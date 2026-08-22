@@ -16,7 +16,7 @@ import {
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 /** Soft-launch cap so one plan cannot fan out unbounded Places calls. */
-export const MAX_CONCURRENT_PLACES_FETCHES = 3;
+export const MAX_CONCURRENT_PLACES_FETCHES = 5;
 
 type CacheEntry = {
   fetchedAt: number;
