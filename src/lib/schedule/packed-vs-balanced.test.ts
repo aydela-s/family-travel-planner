@@ -21,7 +21,7 @@ function plan(style: "balanced" | "packed", overrides: Partial<TripPlan> = {}): 
     dietaryRestrictions: "",
     naps: [{ startTime: "12:00 PM", endTime: "1:30 PM", type: "regular" }],
     budgetStyle: "balanced",
-    interests: ["Playgrounds & Indoor Play", "Nature & Scenic Views"],
+    interests: ["Indoor & Outdoor Play", "Nature & Scenic Views"],
     ...overrides,
   };
 }

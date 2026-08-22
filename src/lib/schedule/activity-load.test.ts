@@ -26,7 +26,7 @@ function plan(overrides: Partial<TripPlan> = {}): TripPlan {
     dietaryRestrictions: "",
     naps: [],
     budgetStyle: "balanced",
-    interests: ["Zoos & Aquariums", "Playgrounds & Indoor Play"],
+    interests: ["Zoos & Aquariums", "Indoor & Outdoor Play"],
     ...overrides,
   };
 }

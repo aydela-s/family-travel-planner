@@ -204,7 +204,7 @@ describe("meal scheduling — no gaps or dinner overlap", () => {
     const plan = balancedPlan([3, 5], {
       destination: "San Diego",
       naps: [{ startTime: "12:00 PM", endTime: "1:30 PM", type: "regular" }],
-      interests: ["Playgrounds & Indoor Play"],
+      interests: ["Indoor & Outdoor Play"],
       transportationType: "taxis",
     });
     // Skeleton-style times that previously produced 10:00–11:30 activity overlapping 11:00 lunch.

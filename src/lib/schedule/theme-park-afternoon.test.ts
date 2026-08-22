@@ -18,7 +18,7 @@ function plan(): TripPlan {
     dietaryRestrictions: "Vegetarian",
     naps: [],
     budgetStyle: "balanced",
-    interests: ["Theme Parks", "Playgrounds & Indoor Play"],
+    interests: ["Theme Parks", "Indoor & Outdoor Play"],
   };
 }
 

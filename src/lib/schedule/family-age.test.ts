@@ -139,7 +139,7 @@ describe("ageTags scoring — Phase 5", () => {
       ...planWithChildren([3, 10]),
       destination: "San Diego",
       budgetStyle: "balanced" as const,
-      interests: ["Playgrounds & Indoor Play"],
+      interests: ["Indoor & Outdoor Play"],
     };
     const pick = pickLandmarkForFamily(sanDiego, plan, 1, 0, []);
     expect(pick.name).not.toBe("Play City Eastlake");
