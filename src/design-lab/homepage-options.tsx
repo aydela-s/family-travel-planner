@@ -348,7 +348,7 @@ function HowSection({
         <ol
           className={
             productCards
-              ? "mt-12 flex flex-col sm:flex-row sm:items-center sm:justify-center sm:gap-1"
+              ? "mt-12 flex flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-stretch sm:gap-x-2"
               : "mt-12 grid gap-6 sm:grid-cols-3 sm:gap-5"
           }
         >
@@ -358,7 +358,7 @@ function HowSection({
                 key={step.step}
                 className={
                   productCards
-                    ? "w-full rounded-[1.5rem] border border-border/70 bg-white p-6 text-left shadow-sm sm:max-w-[15.5rem] sm:flex-1"
+                    ? "flex h-full w-full flex-col rounded-[1.5rem] border border-border/70 bg-white p-6 text-left shadow-sm"
                     : "rounded-[1.5rem] border border-secondary/20 bg-secondary-muted/35 p-6 text-left"
                 }
               >
@@ -372,7 +372,7 @@ function HowSection({
                 <h3 className={`text-lg font-semibold tracking-tight text-ink ${circledSteps ? "mt-4" : "mt-3"}`}>
                   {step.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{step.body}</p>
+                <p className="mt-2 flex-1 text-sm leading-relaxed text-muted">{step.body}</p>
               </li>
             );
 
@@ -380,15 +380,17 @@ function HowSection({
 
             return [
               card,
-              <li key={`${step.step}-arrow-v`} aria-hidden className="list-none flex justify-center py-0.5 sm:hidden">
-                <StepFlowArrow layout="vertical" />
-              </li>,
               <li
-                key={`${step.step}-arrow-h`}
+                key={`${step.step}-arrow`}
                 aria-hidden
-                className="list-none hidden shrink-0 items-center sm:flex"
+                className="list-none flex items-center justify-center py-0.5 sm:px-1 sm:py-0"
               >
-                <StepFlowArrow layout="horizontal" />
+                <span className="sm:hidden">
+                  <StepFlowArrow layout="vertical" />
+                </span>
+                <span className="hidden sm:inline-flex">
+                  <StepFlowArrow layout="horizontal" />
+                </span>
               </li>,
             ];
           })}
