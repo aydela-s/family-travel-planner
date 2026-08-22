@@ -100,8 +100,8 @@ export const initialTripPlan: TripPlan = {
   stayLat: null,
   stayLng: null,
   dietaryRestrictions: "",
-  /** Default one regular midday nap when traveling with a young child (FAM-52). */
-  naps: [{ startTime: "12:00 PM", endTime: "2:00 PM", type: "regular" }],
+  /** No naps until the user picks a preset or Custom when young kids are on the trip. */
+  naps: [],
   budgetStyle: "",
   interests: [],
 };

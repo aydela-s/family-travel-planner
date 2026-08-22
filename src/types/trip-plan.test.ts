@@ -6,4 +6,8 @@ describe("initialTripPlan — FAM-45", () => {
     expect(initialTripPlan.adults).toBe(2);
     expect(initialTripPlan.children).toEqual([0]);
   });
+
+  it("defaults to no naps selected", () => {
+    expect(initialTripPlan.naps).toEqual([]);
+  });
 });
