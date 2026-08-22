@@ -12,12 +12,11 @@
 Replace the **global scoring** itinerary builder (repetitive parks, weak interest coverage, budget-as-price-thirds) with a **sequential vacation planner**:
 
 ```
-Strategy → Themes → Anchor → Support → Meals → Schedule → Validation → AI polish → Enrichment (costs)
+Strategy → Themes → Anchor → Support → Meals → Schedule → Validation → Enrichment (costs / Places)
 ```
 
 - Budget & Pace = **styles** compiled into `PlanningRules` (not dollar caps; cost estimated after).
 - Scoring only ranks **small valid candidate sets**.
-- AI polishes **wording only** after validation.
 - Flag: `PLANNER_ENGINE=score|staged` (default **`score`** for safety).
 
 ---
@@ -33,7 +32,7 @@ POST /api/generate-itinerary
   → planTrip(plan, { cityOverride, plannerEngine? })
   → normalizeRawItinerary
   → enrichItinerary
-  → enrichItineraryTipsWithAi (optional, non-demo)
+  → applyFallbackDisplayTitles
 ```
 
 ### Inside `planTrip` today
@@ -159,7 +158,6 @@ All under `src/lib/planning-engine/staged/` (see table above), including tests:
 | **Phase 3 meals + schedule** | **Next** | Blueprint-owned meals; schedule from committed stops only |
 | Phase 4 validation + enrich | Pending | Strong validators; day repair; enrich by ID only |
 | Phase 5 cutover | Pending | Default `staged`; quarantine score path |
-| Phase 6 AI polish | Pending | Schema-constrained titles/tips |
 
 ### Known product gaps (fix before / during Phase 3)
 
@@ -212,8 +210,7 @@ From SD 5-day compare (`compare-engines-out.json`):
 2. Budget = `save|balanced|splurge` → `PlanningRules`, **not** `landmarksForStyle` thirds on staged.  
 3. Pace → `rules.capacity` (max activities / support).  
 4. Cost estimated **after** structure (enrichment).  
-5. AI = polish only, post-validation.  
-6. Validation (Phase 4) regenerates **affected day only**.
+5. Validation (Phase 4) regenerates **affected day only**.
 
 ### Theme rules (approved)
 
@@ -308,7 +305,7 @@ npx tsc --noEmit
 | `config/city-restaurants.ts` | Dietary/geo; user-reported bad pins |
 | `planTrip` score branch in `index.ts` | Production default; regressions hit all users |
 | `enrich-itinerary.ts` re-pick logic | Easy to drift titles vs blueprint |
-| API route contract / `TripPlan` shape | Client + demo compatibility |
+| API route contract / `TripPlan` shape | Client compatibility |
 
 Prefer **additive** staged modules over editing score-path scoring in `family-profile.ts` unless fixing a shared bug.
 

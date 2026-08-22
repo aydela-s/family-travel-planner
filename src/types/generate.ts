@@ -1,7 +1,6 @@
 import { AdjustActionId } from "@/lib/planning-engine/adjust-types";
 
 export type GenerateItineraryOptions = {
-  demo?: boolean;
   relaxed?: boolean;
   adjustDay?: number;
   adjustAction?: AdjustActionId;

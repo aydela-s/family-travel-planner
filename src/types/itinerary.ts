@@ -100,7 +100,7 @@ export type Itinerary = {
   conflicts?: import("@/lib/planning-engine/conflicts").PlannerConflict[];
 };
 
-/** Raw AI/demo output before enrichment */
+/** Raw planner output before Places/maps enrichment */
 export type RawItinerary = {
   days: {
     day: number;

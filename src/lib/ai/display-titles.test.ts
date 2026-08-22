@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { applyFallbackDisplayTitles, fallbackDisplayTitle } from "@/lib/ai/display-titles";
-import { applyPolishPayload } from "@/lib/ai/polish-itinerary";
-import { parsePolishPayload, sanitizeDisplayTitle, sanitizeTip } from "@/lib/ai/polish-schema";
 import { applyDailyThemes, buildTripStrategy } from "@/lib/planning-engine/staged";
 import { CITY_CONFIGS } from "@/config/city-pricing";
 import type { Itinerary } from "@/types/itinerary";
@@ -24,7 +22,7 @@ function sdPlan(): TripPlan {
     dietaryRestrictions: "",
     naps: [],
     budgetStyle: "balanced",
-    interests: ["Beaches & Waterfronts", "Interactive Museums"],
+    interests: ["Swimming & Water Play", "Interactive Museums"],
   };
 }
 
@@ -88,67 +86,5 @@ describe("fallback display titles", () => {
     expect(stamped.days[0]!.activities[0]!.title).toBe(
       itinerary.days[0]!.activities[0]!.title,
     );
-  });
-});
-
-describe("polish schema", () => {
-  it("accepts a constrained title and tip", () => {
-    expect(sanitizeDisplayTitle("Ocean Adventure Day")).toBe("Ocean Adventure Day");
-    expect(sanitizeTip("Bring layers — the cove is breezy.")).toBe(
-      "Bring layers — the cove is breezy.",
-    );
-  });
-
-  it("rejects titles that look like activity or restaurant copy", () => {
-    expect(sanitizeDisplayTitle("Explore La Jolla Cove")).toBeNull();
-    expect(sanitizeDisplayTitle("Lunch at Mr. Charlie's")).toBeNull();
-    expect(sanitizeDisplayTitle("Day")).toBeNull();
-    expect(sanitizeDisplayTitle("https://evil.example")).toBeNull();
-  });
-
-  it("parses fenced JSON and drops invalid days", () => {
-    const payload = parsePolishPayload(`\`\`\`json
-{"days":[
-  {"day":1,"displayTitle":"Ocean Adventure Day","tips":{"1|10:00|Explore Waterfront Park Playground":"Pack sunscreen."}},
-  {"day":"nope","displayTitle":"Bad"}
-]}
-\`\`\``);
-    expect(payload?.days).toHaveLength(1);
-    expect(payload?.days[0]!.displayTitle).toBe("Ocean Adventure Day");
-    expect(payload?.days[0]!.tips?.["1|10:00|Explore Waterfront Park Playground"]).toBe(
-      "Pack sunscreen.",
-    );
-  });
-});
-
-describe("applyPolishPayload", () => {
-  it("overlays empty-note tips without rewriting stops, notes, or day titles", () => {
-    const itinerary = sampleItinerary();
-    const originalTitle = itinerary.days[0]!.activities[0]!.title;
-    const originalMealNotes = itinerary.days[0]!.activities[1]!.notes;
-
-    const polished = applyPolishPayload(
-      itinerary,
-      parsePolishPayload(
-        JSON.stringify({
-          days: [
-            {
-              day: 1,
-              displayTitle: "Ocean Adventure Day",
-              tips: {
-                "1|10:00|Explore Waterfront Park Playground": "Go early for open swings.",
-                "1|12:30|Picnic lunch near Waterfront Park Playground": "Should not replace notes.",
-              },
-            },
-          ],
-        }),
-      ),
-    );
-
-    expect(polished.days[0]!.displayTitle).toBeUndefined();
-    expect(polished.days[0]!.activities[0]!.title).toBe(originalTitle);
-    expect(polished.days[0]!.activities[0]!.notes).toBe("Go early for open swings.");
-    expect(polished.days[0]!.activities[1]!.notes).toBe(originalMealNotes);
-    expect(polished.days[0]!.activities).toHaveLength(itinerary.days[0]!.activities.length);
   });
 });

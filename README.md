@@ -20,7 +20,6 @@ Instead of only testing software, I designed product requirements, identified ed
 
 - Multi-step trip planning wizard
 - Deterministic planning engine for scheduling, meal timing, naps, travel style, budgeting, and transportation logic
-- Demo mode (no OpenAI cost)
 - Family-aware cost calculations with child pricing rules
 - Budget-aware itinerary generation targeting 80–100% budget utilization without exceeding the daily limit
 - Google Places destination autocomplete with fallback support
@@ -38,7 +37,6 @@ Instead of only testing software, I designed product requirements, identified ed
 - React
 - TypeScript
 - Tailwind CSS
-- OpenAI API (via Vercel AI Gateway)
 - Google Maps API
 - Vitest
 - Vercel
@@ -88,11 +86,6 @@ npm run test
 
 | Variable              | Purpose                                                                 |
 | --------------------- | ----------------------------------------------------------------------- |
-| DEMO_MODE             | Use mock itineraries without AI tip enrichment                          |
-| AI_GATEWAY_API_KEY    | Vercel AI Gateway key for optional family tips (FAM-47)                 |
-| AI_GATEWAY_MODEL      | Optional model id (default `openai/gpt-4o-mini`)                        |
-| AI_ENRICH_TIPS        | Set `false` to disable tip enrichment while keeping the gateway key     |
-| OPENAI_API_KEY        | Legacy fallback auth for AI Gateway locally                             |
 | GOOGLE_MAPS_API_KEY   | Static Maps, Directions, and fallback for Places if the Places key is unset |
 | GOOGLE_PLACES_API_KEY | Places API (New): Autocomplete, Details, Text Search. Falls back to `GOOGLE_MAPS_API_KEY` |
 | RESEND_API_KEY        | Send product feedback email (FAM-49)                                    |

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { applyFallbackDisplayTitles } from "@/lib/ai/display-titles";
-import { polishItineraryWithAi } from "@/lib/ai/polish-itinerary";
-import { shouldEnrichItineraryWithAi } from "@/lib/ai/config";
-import { enrichItinerary, isDemoMode } from "@/lib/enrich-itinerary";
+import { enrichItinerary } from "@/lib/enrich-itinerary";
 import { isValidTripPlan, normalizeRawItinerary } from "@/lib/itinerary";
 import { resolvePlanningCity } from "@/lib/maps/places-city-config";
 import { applyDestinationCenter } from "@/lib/maps/resolve-destination-center";
@@ -13,7 +11,6 @@ import { Itinerary, RawItinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
 type GenerateRequest = TripPlan & {
-  demo?: boolean;
   relaxed?: boolean;
   adjustDay?: number;
   adjustAction?: AdjustActionId;
@@ -23,7 +20,6 @@ type GenerateRequest = TripPlan & {
 
 function extractTripPlan(body: GenerateRequest): TripPlan {
   const {
-    demo: _d,
     relaxed: _r,
     adjustDay: _a,
     adjustAction: _aa,
@@ -63,7 +59,6 @@ export async function POST(request: Request) {
     plan = await applyDestinationCenter(plan);
     plan = await resolveStayOntoPlan(plan);
 
-    const useDemo = body.demo === true || isDemoMode();
     const city = await resolvePlanningCity(plan);
 
     const enrichedDay = body.existingItinerary?.days.find((d) => d.day === body.adjustDay);
@@ -91,19 +86,10 @@ export async function POST(request: Request) {
       conflicts,
     });
 
-    // Theme display titles always; optional AI polish never blocks the deterministic plan.
     enriched = applyFallbackDisplayTitles(enriched, blueprint);
-    if (shouldEnrichItineraryWithAi(useDemo)) {
-      try {
-        enriched = await polishItineraryWithAi(enriched, effectivePlan, blueprint);
-      } catch (aiError) {
-        console.warn("AI Gateway polish skipped:", aiError);
-      }
-    }
 
     return NextResponse.json({
       ...enriched,
-      demo: useDemo,
       transportationType: effectivePlan.transportationType,
     });
   } catch (error) {

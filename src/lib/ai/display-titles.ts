@@ -3,7 +3,6 @@ import type { Itinerary } from "@/types/itinerary";
 
 /**
  * Deterministic user-facing day titles from internal theme ids.
- * AI polish may replace these; it must never invent POIs or rewrite the schedule.
  */
 export const FALLBACK_DISPLAY_TITLES: Record<ThemeId, string> = {
   arrival: "Easy Arrival Day",
