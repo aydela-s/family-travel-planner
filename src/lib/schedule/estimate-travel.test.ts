@@ -96,7 +96,7 @@ describe("haversine travel estimates — Phase 4", () => {
 
   it("builds per-leg gaps from day landmark context", () => {
     const plan = basePlan({ children: [10] });
-    const ctx = buildLandmarkContext(sanDiego, plan, 1, 2);
+    const ctx = buildLandmarkContext(sanDiego, plan, 1, 2).ctx;
     const activities = [
       { title: "Morning", type: "activity", slotKind: "morning_activity" as const },
       { title: "Lunch", type: "meal", slotKind: "lunch" as const },

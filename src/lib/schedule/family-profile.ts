@@ -7,6 +7,9 @@ import {
   isHighValueAttraction,
   travelFrictionScore,
 } from "@/lib/maps/travel-estimate";
+import { compileTripConstraints } from "@/lib/planning-engine/constraints";
+import { filterScoreLandmarkCandidates } from "@/lib/planning-engine/score-hard-rules";
+import type { ExperienceCoverage } from "@/lib/planning-engine/staged/types";
 import { landmarksForStyle } from "@/lib/pricing/budget-style";
 import {
   interestTagsFromPlan,
@@ -366,6 +369,11 @@ export type PickLandmarkOptions = {
   excludeNames?: Set<string> | string[];
   /** Prefer quiet low-intensity landmarks (stroller nap window). */
   strollerQuiet?: boolean;
+  /** FAM-84: shared hard gates (eligibility, pairing, interest coverage). */
+  constraints?: TripConstraints;
+  coverage?: ExperienceCoverage;
+  applyInterestGates?: boolean;
+  slotIndex?: number;
 };
 
 /** Score margin for rotating among near-tied top candidates across days. */
@@ -468,6 +476,23 @@ export function pickLandmarkForFamily(
     opts.visitWindow,
     wantedTags,
   );
+
+  pool = filterScoreLandmarkCandidates(pool, {
+    plan,
+    city,
+    constraints: opts.constraints ?? compileTripConstraints(plan),
+    visitWindow: opts.visitWindow,
+    coverage: opts.coverage,
+    applyInterestGates: opts.applyInterestGates,
+    alreadyPicked,
+    excludeNames: tripExcluded,
+    slotIndex: opts.slotIndex ?? slotIndex,
+  });
+
+  if (pool.length === 0) {
+    pool = withoutTripUsed(stylePool);
+    if (pool.length === 0) pool = withoutTripUsed(city.landmarks);
+  }
 
   const ranked = [...pool]
     .map((lm) => {

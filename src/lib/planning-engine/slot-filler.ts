@@ -1,5 +1,12 @@
 import { CityConfig, Landmark, LandmarkAgeTag, OnSiteMeal } from "@/config/city-pricing";
 import { addDays } from "@/lib/format";
+import { compileTripConstraints } from "@/lib/planning-engine/constraints";
+import {
+  buildExperienceCoverageTargets,
+  markExperienceCompletedByKeys,
+} from "@/lib/planning-engine/staged/experience-coverage";
+import { coverageKeysFromLandmark } from "@/lib/planning-engine/staged/fill-stops";
+import type { ExperienceCoverage } from "@/lib/planning-engine/staged/types";
 import {
   getFamilyAgeProfile,
   pickLandmarkForFamily,
@@ -89,11 +96,20 @@ export function buildLandmarkContext(
   totalDays: number,
   adjustNote?: string,
   usedLandmarks: Set<string> = new Set(),
-): DayLandmarkContext {
+  tripCoverage?: ExperienceCoverage,
+): { ctx: DayLandmarkContext; coverage: ExperienceCoverage } {
   const adjustment = getAdjustmentContext(adjustNote, day);
   const offset = day + adjustment.landmarkOffset;
   const activityMins = getIntensityConfig(plan).activityDurationMin;
   const visitDate = addDays(plan.startDate, day - 1);
+  const constraints = compileTripConstraints(plan);
+  let coverage = tripCoverage ?? buildExperienceCoverageTargets(plan, totalDays);
+  const hardRuleBase = {
+    constraints,
+    coverage,
+    applyInterestGates: true,
+    excludeNames: usedLandmarks,
+  };
   const morningWindow = visitWindowFromTime(
     morningActivityDefaultTime(plan),
     activityMins,
@@ -112,21 +128,29 @@ export function buildLandmarkContext(
     visitDate,
   );
   const profile = getFamilyAgeProfile(plan);
-  const excludeNames = usedLandmarks;
 
   const morning = pickLandmarkForFamily(city, plan, offset, 0, [], {
     visitWindow: morningWindow,
     preferBand: nextPreferBand(profile, [], day, 0),
     anchorToStay: true,
-    excludeNames,
+    excludeNames: usedLandmarks,
     strollerQuiet: overlapsStrollerNap(plan, morningWindow.startMin, morningWindow.endMin),
+    ...hardRuleBase,
+    slotIndex: 0,
   });
+  coverage = markExperienceCompletedByKeys(coverage, coverageKeysFromLandmark(morning));
+  hardRuleBase.coverage = coverage;
+
   const afternoon = pickLandmarkForFamily(city, plan, offset, 1, [morning], {
     visitWindow: afternoonWindow,
     preferBand: nextPreferBand(profile, [morning], day, 1),
-    excludeNames,
+    excludeNames: usedLandmarks,
     strollerQuiet: overlapsStrollerNap(plan, afternoonWindow.startMin, afternoonWindow.endMin),
+    ...hardRuleBase,
+    slotIndex: 1,
   });
+  coverage = markExperienceCompletedByKeys(coverage, coverageKeysFromLandmark(afternoon));
+  hardRuleBase.coverage = coverage;
   // Theme parks are half-day — don't stack a third stop on the same day.
   const themeDay =
     morning.interestTags.includes("theme-parks") ||
@@ -136,8 +160,10 @@ export function buildLandmarkContext(
     : pickLandmarkForFamily(city, plan, offset, 2, [morning, afternoon], {
         visitWindow: extraWindow,
         preferBand: nextPreferBand(profile, [morning, afternoon], day, 2),
-        excludeNames,
+        excludeNames: usedLandmarks,
         strollerQuiet: overlapsStrollerNap(plan, extraWindow.startMin, extraWindow.endMin),
+        ...hardRuleBase,
+        slotIndex: 2,
       });
   // Theme-park afternoons are half-day: lunch at/near the park so the visit
   // starts right after lunch instead of after a cross-city transfer.
@@ -150,12 +176,15 @@ export function buildLandmarkContext(
   if (extra) usedLandmarks.add(extra.name);
 
   return {
-    morning,
-    afternoon,
-    lunch,
-    dinner,
-    extra,
-    dayOffset: adjustment.landmarkOffset,
+    ctx: {
+      morning,
+      afternoon,
+      lunch,
+      dinner,
+      extra,
+      dayOffset: adjustment.landmarkOffset,
+    },
+    coverage,
   };
 }
 

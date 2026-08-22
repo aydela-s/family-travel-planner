@@ -89,7 +89,7 @@ describe("FAM-7 — mixed-age band coverage", () => {
       children: [17, 8, 3],
       budgetStyle: "splurge",
     });
-    const ctx = buildLandmarkContext(sanDiego, plan, 1, 2);
+    const ctx = buildLandmarkContext(sanDiego, plan, 1, 2).ctx;
     const covered = new Set([...ctx.morning.ageTags, ...ctx.afternoon.ageTags]);
     // Prefer covering at least two of the three family bands across the two stops.
     const familyBands = ["toddler", "tween", "teen"] as const;
@@ -106,7 +106,7 @@ describe("FAM-7 — interest matching", () => {
       "zoos",
     ]);
     expect(interestTagsFromPlan(["Nature & Scenic Views"])).toEqual(["nature"]);
-    expect(interestTagsFromPlan(["Playgrounds & Indoor Play"]).sort()).toEqual(
+    expect(interestTagsFromPlan(["Indoor & Outdoor Play"]).sort()).toEqual(
       ["indoor-play", "playgrounds"].sort(),
     );
     // Legacy wizard chip still maps after rename.

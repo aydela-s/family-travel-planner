@@ -63,7 +63,7 @@ describe("same-day landmark proximity — Phase 3", () => {
 
   it("buildLandmarkContext keeps morning + afternoon within the cluster radius when possible", () => {
     const plan = basePlan({ destination: "Paris", budgetStyle: "balanced" });
-    const ctx = buildLandmarkContext(paris, plan, 1, 2);
+    const ctx = buildLandmarkContext(paris, plan, 1, 2).ctx;
     const activityStops = [ctx.morning, ctx.afternoon];
     const spread = maxPairwiseDistanceKm(activityStops);
 
@@ -74,7 +74,7 @@ describe("same-day landmark proximity — Phase 3", () => {
 
   it("does not reuse the same landmark for morning and afternoon when alternatives exist", () => {
     const plan = basePlan({ budgetStyle: "balanced" });
-    const ctx = buildLandmarkContext(sanDiego, plan, 1, 2);
+    const ctx = buildLandmarkContext(sanDiego, plan, 1, 2).ctx;
     expect(ctx.morning.name).not.toBe(ctx.afternoon.name);
   });
 

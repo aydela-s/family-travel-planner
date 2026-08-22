@@ -21,7 +21,10 @@ import {
   planMealsOnBlueprint,
   resolvePlannerEngine,
   validateAndRepairBlueprint,
+  replanStagedDayWithNote,
 } from "@/lib/planning-engine/staged";
+import { buildExperienceCoverageTargets } from "@/lib/planning-engine/staged/experience-coverage";
+import type { ExperienceCoverage } from "@/lib/planning-engine/staged/types";
 import type { PlannerConflict } from "@/lib/planning-engine/conflicts";
 import type { PlannerEngine, TripBlueprint } from "@/lib/planning-engine/staged/types";
 import { PlanOptions } from "@/lib/planning-engine/types";
@@ -93,10 +96,19 @@ function buildDayActivities(
   adjustNote?: string,
   usedRestaurants: Set<string> = new Set(),
   usedLandmarks: Set<string> = new Set(),
-): RawItinerary["days"][0]["activities"] {
+  tripCoverage?: ExperienceCoverage,
+): { activities: RawItinerary["days"][0]["activities"]; coverage: ExperienceCoverage } {
   const adjustment = getAdjustmentContext(adjustNote, day);
   const slots = buildDaySkeleton(plan, day, totalDays, adjustment);
-  const ctx = buildLandmarkContext(city, plan, day, totalDays, adjustNote, usedLandmarks);
+  const { ctx, coverage } = buildLandmarkContext(
+    city,
+    plan,
+    day,
+    totalDays,
+    adjustNote,
+    usedLandmarks,
+    tripCoverage,
+  );
   const activities = fillDaySkeleton(
     slots,
     plan,
@@ -107,7 +119,10 @@ function buildDayActivities(
     adjustNote,
     usedRestaurants,
   );
-  return fixRawDayActivities(activities, plan, adjustment, ctx, day);
+  return {
+    activities: fixRawDayActivities(activities, plan, adjustment, ctx, day),
+    coverage,
+  };
 }
 
 function applySurgicalAdjust(
@@ -200,23 +215,32 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
       options.existingItinerary,
       options.adjustDay,
     );
+    const adjustDay = options.adjustDay;
+    const adjustNote = options.adjustNote;
+    const activities =
+      plannerEngine === "score"
+        ? buildDayActivities(
+            workingPlan,
+            city,
+            adjustDay,
+            dayCount,
+            adjustNote,
+            usedRestaurants,
+            usedLandmarks,
+          ).activities
+        : replanStagedDayWithNote(
+            blueprint,
+            workingPlan,
+            city,
+            adjustDay,
+            adjustNote,
+            usedLandmarks,
+            usedRestaurants,
+          );
     return {
       raw: {
         days: options.existingItinerary.days.map((d) =>
-          d.day === options.adjustDay
-            ? {
-                day: d.day,
-                activities: buildDayActivities(
-                  workingPlan,
-                  city,
-                  d.day,
-                  dayCount,
-                  options.adjustNote,
-                  usedRestaurants,
-                  usedLandmarks,
-                ),
-              }
-            : d,
+          d.day === adjustDay ? { day: d.day, activities } : d,
         ),
       },
       plan: workingPlan,
@@ -230,20 +254,23 @@ export function planTrip(plan: TripPlan, options?: PlanOptions): PlanTripResult 
   function buildFullRawScore(p: TripPlan): RawItinerary {
     const usedRestaurants = new Set<string>();
     const usedLandmarks = new Set<string>();
-    return {
-      days: Array.from({ length: dayCount }, (_, i) => ({
-        day: i + 1,
-        activities: buildDayActivities(
-          p,
-          city,
-          i + 1,
-          dayCount,
-          undefined,
-          usedRestaurants,
-          usedLandmarks,
-        ),
-      })),
-    };
+    let coverage = buildExperienceCoverageTargets(p, dayCount);
+    const days = Array.from({ length: dayCount }, (_, i) => {
+      const day = i + 1;
+      const built = buildDayActivities(
+        p,
+        city,
+        day,
+        dayCount,
+        undefined,
+        usedRestaurants,
+        usedLandmarks,
+        coverage,
+      );
+      coverage = built.coverage;
+      return { day, activities: built.activities };
+    });
+    return { days };
   }
 
   function buildFullRawStaged(p: TripPlan): { raw: RawItinerary; blueprint: TripBlueprint } {

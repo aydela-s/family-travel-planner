@@ -1,6 +1,6 @@
 import type { CityConfig, Landmark } from "@/config/city-pricing";
 import { getTripDayCount } from "@/lib/itinerary";
-import { getAdjustmentContext } from "@/lib/planning-engine/day-adjustment";
+import { getAdjustmentContext, activityTitlePrefix } from "@/lib/planning-engine/day-adjustment";
 import {
   labelForMealIntent,
 } from "@/lib/planning-engine/staged/meal-planner";
@@ -34,6 +34,7 @@ function fillActivitySlot(
   city: CityConfig,
   ctx: DayLandmarkContext,
   totalDays: number,
+  adjustment: AdjustmentContext,
 ): RawActivity {
   const type = slotActivityType(slot.kind);
   const intensity = getIntensityConfig(plan);
@@ -73,8 +74,14 @@ function fillActivitySlot(
       return tagged(
         {
           time: slot.defaultTime,
-          title: suggestActivityTitle(ctx.morning.name, plan, "morning", ctx.morning.interestTags),
+          title: activityTitlePrefix(
+            adjustment,
+            suggestActivityTitle(ctx.morning.name, plan, "morning", ctx.morning.interestTags),
+          ),
           type,
+          ...(adjustment.summaryNote
+            ? { notes: `Tailored to your request: ${adjustment.summaryNote}` }
+            : {}),
         },
         ctx.morning,
       );
@@ -82,7 +89,10 @@ function fillActivitySlot(
       return tagged(
         {
           time: slot.defaultTime,
-          title: suggestActivityTitle(ctx.afternoon.name, plan, "afternoon", ctx.afternoon.interestTags),
+          title: activityTitlePrefix(
+            adjustment,
+            suggestActivityTitle(ctx.afternoon.name, plan, "afternoon", ctx.afternoon.interestTags),
+          ),
           type,
           notes:
             ctx.afternoon.adultPrice > 0 ? "Paid stop within your family budget." : undefined,
@@ -196,9 +206,10 @@ export function buildScheduleFromBlueprint(
   day: DayBlueprint,
   plan: TripPlan,
   city: CityConfig,
+  adjustNote?: string,
 ): StagedDaySchedule {
   const totalDays = getTripDayCount(plan.startDate, plan.endDate);
-  const adjustment = getAdjustmentContext(undefined, day.dayIndex);
+  const adjustment = getAdjustmentContext(adjustNote, day.dayIndex);
   const ledger = new Set<string>([
     ...(day.anchor ? [day.anchor.landmarkName] : []),
     ...day.support.map((s) => s.landmarkName),
@@ -239,7 +250,7 @@ export function buildScheduleFromBlueprint(
   }
 
   const activities = slots.map((slot) =>
-    fillActivitySlot(slot, day, plan, city, ctx, totalDays),
+    fillActivitySlot(slot, day, plan, city, ctx, totalDays, adjustment),
   );
 
   return { activities, ctx };

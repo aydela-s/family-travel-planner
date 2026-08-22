@@ -139,7 +139,7 @@ describe("opening-hours preference at selection — P0", () => {
 
   it("buildLandmarkContext morning pick is open at the skeleton morning time", () => {
     const plan = basePlan({ accommodationType: "hotel_breakfast_included" });
-    const ctx = buildLandmarkContext(hoursCity, plan, 1, 2);
+    const ctx = buildLandmarkContext(hoursCity, plan, 1, 2).ctx;
     const startMin = parseTimeToMinutes("08:30");
     const endMin = startMin + getIntensityConfig(plan).activityDurationMin;
 

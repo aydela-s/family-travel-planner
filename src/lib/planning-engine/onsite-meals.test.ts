@@ -40,7 +40,7 @@ describe("on-site café meals", () => {
       endDate: "2026-09-16",
       budgetStyle: "save",
     });
-    const ctx = buildLandmarkContext(city, plan, 1, 1);
+    const ctx = buildLandmarkContext(city, plan, 1, 1).ctx;
     // Force morning to Fleet (open Wednesday) to assert café preference.
     const forced = { ...ctx, morning: fleet };
     const slots = buildDaySkeleton(plan, 1, 1);
@@ -58,7 +58,7 @@ describe("on-site café meals", () => {
       dietaryRestrictions: "Gluten-free",
       budgetStyle: "splurge",
     });
-    const ctx = { ...buildLandmarkContext(city, plan, 1, 1), morning: fleet };
+    const ctx = { ...buildLandmarkContext(city, plan, 1, 1).ctx, morning: fleet };
     const slots = buildDaySkeleton(plan, 1, 1);
     const activities = fillDaySkeleton(slots, plan, city, ctx, 1, 1);
     const lunch = activities.find((a) => a.slotKind === "lunch" || /lunch/i.test(a.title));

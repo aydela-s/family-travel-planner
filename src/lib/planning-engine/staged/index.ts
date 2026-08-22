@@ -54,6 +54,7 @@ export {
   buildScheduleFromBlueprint,
   type StagedDaySchedule,
 } from "@/lib/planning-engine/staged/schedule-builder";
+export { replanStagedDayWithNote } from "@/lib/planning-engine/staged/replan-day";
 export { validateBlueprint } from "@/lib/planning-engine/staged/validate-blueprint";
 export {
   repairBlueprint,
