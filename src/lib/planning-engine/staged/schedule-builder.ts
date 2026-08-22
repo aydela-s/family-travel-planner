@@ -227,6 +227,17 @@ export function buildScheduleFromBlueprint(
     slots = slots.filter((s) => s.kind !== "extra_activity");
   }
 
+  // Single-outing days: no synthetic gap-fillers in the skeleton (FAM-84 rules 13–14).
+  const committedStopCount = (day.anchor ? 1 : 0) + day.support.length;
+  if (committedStopCount <= 1) {
+    slots = slots.filter(
+      (s) =>
+        s.kind !== "extra_activity" &&
+        s.kind !== "calm_activity" &&
+        s.kind !== "midday_rest",
+    );
+  }
+
   const activities = slots.map((slot) =>
     fillActivitySlot(slot, day, plan, city, ctx, totalDays),
   );

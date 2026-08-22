@@ -114,7 +114,7 @@ describe("itinerary export — FAM-50", () => {
     );
     expect(summary).toMatch(/10:00a/);
     expect(summary).toContain("Explore Belmont Park");
-    expect(summary).toContain("*4.6 (18k)");
+    expect(summary).toContain("*4.6 · (18k)");
     expect(summary).toContain("$60");
     expect(details[0]).toBe("10:00 AM – 12:00 PM");
     expect(details[1]).toMatch(/Maps: https:\/\/www\.google\.com\/maps/);

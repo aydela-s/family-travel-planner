@@ -30,6 +30,7 @@ import {
   wantsNoNaps,
 } from "@/lib/schedule/nap-policy";
 import { getIntensityConfig } from "@/lib/schedule/travel-style";
+import { isOptionalActivity } from "@/lib/planning-engine/day-intent";
 import {
   activitiesOverlap,
   defaultTravelMin,
@@ -87,6 +88,32 @@ function processRawActivities(
   return scheduled;
 }
 
+/** Drop optional gap-fillers so overlap repair can succeed (FAM-84 rule 1). */
+function dropLastOptionalActivity(activities: RawActivity[]): RawActivity[] {
+  for (let i = activities.length - 1; i >= 0; i--) {
+    const item = activities[i]!;
+    if (isOptionalActivity(item)) {
+      return [...activities.slice(0, i), ...activities.slice(i + 1)];
+    }
+    if (
+      item.type === "activity" &&
+      (item.slotKind === "calm_activity" ||
+        item.slotKind === "midday_rest" ||
+        /\b(calm family|family time|free time|stroll)\b/i.test(item.title))
+    ) {
+      return [...activities.slice(0, i), ...activities.slice(i + 1)];
+    }
+  }
+  return activities;
+}
+
+function hasScheduleOverlapIssues(activities: RawActivity[], plan: TripPlan): boolean {
+  if (validateRawDay(activities, plan).some((v) => v.code === "overlap")) return true;
+  return validateDaySchedule(activities, plan).some(
+    (v) => v.code === "overlap" || v.code === "time_travel",
+  );
+}
+
 export function fixRawDayActivities(
   activities: RawActivity[],
   plan: TripPlan,
@@ -95,10 +122,13 @@ export function fixRawDayActivities(
   day: number = 1,
 ): RawActivity[] {
   let result = processRawActivities(activities, plan, adjustment, landmarkCtx, day);
-  const issues = validateRawDay(result, plan);
+  let attempts = 0;
 
-  if (issues.length > 0) {
-    result = processRawActivities(result, plan, adjustment, landmarkCtx, day);
+  while (hasScheduleOverlapIssues(result, plan) && attempts < 4) {
+    const trimmed = dropLastOptionalActivity(result);
+    if (trimmed.length === result.length) break;
+    result = processRawActivities(trimmed, plan, adjustment, landmarkCtx, day);
+    attempts += 1;
   }
 
   return result;

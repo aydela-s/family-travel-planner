@@ -12,6 +12,7 @@ import {
   formatTime12h,
   formatTimeCompact,
   oneLineNote,
+  shouldShowLineItemCost,
 } from "@/lib/format";
 import { formatCoverDateRange } from "@/lib/itinerary-export";
 import { interestSourceLabels } from "@/lib/schedule/interest-map";
@@ -368,10 +369,9 @@ function TimelineItem({
 }) {
   const style = typeStyle[activity.type];
   const ratingBadge = formatPlaceRatingBadge(activity.rating, activity.reviewCount);
-  const paid =
-    activity.type === "meal" || (activity.activityCost != null && activity.activityCost > 0)
-      ? moneyWhole(activity.activityCost ?? 0, currencySymbol)
-      : null;
+  const paid = shouldShowLineItemCost(activity)
+    ? moneyWhole(activity.activityCost!, currencySymbol)
+    : null;
   const rawNote = activity.notes ? oneLineNote(activity.notes) : "";
   const detailNote = rawNote && !isBoilerplateAgeNote(rawNote) ? rawNote : "";
   const maps = mapsUrl(activity);

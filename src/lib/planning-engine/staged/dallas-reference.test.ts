@@ -41,7 +41,7 @@ function dallasReferencePlan(overrides: Partial<TripPlan> = {}): TripPlan {
     budgetStyle: "balanced",
     interests: [
       "Interactive Museums",
-      "Playgrounds & Indoor Play",
+      "Indoor & Outdoor Play",
       "Shopping",
       "Swimming & Water Play",
     ],

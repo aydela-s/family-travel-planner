@@ -6,6 +6,7 @@ import {
   formatTimeCompact,
   formatTripDate,
   oneLineNote,
+  shouldShowLineItemCost,
 } from "@/lib/format";
 import { Itinerary, ItineraryActivity } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
@@ -37,12 +38,9 @@ export function formatCompactActivityLines(
   const badge = formatPlaceRatingBadge(activity.rating, activity.reviewCount);
   const badgeText =
     badge && opts.asciiStar ? badge.replace(/^★/, "*") : badge;
-  const paid =
-    activity.type === "meal" ||
-    activity.type === "travel" ||
-    (activity.activityCost != null && activity.activityCost > 0)
-      ? moneyWhole(activity.activityCost ?? 0, currencySymbol)
-      : "";
+  const paid = shouldShowLineItemCost(activity)
+    ? moneyWhole(activity.activityCost!, currencySymbol)
+    : "";
 
   const summaryParts = [
     formatTimeCompact(activity.time),

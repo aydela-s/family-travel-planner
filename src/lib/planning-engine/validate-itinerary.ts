@@ -1,5 +1,6 @@
 import type { CityConfig, Landmark, LandmarkInterestTag } from "@/config/city-pricing";
 import { haversineKm } from "@/lib/maps/travel-estimate";
+import { addDays } from "@/lib/format";
 import { dayActivityCategories } from "@/lib/planning-engine/staged/landmark-experience";
 import { mealDetourLimits } from "@/lib/planning-engine/restaurant-picker";
 import { familyActivityCost } from "@/lib/pricing/activity-cost";
@@ -11,13 +12,13 @@ import {
   isCategorizableActivity,
 } from "@/lib/schedule/classify-activity";
 import { suggestActivityTitle } from "@/lib/schedule/family-profile";
-import { extractLandmarkFromTitle } from "@/lib/schedule/landmark-hours";
+import { extractLandmarkFromTitle, findLandmarkByName, isKnownClosedForVisit, validateActivityOpeningHours } from "@/lib/schedule/landmark-hours";
 import {
   INTEREST_LABEL_TO_TAGS,
   interestSourceLabels,
   interestTagsFromPlan,
 } from "@/lib/schedule/interest-map";
-import { isUnpaidTimelineActivity } from "@/lib/schedule/timeline";
+import { isUnpaidTimelineActivity, itemDurationMin, parseTimeToMinutes } from "@/lib/schedule/timeline";
 import type { ItineraryActivity, ItineraryDay } from "@/types/itinerary";
 import type { TripPlan } from "@/types/trip-plan";
 
@@ -30,7 +31,9 @@ export type ItineraryViolation = {
     | "distance_not_in_miles"
     | "meal_cost_mismatch"
     | "transport_cost_mismatch"
-    | "activity_reused";
+    | "activity_reused"
+    | "venue_closed"
+    | "outside_opening_hours";
   message: string;
   day?: number;
 };
@@ -46,7 +49,7 @@ export function scheduledAttractions(day: ItineraryDay): ItineraryActivity[] {
  * Stops the day-uniqueness rule applies to. Wider than `scheduledAttractions`:
  * a stop with no catalog tags still counts once its name resolves to a category.
  */
-function categoryBearingStops(day: ItineraryDay): ItineraryActivity[] {
+export function categoryBearingStops(day: ItineraryDay): ItineraryActivity[] {
   return day.activities.filter(
     (a) =>
       isCategorizableActivity(a) &&
@@ -190,6 +193,9 @@ export function validateItinerary(
           message: `Day ${day.day} "${activity.title}" is not in any selected interest.`,
         });
       }
+    }
+
+    for (const activity of categoryBearingStops(day)) {
       const venue = (activity.location?.name ?? activity.title).trim().toLowerCase();
       if (venue) {
         const prior = seenVenues.get(venue);
@@ -213,6 +219,21 @@ export function validateItinerary(
           message: `Day ${day.day} "${detour.title}" adds ${detour.km.toFixed(1)} km of backtracking (max ${detourLimit}).`,
         });
       }
+    }
+
+    const visitDate = addDays(plan.startDate, day.day - 1);
+    for (const issue of validateActivityOpeningHours(
+      day.activities,
+      city.landmarks,
+      (a) => itemDurationMin(a, plan),
+      visitDate,
+    )) {
+      if (!issue.hoursReliable) continue;
+      out.push({
+        code: issue.code === "closed_that_day" ? "venue_closed" : "outside_opening_hours",
+        day: day.day,
+        message: issue.message,
+      });
     }
 
     for (const activity of day.activities) {
@@ -252,7 +273,7 @@ export function validateItinerary(
     }
   }
 
-  // Coverage is per wizard choice: "Playgrounds & Indoor Play" is satisfied by
+  // Coverage is per wizard choice: "Indoor & Outdoor Play" is satisfied by
   // either a playground or an indoor-play stop, not both.
   for (const label of plan.interests) {
     const tags = INTEREST_LABEL_TO_TAGS[label] ?? [];
@@ -609,6 +630,139 @@ export function repairReusedVenues(
       for (const c of dayActivityCategories(replacement)) takenCategories.add(c);
       dayStops.push(replacement);
       activities.push(applyReplacement(raw, replacement));
+    }
+
+    return { ...day, activities };
+  });
+}
+
+function applyActivityReplacement(
+  activity: ItineraryActivity,
+  replacement: Landmark,
+  plan: TripPlan,
+): ItineraryActivity {
+  return {
+    ...activity,
+    title: suggestActivityTitle(
+      replacement.name,
+      plan,
+      activity.timeOfDay === "morning" ? "morning" : "afternoon",
+      replacement.interestTags,
+    ),
+    location: { name: replacement.name, lat: replacement.lat, lng: replacement.lng },
+    placeId: replacement.placeId,
+    rating: replacement.rating,
+    reviewCount: replacement.reviewCount,
+    interestTags: replacement.interestTags,
+    landmarkIntensity: replacement.intensity,
+    activityCost: familyActivityCost(replacement, plan.adults, plan.children),
+  };
+}
+
+/** Same-day duplicate venue: replace the later copy instead of dropping (FAM-84 rule 3). */
+export function repairSameDayVenueRepeats(
+  activities: ItineraryActivity[],
+  plan: TripPlan,
+  city: CityConfig,
+): ItineraryActivity[] {
+  const normalize = (value: string) => value.replace(/\s+area$/i, "").trim().toLowerCase();
+  const seen = new Set<string>();
+  const usedNames = new Set<string>();
+  const dayStops: Landmark[] = [];
+  const takenCategories = new Set<string>();
+  const out: ItineraryActivity[] = [];
+
+  for (const raw of activities) {
+    if (raw.type !== "activity" || isUnpaidTimelineActivity(raw) || isGroceryActivityLike(raw)) {
+      out.push(raw);
+      continue;
+    }
+    const key = normalize(raw.location?.name ?? raw.title);
+    if (!key || !seen.has(key)) {
+      if (key) seen.add(key);
+      const name = raw.location?.name?.replace(/\s+area$/i, "").trim();
+      if (name) usedNames.add(name);
+      for (const c of categoriesForActivity(raw)) takenCategories.add(c);
+      if (raw.location) dayStops.push(activityAsLandmark(raw));
+      out.push(raw);
+      continue;
+    }
+
+    const replacement = findReplacementLandmark(city, plan, {
+      takenCategories,
+      usedNames,
+      dayStops,
+      preferTags: raw.interestTags ?? [...interestTagsFromPlan(plan.interests)],
+      near: raw.location,
+    });
+    if (!replacement) continue;
+
+    usedNames.add(replacement.name);
+    seen.add(normalize(replacement.name));
+    for (const c of dayActivityCategories(replacement)) takenCategories.add(c);
+    dayStops.push(replacement);
+    out.push(applyActivityReplacement(raw, replacement, plan));
+  }
+
+  return out;
+}
+
+/** Replace reliably-closed stops with an open alternative (FAM-84 rule 2). */
+export function repairClosedVenues(
+  days: ItineraryDay[],
+  plan: TripPlan,
+  city: CityConfig,
+): ItineraryDay[] {
+  const tripUsed = new Set<string>();
+
+  return days.map((day) => {
+    const visitDate = addDays(plan.startDate, day.day - 1);
+    const takenCategories = new Set<string>();
+    const dayStops: Landmark[] = [];
+    const usedNames = new Set(tripUsed);
+    const activities: ItineraryActivity[] = [];
+
+    for (const raw of day.activities) {
+      if (raw.type !== "activity" || isUnpaidTimelineActivity(raw) || isGroceryActivityLike(raw)) {
+        activities.push(raw);
+        continue;
+      }
+
+      const landmarkName = raw.location?.name ?? extractLandmarkFromTitle(raw.title);
+      const landmark = landmarkName ? findLandmarkByName(city.landmarks, landmarkName) : undefined;
+      const start = parseTimeToMinutes(raw.time);
+      const end = raw.endTime ? parseTimeToMinutes(raw.endTime) : start + 90;
+
+      if (
+        landmark &&
+        isKnownClosedForVisit(landmark, { visitDate, startMin: start, endMin: end })
+      ) {
+        const replacement = findReplacementLandmark(city, plan, {
+          takenCategories,
+          usedNames,
+          dayStops,
+          preferTags: raw.interestTags ?? [...interestTagsFromPlan(plan.interests)],
+          near: raw.location,
+        });
+        if (replacement) {
+          usedNames.add(replacement.name);
+          tripUsed.add(replacement.name);
+          for (const c of dayActivityCategories(replacement)) takenCategories.add(c);
+          dayStops.push(replacement);
+          activities.push(applyActivityReplacement(raw, replacement, plan));
+          continue;
+        }
+        continue;
+      }
+
+      if (raw.location?.name) {
+        const clean = raw.location.name.replace(/\s+area$/i, "").trim();
+        usedNames.add(clean);
+        tripUsed.add(clean);
+        dayStops.push(activityAsLandmark(raw));
+      }
+      for (const c of categoriesForActivity(raw)) takenCategories.add(c);
+      activities.push(raw);
     }
 
     return { ...day, activities };

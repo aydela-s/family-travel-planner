@@ -6,6 +6,10 @@ import {
 import { planMealsForDay } from "@/lib/planning-engine/staged/meal-planner";
 import { selectSupportForDay } from "@/lib/planning-engine/staged/support-selector";
 import { validateBlueprint } from "@/lib/planning-engine/staged/validate-blueprint";
+import { uncoveredSelectedTags } from "@/lib/planning-engine/staged/experience-coverage";
+import {
+  coverageThroughPriorDays,
+} from "@/lib/planning-engine/staged/fill-stops";
 import type {
   DayBlueprint,
   TripBlueprint,
@@ -46,12 +50,15 @@ function repairAnchorForDay(
   badNames: Set<string>,
   priorFullDayAnchors: Set<string>,
   ctx: { constraints: TripConstraints; conflicts: PlannerConflict[] },
+  blueprint: TripBlueprint,
 ): DayBlueprint {
   if (day.anchor) ledgerNames.delete(day.anchor.landmarkName);
   for (const s of day.support) ledgerNames.delete(s.landmarkName);
 
   const softExclude = new Set(badNames);
   if (day.anchor) softExclude.add(day.anchor.landmarkName);
+
+  const interestCoverage = coverageThroughPriorDays(blueprint, plan, city, day.dayIndex);
 
   const anchor = selectAnchorForDay(city, plan, day, {
     visitWindow: anchorVisitWindow(plan, day),
@@ -60,6 +67,7 @@ function repairAnchorForDay(
     priorFullDayAnchors,
     constraints: ctx.constraints,
     conflicts: ctx.conflicts,
+    interestCoverage,
   });
   ledgerNames.add(anchor.name);
 
@@ -67,6 +75,7 @@ function repairAnchorForDay(
     visitWindow: supportVisitWindow(plan, day),
     ledgerNames,
     alreadyToday: [anchor],
+    uncoveredSelectedTags: uncoveredSelectedTags(interestCoverage),
     constraints: ctx.constraints,
   });
   for (const s of support) ledgerNames.add(s.name);
@@ -75,6 +84,14 @@ function repairAnchorForDay(
     ...day,
     anchor: toCommittedStop(anchor, "anchor"),
     support: support.map((s) => toCommittedStop(s, "support")),
+  };
+}
+
+function dropLastSupportStop(day: DayBlueprint): DayBlueprint {
+  if (day.support.length === 0) return day;
+  return {
+    ...day,
+    support: day.support.slice(0, -1),
   };
 }
 
@@ -132,10 +149,12 @@ export function repairBlueprint(
       (v) =>
         v.repairHint === "regenerate_anchor" ||
         v.repairHint === "regenerate_day" ||
-        v.repairHint === "regenerate_support",
+        (v.repairHint === "regenerate_support" && v.code !== "day_overload"),
     );
+    const needsSupportTrim = dayViolations.some((v) => v.code === "day_overload");
     const needsMeals =
       needsAnchor ||
+      needsSupportTrim ||
       dayViolations.some(
         (v) => v.repairHint === "regenerate_meals" || v.repairHint === "regenerate_day",
       );
@@ -163,7 +182,13 @@ export function repairBlueprint(
         badNames,
         priorFullDayAnchors,
         ctx,
+        { ...blueprint, days },
       );
+    } else if (needsSupportTrim) {
+      if (day.support.length > 0) {
+        ledgerNames.delete(day.support[day.support.length - 1]!.landmarkName);
+      }
+      day = dropLastSupportStop(day);
     }
 
     if (needsMeals) {

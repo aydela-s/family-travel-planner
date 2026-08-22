@@ -27,7 +27,7 @@ function plan(overrides: Partial<TripPlan> = {}): TripPlan {
     interests: [
       "Swimming & Water Play",
       "Nature & Scenic Views",
-      "Playgrounds & Indoor Play",
+      "Indoor & Outdoor Play",
       "Interactive Museums",
       "Shopping",
     ],

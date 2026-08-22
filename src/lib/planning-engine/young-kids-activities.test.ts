@@ -20,7 +20,7 @@ function youngKidsPlan(overrides: Partial<TripPlan> = {}): TripPlan {
     dietaryRestrictions: "Vegan",
     naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
     budgetStyle: "balanced",
-    interests: ["Nature & Scenic Views", "Playgrounds & Indoor Play"],
+    interests: ["Nature & Scenic Views", "Indoor & Outdoor Play"],
     ...overrides,
   };
 }
@@ -53,7 +53,7 @@ describe("young kids — real activities over stroll fillers", () => {
     expect(activityNames.length).toBeLessThanOrEqual(city.landmarks.length);
   });
 
-  it("prefers playground and indoor-play stops when Playgrounds & Indoor Play is selected", () => {
+  it("prefers playground and indoor-play stops when Indoor & Outdoor Play is selected", () => {
     const city = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
     const plan = youngKidsPlan({ budgetStyle: "balanced" });
     const playground = city.landmarks.find((l) => l.name === "Mission Bay Park")!;

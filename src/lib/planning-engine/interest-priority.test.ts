@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CITY_CONFIGS, type CityConfig, type Landmark } from "@/config/city-pricing";
 import { buildTripStrategy } from "@/lib/planning-engine/staged";
-import { selectSoftFiller } from "@/lib/planning-engine/staged/anchor-selector";
+import { selectAnchorForDay, selectSoftFiller } from "@/lib/planning-engine/staged/anchor-selector";
 import { selectSupportForDay } from "@/lib/planning-engine/staged/support-selector";
+import {
+  buildExperienceCoverageTargets,
+  markExperienceCompletedByKeys,
+} from "@/lib/planning-engine/staged/experience-coverage";
 import type { TripPlan } from "@/types/trip-plan";
 
 /**
@@ -174,5 +178,40 @@ describe("uncovered selected interests come before unselected categories", () =>
       { uncoveredSelectedTags: ["beaches"] },
     );
     expect(filler?.name).toBe("Rose Garden");
+  });
+});
+
+describe("anchor-level interest coverage (FAM-84 rules 9–10)", () => {
+  const museumAnchor = landmark("Hands-On Discovery Lab", ["interactive"], 1, { indoor: true });
+  const museumAlt = landmark("City Art Museum", ["museums"], 1.1, { indoor: true });
+  const parksAlt = landmark("Neighborhood Park", ["parks"], 1.2);
+
+  it("picks an uncovered selected interest over an unselected category", () => {
+    const trip = plan({ interests: ["Interactive Museums", "Museums & Art"] });
+    const city = cityWith([museumAnchor, museumAlt, parksAlt]);
+    const day = fullDay(trip, city);
+    const anchor = selectAnchorForDay(city, trip, day, {
+      ledgerNames: new Set(),
+      interestCoverage: buildExperienceCoverageTargets(trip, 4),
+    });
+    expect(anchor.interestTags.some((t) => ["interactive", "museums"].includes(t))).toBe(true);
+    expect(anchor.name).not.toBe("Neighborhood Park");
+  });
+
+  it("does not assign a second parks day before museums has an anchor", () => {
+    const trip = plan({ interests: ["Parks & Gardens", "Museums & Art"] });
+    let coverage = buildExperienceCoverageTargets(trip, 4);
+    coverage = markExperienceCompletedByKeys(coverage, ["parks"]);
+    const city = cityWith([
+      landmark("First Park", ["parks"], 1),
+      parksAlt,
+      museumAlt,
+    ]);
+    const day = fullDay(trip, city);
+    const anchor = selectAnchorForDay(city, trip, day, {
+      ledgerNames: new Set(["First Park"]),
+      interestCoverage: coverage,
+    });
+    expect(anchor.name).toBe("City Art Museum");
   });
 });

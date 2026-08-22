@@ -11,8 +11,18 @@ import {
   selectSoftFiller,
   toCommittedStop,
 } from "@/lib/planning-engine/staged/anchor-selector";
+import { fitsInDailyLoadBudget } from "@/lib/schedule/activity-load";
 import { selectSupportForDay } from "@/lib/planning-engine/staged/support-selector";
-import { markExperienceCompletedByKeys } from "@/lib/planning-engine/staged/experience-coverage";
+import {
+  buildExperienceCoverageTargets,
+  markExperienceCompletedByKeys,
+  uncoveredSelectedTags,
+} from "@/lib/planning-engine/staged/experience-coverage";
+import {
+  anchorRepeatsBeforeFullCoverage,
+  cityHasEligibleForInterestTags,
+} from "@/lib/planning-engine/staged/interest-coverage-gates";
+import { interestTagsFromPlan } from "@/lib/schedule/interest-map";
 import {
   isChillDayCompanion,
   isIndoorPlayExperience,
@@ -51,16 +61,33 @@ export function coverageKeysFromLandmark(landmark: Landmark): string[] {
   return keys;
 }
 
-/**
- * Selected interests the trip has not covered yet. Selection fills these before
- * reaching for anything the family did not ask for.
- */
-export function uncoveredSelectedTags(
-  coverage: ExperienceCoverage,
-): LandmarkInterestTag[] {
-  return coverage.items
-    .filter((item) => item.source === "interest" && item.completed < item.target)
-    .map((item) => item.tag);
+/** Replay coverage ledger through days before `beforeDayIndex` (1-based). */
+export function coverageThroughPriorDays(
+  blueprint: TripBlueprint,
+  plan: TripPlan,
+  city: CityConfig,
+  beforeDayIndex: number,
+): ExperienceCoverage {
+  let coverage = buildExperienceCoverageTargets(plan, blueprint.days.length);
+  for (const day of blueprint.days) {
+    if (day.dayIndex >= beforeDayIndex) break;
+    if (day.role !== "full" && day.role !== "recovery") continue;
+    const anchorLm = day.anchor && findLandmark(city, day.anchor.landmarkName);
+    if (!anchorLm) continue;
+    const supportLms = day.support
+      .map((s) => findLandmark(city, s.landmarkName))
+      .filter((l): l is Landmark => Boolean(l));
+    const coveredKeys = [
+      ...coverageKeysFromLandmark(anchorLm),
+      ...supportLms.flatMap((s) => coverageKeysFromLandmark(s)),
+    ];
+    const themeKeys = day.theme.primaryTags.filter((t) => coveredKeys.includes(t));
+    const keysToMark = themeKeys.length > 0 ? themeKeys : coveredKeys.slice(0, 2);
+    if (keysToMark.length > 0) {
+      coverage = markExperienceCompletedByKeys(coverage, keysToMark);
+    }
+  }
+  return coverage;
 }
 
 function anchorMatchesTheme(day: DayBlueprint, anchor: Landmark): boolean {
@@ -144,6 +171,7 @@ export function commitStopsToBlueprint(
       priorFullDayAnchors,
       constraints,
       conflicts,
+      interestCoverage: coverage,
     });
 
     // Full-day theme match: re-pick once if the winner misses the theme
@@ -157,8 +185,46 @@ export function commitStopsToBlueprint(
         priorFullDayAnchors,
         constraints,
         conflicts,
+        interestCoverage: coverage,
       });
       if (anchorMatchesTheme(day, retry)) anchor = retry;
+    }
+
+    // Rule 10: re-pick once if theme locked a repeat while another interest awaits
+    if (
+      (day.role === "full" || day.role === "recovery") &&
+      plan.interests.length > 0
+    ) {
+      const selected = new Set(interestTagsFromPlan(plan.interests));
+      if (anchorRepeatsBeforeFullCoverage(anchor, coverage, selected)) {
+        const awaiting = coverage.items
+          .filter((i) => i.source === "interest" && i.target > 0 && i.completed === 0)
+          .map((i) => i.tag);
+        const hasAwaiting = cityHasEligibleForInterestTags(
+          city,
+          plan,
+          awaiting,
+          ledgerNames,
+          constraints,
+          anchorWindow,
+        );
+        if (hasAwaiting) {
+          const repeatExclude = new Set(softExclude);
+          repeatExclude.add(anchor.name);
+          const retry = selectAnchorForDay(city, plan, day, {
+            visitWindow: anchorWindow,
+            ledgerNames,
+            softExcludeNames: repeatExclude,
+            priorFullDayAnchors,
+            constraints,
+            conflicts,
+            interestCoverage: coverage,
+          });
+          if (!anchorRepeatsBeforeFullCoverage(retry, coverage, selected)) {
+            anchor = retry;
+          }
+        }
+      }
     }
 
     ledgerNames.add(anchor.name);
@@ -191,7 +257,11 @@ export function commitStopsToBlueprint(
         [anchor, ...support],
         { uncoveredSelectedTags: uncovered, constraints },
       );
-      if (filler && landmarkAgeScore(filler, profile) > 0) {
+      if (
+        filler &&
+        landmarkAgeScore(filler, profile) > 0 &&
+        fitsInDailyLoadBudget([anchor, ...support], filler, plan)
+      ) {
         support = [filler, ...support].slice(0, Math.max(1, day.capacity.maxSupportStops));
       }
     }
@@ -215,7 +285,11 @@ export function commitStopsToBlueprint(
         [anchor, ...support],
         { uncoveredSelectedTags: uncovered, constraints },
       );
-      if (filler && dayHasOlderAppeal([filler])) {
+      if (
+        filler &&
+        dayHasOlderAppeal([filler]) &&
+        fitsInDailyLoadBudget([anchor, ...support], filler, plan)
+      ) {
         support = [filler, ...support].slice(0, Math.max(1, day.capacity.maxSupportStops));
       }
     }
@@ -317,18 +391,7 @@ export function placementFromDayBlueprint(
         dropSlotKinds.push("extra_activity", "morning_activity");
       }
     } else {
-      morning =
-        support[0] ??
-        selectSoftFiller(
-          city,
-          plan,
-          day,
-          anchor,
-          ledgerNames,
-          supportVisitWindow(plan, day),
-          [anchor, ...support],
-        ) ??
-        anchor;
+      morning = support[0] ?? anchor;
       afternoon = anchor;
       extra = undefined;
       dropSlotKinds.push("extra_activity");
@@ -339,18 +402,7 @@ export function placementFromDayBlueprint(
     afternoon = anchor;
     dropSlotKinds.push("afternoon_activity", "extra_activity");
   } else {
-    morning =
-      support[0] ??
-      selectSoftFiller(
-        city,
-        plan,
-        day,
-        anchor,
-        ledgerNames,
-        supportVisitWindow(plan, day),
-        [anchor, ...support],
-      ) ??
-      anchor;
+    morning = support[0] ?? anchor;
     afternoon = anchor;
     extra = support[1];
     if (!extra) dropSlotKinds.push("extra_activity");

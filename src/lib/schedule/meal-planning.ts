@@ -952,7 +952,7 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       needsRecoveryRest = false;
     }
 
-    // Packed + early mornings: fill toward lunch, but never overrun the lunch window.
+    // Packed + early mornings: allow modest stretch toward lunch — never fill the whole gap (FAM-84).
     if (
       plan.travelStyle === "packed" &&
       item.slotKind === "morning_activity" &&
@@ -964,12 +964,13 @@ export function rescheduleActivitiesWithMealAnchors<T extends RawActivity>(
       const fillUntil = lunchMin - lunchTransfer;
       if (fillUntil > start) {
         const room = fillUntil - start;
-        // Stretch into empty morning time, but cap so lunch can still start on time.
-        duration = Math.min(Math.max(duration, Math.min(room, 3 * 60)), room);
+        const minDur = minRealisticActivityDuration(item, plan);
+        const stretchCap = Math.min(room, minDur + 45, 3 * 60);
+        duration = Math.min(Math.max(duration, minDur), stretchCap);
       }
     }
 
-    // Theme parks: run from right after lunch through dinner — no idle afternoon gap.
+    // Theme parks: run from right after lunch through dinner — no idle afternoon gap (FAM-70).
     if (
       isThemeParkActivity(item) &&
       item.slotKind === "afternoon_activity" &&

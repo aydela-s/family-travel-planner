@@ -507,7 +507,7 @@ describe("timeline integrity repairs", () => {
           activity({
             time: "12:30",
             endTime: "14:00",
-            title: "Nap & Quiet Time",
+            title: "Nap",
             type: "nap",
             location: { name: "Your stay", lat: 1, lng: 1 },
           }),

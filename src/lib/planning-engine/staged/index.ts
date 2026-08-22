@@ -6,6 +6,7 @@ export {
   markExperienceCompletedByKeys,
   remainingExperiences,
   targetForInterest,
+  uncoveredSelectedTags,
 } from "@/lib/planning-engine/staged/experience-coverage";
 export {
   isIndoorPlayExperience,

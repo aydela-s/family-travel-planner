@@ -10,6 +10,7 @@ import {
 } from "@/lib/maps/travel-estimate";
 import { interestTagsFromPlan } from "@/lib/schedule/interest-map";
 import { getFamilyAgeProfile, landmarkAgeScore } from "@/lib/schedule/family-profile";
+import { fitsInDailyLoadBudget } from "@/lib/schedule/activity-load";
 import { isLandmarkOpenForVisit, type VisitWindow } from "@/lib/schedule/landmark-hours";
 import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
 import {
@@ -44,7 +45,12 @@ import type {
   CommittedStop,
   DayBlueprint,
   DayConstraint,
+  ExperienceCoverage,
 } from "@/lib/planning-engine/staged/types";
+import {
+  filterAnchorsByInterestCoverage,
+  interestTierForAnchor,
+} from "@/lib/planning-engine/staged/interest-coverage-gates";
 import type { TripPlan } from "@/types/trip-plan";
 
 function stayKm(landmark: Landmark, plan: TripPlan): number | null {
@@ -564,6 +570,8 @@ export type SelectAnchorOptions = {
   constraints?: TripConstraints;
   /** Sink for hard rules that could not be satisfied. */
   conflicts?: PlannerConflict[];
+  /** Running interest coverage — gates rules 9–10 on full/recovery days. */
+  interestCoverage?: ExperienceCoverage;
 };
 
 /** Last-resort near-stay pick for arrival/departure — never leave the low-friction ring. */
@@ -681,6 +689,17 @@ export function selectAnchorForDay(
     const filtered = candidates.filter((l) => !opts.softExcludeNames!.has(l.name));
     if (filtered.length > 0) candidates = filtered;
   }
+
+  const applyCoverageGates = day.role === "full" || day.role === "recovery";
+  if (opts.interestCoverage && applyCoverageGates && plan.interests.length > 0) {
+    candidates = filterAnchorsByInterestCoverage(candidates, plan, opts.interestCoverage, city, {
+      excludeNames: opts.ledgerNames,
+      constraints,
+      visitWindow: opts.visitWindow,
+      applyGates: true,
+    });
+  }
+
   if (candidates.length === 0) {
     if (day.role === "arrival" || day.role === "departure") {
       const near = lowFrictionFallback(eligibility.eligible, plan, day);
@@ -703,13 +722,23 @@ export function selectAnchorForDay(
           : travelDay
             ? cityLandmarks.filter(eligible)
             : notPriorAnchor;
-    if (pool.length === 0) {
+    let fallbackPool = pool;
+    if (opts.interestCoverage && applyCoverageGates && plan.interests.length > 0) {
+      const gated = filterAnchorsByInterestCoverage(fallbackPool, plan, opts.interestCoverage, city, {
+        excludeNames: opts.ledgerNames,
+        constraints,
+        visitWindow: opts.visitWindow,
+        applyGates: true,
+      });
+      if (gated.length > 0) fallbackPool = gated;
+    }
+    if (fallbackPool.length === 0) {
       // Nothing in the city satisfies the hard rules. The day still needs a hero
       // stop, so record exactly what was rejected and mark the fallback as a
       // known violation rather than passing it off as a valid pick.
       return anchorViolatingFallback(city, plan, day, eligibility.rejected, opts);
     }
-    const ranked = [...pool]
+    const ranked = [...fallbackPool]
       .map((lm) => ({
         lm,
         score: scoreAnchorCandidate(lm, day, plan, opts.ledgerNames),
@@ -718,11 +747,20 @@ export function selectAnchorForDay(
     return ranked[0]!.lm;
   }
 
+  const selected =
+    applyCoverageGates && opts.interestCoverage && plan.interests.length > 0
+      ? new Set(interestTagsFromPlan(plan.interests))
+      : null;
+
   const ranked = [...candidates]
-    .map((lm) => ({
-      lm,
-      score: scoreAnchorCandidate(lm, day, plan, opts.ledgerNames),
-    }))
+    .map((lm) => {
+      let score = scoreAnchorCandidate(lm, day, plan, opts.ledgerNames);
+      if (selected && opts.interestCoverage) {
+        const tier = interestTierForAnchor(lm, opts.interestCoverage, selected);
+        score -= tier * 1000;
+      }
+      return { lm, score };
+    })
     .sort((a, b) => b.score - a.score || a.lm.name.localeCompare(b.lm.name));
 
   return ranked[0]!.lm;
@@ -828,6 +866,15 @@ export function selectSoftFiller(
     l.interestTags.filter((t) => uncovered.has(t)).length * 40 +
     l.interestTags.filter((t) => selected.has(t)).length * 30 +
     landmarkAgeScore(l, profile);
+
+  const loadFiltered = pool.filter((l) => fitsInDailyLoadBudget(today, l, plan));
+  if (loadFiltered.length > 0) pool = loadFiltered;
+
+  // FAM-84 rule 14: only fill when covering a selected interest — not generic gap POIs.
+  if (uncovered.size === 0 && !pool.some((l) => l.interestTags.some((t) => selected.has(t)))) {
+    return null;
+  }
+
   return [...pool].sort(
     (a, b) =>
       interestTier(a) - interestTier(b) ||

@@ -2,13 +2,17 @@ import type { CityConfig } from "@/config/city-pricing";
 import { parseDietaryTags } from "@/lib/planning-engine/dietary";
 import { dietaryCheckNote } from "@/lib/planning-engine/staged/meal-planner";
 import {
+  categoryBearingStops,
+  repairClosedVenues,
   repairReusedVenues,
   repairUncoveredSelectedInterests,
-  scheduledAttractions,
   validateItinerary,
   type ItineraryViolation,
 } from "@/lib/planning-engine/validate-itinerary";
 import { dinnerTimeWindow } from "@/lib/planning-engine/meal-timing";
+import { addDays } from "@/lib/format";
+import { validateActivityOpeningHours } from "@/lib/schedule/landmark-hours";
+import { itemDurationMin } from "@/lib/schedule/timeline";
 import { costsFromDisplayedItems } from "@/lib/pricing/budget";
 import { isStayLikeStop, namesMatch } from "@/lib/pricing/transport-planner";
 import {
@@ -40,7 +44,9 @@ export type IntegrityCode =
   | "cost_reconciliation"
   | "dietary_evidence_missing"
   | "chronology"
-  | "unexplained_gap";
+  | "unexplained_gap"
+  | "venue_closed"
+  | "outside_opening_hours";
 
 export type IntegrityViolation = {
   code: IntegrityCode;
@@ -246,8 +252,8 @@ export function validateItineraryIntegrity(
       out.push({ code: "chronology", message: v.message, day: day.day });
     }
     const venues = new Set<string>();
-    for (const a of scheduledAttractions(day)) {
-      const key = (a.location?.name ?? a.title).trim().toLowerCase();
+    for (const a of categoryBearingStops(day)) {
+      const key = (a.location?.name ?? a.title).replace(/\s+area$/i, "").trim().toLowerCase();
       if (key && venues.has(key)) {
         out.push({
           code: "activity_reused",
@@ -255,7 +261,22 @@ export function validateItineraryIntegrity(
           day: day.day,
         });
       }
-      venues.add(key);
+      if (key) venues.add(key);
+    }
+
+    const visitDate = addDays(plan.startDate, day.day - 1);
+    for (const issue of validateActivityOpeningHours(
+      day.activities,
+      city.landmarks,
+      (a) => itemDurationMin(a, plan),
+      visitDate,
+    )) {
+      if (!issue.hoursReliable) continue;
+      out.push({
+        code: issue.code === "closed_that_day" ? "venue_closed" : "outside_opening_hours",
+        message: issue.message,
+        day: day.day,
+      });
     }
   }
 
@@ -564,7 +585,11 @@ export function repairItineraryIntegrity(
   city: CityConfig,
 ): { days: ItineraryDay[]; violations: IntegrityViolation[] } {
   let next = repairReusedVenues(
-    repairUncoveredSelectedInterests(days, plan, city),
+    repairClosedVenues(
+      repairUncoveredSelectedInterests(days, plan, city),
+      plan,
+      city,
+    ),
     plan,
     city,
   ).map((day) => {

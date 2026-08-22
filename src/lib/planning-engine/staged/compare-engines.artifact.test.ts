@@ -25,7 +25,7 @@ function sdPlan(): TripPlan {
     naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
     budgetStyle: "balanced",
     interests: [
-      "Playgrounds & Indoor Play",
+      "Indoor & Outdoor Play",
       "Interactive Museums",
       "Beaches & Waterfronts",
       "Shows & Entertainment",
@@ -96,7 +96,7 @@ describe("compare planner engines (artifact)", () => {
         destination: "San Diego",
         dates: "2026-09-15 – 2026-09-19",
         interests: [
-          "Playgrounds & Indoor Play",
+          "Indoor & Outdoor Play",
           "Interactive Museums",
           "Beaches & Waterfronts",
           "Shows & Entertainment",

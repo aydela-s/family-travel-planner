@@ -29,7 +29,7 @@ function sdPlan(overrides: Partial<TripPlan> = {}): TripPlan {
     naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
     budgetStyle: "balanced",
     interests: [
-      "Playgrounds & Indoor Play",
+      "Indoor & Outdoor Play",
       "Interactive Museums",
       "Beaches & Waterfronts",
       "Shows & Entertainment",
@@ -113,7 +113,7 @@ describe("planTrip staged meals + schedule", () => {
     const { raw } = planTrip(sdPlan(), { cityOverride: city, plannerEngine: "staged" });
     const nap = raw.days.flatMap((d) => d.activities).find((a) => a.type === "nap");
     expect(nap).toBeDefined();
-    expect(nap!.title).toMatch(/Nap & Quiet Time/i);
+    expect(nap!.title).toMatch(/^Nap$/i);
     expect(nap!.notes).toBeUndefined();
     expect(parseTimeToMinutes(nap!.time)).toBeGreaterThanOrEqual(12 * 60 + 25);
     expect(parseTimeToMinutes(nap!.endTime!)).toBeLessThanOrEqual(14 * 60 + 20);

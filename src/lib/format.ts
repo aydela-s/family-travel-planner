@@ -1,4 +1,4 @@
-import type { TimeOfDay } from "@/types/itinerary";
+import type { TimeOfDay, ItineraryActivity } from "@/types/itinerary";
 
 export function formatTripDate(isoDate: string): string {
   const date = new Date(`${isoDate}T12:00:00`);
@@ -46,6 +46,11 @@ export function formatTimeCompact(time24: string): string {
   const hour12 = h % 12 || 12;
   const period = h >= 12 ? "p" : "a";
   return `${hour12}:${m.toString().padStart(2, "0")}${period}`;
+}
+
+/** Week-board clock — e.g. "9a", "4p", "10:15a". */
+export function formatTimeShort(time24: string): string {
+  return formatTimeCompact(time24).replace(":00", "");
 }
 
 /** Morning 06:00–11:59, Afternoon 12:00–17:59, Evening 18:00–22:00 */
@@ -106,6 +111,14 @@ export function formatMoney(amount: number, currency: string, symbol: string): s
   return `${symbol}${amount.toFixed(2)}`;
 }
 
+/** FAM-84 rule 17: hide line-item cost when free or transport-included. */
+export function shouldShowLineItemCost(
+  activity: Pick<ItineraryActivity, "activityCost" | "transportCovered">,
+): boolean {
+  if (activity.transportCovered) return false;
+  return (activity.activityCost ?? 0) > 0;
+}
+
 function ratingText(rating: number): string {
   const rounded = Math.round(rating * 10) / 10;
   return Number.isInteger(rounded) ? rounded.toFixed(1) : String(rounded);
@@ -132,7 +145,7 @@ export function formatPlaceRating(
   return `Rated ${text}`;
 }
 
-/** Compact badge — e.g. "★4.5 (3.4k)". Empty when rating is missing. */
+/** Compact badge — e.g. "★4.6 · (4.6k)". Empty when rating is missing. */
 export function formatPlaceRatingBadge(
   rating: number | undefined,
   reviewCount: number | undefined,
@@ -140,7 +153,20 @@ export function formatPlaceRatingBadge(
   if (typeof rating !== "number" || !Number.isFinite(rating)) return "";
   const text = ratingText(rating);
   if (typeof reviewCount === "number" && reviewCount > 0) {
-    return `★${text} (${formatReviewCountShort(reviewCount)})`;
+    return `★${text} · (${formatReviewCountShort(reviewCount)})`;
   }
   return `★${text}`;
+}
+
+export function formatAdultsLabel(adults: number): string {
+  return `${adults} adult${adults !== 1 ? "s" : ""}`;
+}
+
+/** e.g. "2 kids (ages 4, 8)" or "1 kid (age 2)". Empty when there are no kids. */
+export function formatKidsWithAges(children: number[]): string {
+  if (children.length === 0) return "";
+  const noun = children.length === 1 ? "kid" : "kids";
+  const ages = children.join(", ");
+  const ageLabel = children.length === 1 ? "age" : "ages";
+  return `${children.length} ${noun} (${ageLabel} ${ages})`;
 }

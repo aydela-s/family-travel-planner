@@ -3,6 +3,23 @@ import { restaurantsForCity } from "@/config/city-restaurants";
 import { haversineKm } from "@/lib/maps/directions";
 import { stayTravelMin } from "@/lib/maps/travel-estimate";
 import { travelDayBudget } from "@/config/travel-times";
+import { compileTripConstraints } from "@/lib/planning-engine/constraints";
+import { interestTagsFromPlan } from "@/lib/schedule/interest-map";
+import {
+  dailyLoadBudget,
+  sumActivityLoadUnits,
+} from "@/lib/schedule/activity-load";
+import { shouldIncludeNaps } from "@/lib/schedule/nap-policy";
+import {
+  buildExperienceCoverageTargets,
+  markExperienceCompletedByKeys,
+  uncoveredSelectedTags,
+} from "@/lib/planning-engine/staged/experience-coverage";
+import { coverageKeysFromLandmark } from "@/lib/planning-engine/staged/fill-stops";
+import {
+  anchorRepeatsBeforeFullCoverage,
+  cityHasEligibleForInterestTags,
+} from "@/lib/planning-engine/staged/interest-coverage-gates";
 import {
   exceedsBudgetStyleTicket,
   isChillDayCompanion,
@@ -200,6 +217,37 @@ function validateDay(
     }
   }
 
+  const dayLoad = sumActivityLoadUnits(dayStops);
+  const loadBudget = dailyLoadBudget(plan);
+  const anchorLoad = sumActivityLoadUnits([anchor]);
+  if (
+    supportLandmarks.length > 0 &&
+    dayLoad > loadBudget + 0.05 &&
+    anchorLoad <= loadBudget + 0.05
+  ) {
+    out.push({
+      code: "day_overload",
+      message: `Day ${day.dayIndex} load ${dayLoad.toFixed(2)} exceeds budget ${loadBudget.toFixed(2)} after support stops.`,
+      day: day.dayIndex,
+      repairHint: "regenerate_support",
+    });
+  }
+
+  // FAM-84 rule 13: morning + afternoon same venue with nap forces stay → out → stay → out.
+  if (
+    shouldIncludeNaps(plan) &&
+    day.role === "full" &&
+    supportLandmarks.length > 0 &&
+    supportLandmarks.some((s) => s.name === anchor.name)
+  ) {
+    out.push({
+      code: "unnecessary_stay_return",
+      message: `Day ${day.dayIndex} repeats "${anchor.name}" as anchor and support — avoid the extra stay round-trip.`,
+      day: day.dayIndex,
+      repairHint: "regenerate_support",
+    });
+  }
+
   for (const meal of day.meals) {
     if (meal.mode === "named_restaurant" && meal.restaurantName) {
       if (!cityHasRestaurant(city, meal.restaurantName)) {
@@ -216,6 +264,86 @@ function validateDay(
   return out;
 }
 
+/** FAM-84 rules 9–10: replay coverage in day order and flag anchor violations. */
+function validateInterestCoverageSequence(
+  blueprint: TripBlueprint,
+  plan: TripPlan,
+  city: CityConfig,
+): ValidationViolation[] {
+  const out: ValidationViolation[] = [];
+  if (plan.interests.length === 0) return out;
+
+  const selected = new Set(interestTagsFromPlan(plan.interests));
+  const constraints = blueprint.rules.constraints ?? compileTripConstraints(plan);
+  let coverage = buildExperienceCoverageTargets(plan, blueprint.days.length);
+  const ledgerNames = new Set<string>();
+
+  for (const day of blueprint.days) {
+    if (day.role !== "full" && day.role !== "recovery") continue;
+    const anchor = findLandmark(city, day.anchor?.landmarkName);
+    if (!anchor) continue;
+
+    const awaiting = coverage.items
+      .filter((i) => i.source === "interest" && i.target > 0 && i.completed === 0)
+      .map((i) => i.tag);
+    if (awaiting.length > 0) {
+      const hasAwaiting = cityHasEligibleForInterestTags(
+        city,
+        plan,
+        awaiting,
+        ledgerNames,
+        constraints,
+      );
+      if (hasAwaiting && anchorRepeatsBeforeFullCoverage(anchor, coverage, selected)) {
+        out.push({
+          code: "repeat_interest_before_coverage",
+          message: `Day ${day.dayIndex} anchor "${anchor.name}" repeats a covered interest before every selected interest has a stop.`,
+          day: day.dayIndex,
+          repairHint: "regenerate_anchor",
+        });
+      }
+    }
+
+    const uncovered = uncoveredSelectedTags(coverage);
+    if (uncovered.length > 0) {
+      const hasUncovered = cityHasEligibleForInterestTags(
+        city,
+        plan,
+        uncovered,
+        ledgerNames,
+        constraints,
+      );
+      const onAnchor = anchor.interestTags.filter((t) => selected.has(t));
+      if (hasUncovered && onAnchor.length === 0) {
+        out.push({
+          code: "unselected_before_uncovered",
+          message: `Day ${day.dayIndex} anchor "${anchor.name}" is not a selected interest while uncovered interests remain.`,
+          day: day.dayIndex,
+          repairHint: "regenerate_anchor",
+        });
+      }
+    }
+
+    const supportLandmarks = day.support
+      .map((s) => findLandmark(city, s.landmarkName))
+      .filter((l): l is Landmark => Boolean(l));
+    const coveredKeys = [
+      ...coverageKeysFromLandmark(anchor),
+      ...supportLandmarks.flatMap((s) => coverageKeysFromLandmark(s)),
+    ];
+    const themeKeys = day.theme.primaryTags.filter((t) => coveredKeys.includes(t));
+    const keysToMark = themeKeys.length > 0 ? themeKeys : coveredKeys.slice(0, 2);
+    if (keysToMark.length > 0) {
+      coverage = markExperienceCompletedByKeys(coverage, keysToMark);
+    }
+
+    ledgerNames.add(anchor.name);
+    for (const s of day.support) ledgerNames.add(s.landmarkName);
+  }
+
+  return out;
+}
+
 /** Soft validation of a committed blueprint — violations drive day-scoped repair. */
 export function validateBlueprint(
   blueprint: TripBlueprint,
@@ -223,6 +351,7 @@ export function validateBlueprint(
   city: CityConfig,
 ): ValidationViolation[] {
   const violations: ValidationViolation[] = [];
+  violations.push(...validateInterestCoverageSequence(blueprint, plan, city));
   for (const day of blueprint.days) {
     violations.push(...validateDay(day, plan, city));
   }

@@ -32,14 +32,18 @@ export function maxTargetForInterestTag(
 
 /**
  * Wizard labels → coverage keys.
- * Playgrounds & Indoor Play splits into separate outdoor vs indoor buckets.
+ * Indoor & Outdoor Play splits into separate outdoor vs indoor buckets.
  */
 export function coverageEntriesFromInterests(
   interests: string[],
 ): Array<{ key: string; tag: LandmarkInterestTag; label: string }> {
   const entries: Array<{ key: string; tag: LandmarkInterestTag; label: string }> = [];
   for (const label of interests.filter(Boolean)) {
-    if (label === "Playgrounds & Indoor Play" || label === "Playgrounds") {
+    if (
+      label === "Indoor & Outdoor Play" ||
+      label === "Playgrounds & Indoor Play" ||
+      label === "Playgrounds"
+    ) {
       entries.push({ key: "playgrounds", tag: "playgrounds", label });
       entries.push({ key: "indoor-play", tag: "indoor-play", label });
       continue;
@@ -88,6 +92,20 @@ export function buildExperienceCoverageTargets(
   }
 
   return { items: [...byKey.values()] };
+}
+
+/** Selected interests still below their trip target — prioritize before anything else. */
+export function uncoveredSelectedTags(coverage: ExperienceCoverage): LandmarkInterestTag[] {
+  return coverage.items
+    .filter((item) => item.source === "interest" && item.completed < item.target)
+    .map((item) => item.tag);
+}
+
+/** Selected interests that have not yet received a first scheduled stop (FAM-84 rule 10). */
+export function awaitingFirstCoverageTags(coverage: ExperienceCoverage): LandmarkInterestTag[] {
+  return coverage.items
+    .filter((item) => item.source === "interest" && item.target > 0 && item.completed === 0)
+    .map((item) => item.tag);
 }
 
 /** Remaining experiences still needed (target − completed, floored at 0). */

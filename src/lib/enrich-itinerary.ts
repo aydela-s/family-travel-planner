@@ -25,6 +25,7 @@ import { findRestaurantByName } from "@/lib/planning-engine/restaurant-picker";
 import { repairItineraryIntegrity } from "@/lib/planning-engine/itinerary-integrity";
 import {
   repairDuplicateCategories,
+  repairSameDayVenueRepeats,
 } from "@/lib/planning-engine/validate-itinerary";
 import {
   activityUsesStayHome,
@@ -132,30 +133,6 @@ function delayFirstActivityToOpeningHours(
   return activities.map((a) => (a === first ? { ...a, time: hours.open } : a));
 }
 
-/**
- * HARD RULE: the same venue must not appear twice on one day. With naps that
- * would send the family home and then taxi them back to the morning stop.
- */
-function dropSameDayVenueRepeats(activities: ItineraryActivity[]): ItineraryActivity[] {
-  const seen = new Set<string>();
-  const out: ItineraryActivity[] = [];
-  for (const activity of activities) {
-    if (activity.type !== "activity" || isUnpaidTimelineActivity(activity)) {
-      out.push(activity);
-      continue;
-    }
-    const key = (activity.location?.name ?? activity.title).trim().toLowerCase();
-    if (!key) {
-      out.push(activity);
-      continue;
-    }
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(activity);
-  }
-  return out;
-}
-
 function buildCostBreakdown(summary: DaySpendSummary, currency: string): DayCostBreakdown {
   return {
     food: summary.food,
@@ -226,14 +203,21 @@ function landmarkNamesFromPreviousDays(itinerary: Itinerary, adjustDay: number):
   return names;
 }
 
-async function enrichDay(
+type LocatedDayWork = {
+  rawDay: RawItinerary["days"][0];
+  dayIndex: number;
+  date: string;
+  timedForHours: ItineraryActivity[];
+};
+
+/** Sync landmark assignment + exclusions (must stay sequential across days). */
+function locateDayActivities(
   rawDay: RawItinerary["days"][0],
   plan: TripPlan,
   city: CityConfig,
   dayIndex: number,
   tripExcludedLandmarks: Set<string> = new Set(),
-  conflicts?: PlannerConflict[],
-): Promise<ItineraryDay> {
+): LocatedDayWork {
   const date = addDays(plan.startDate, dayIndex);
   const pickedLandmarks: Landmark[] = [];
 
@@ -398,7 +382,7 @@ async function enrichDay(
       ),
     };
   });
-  const withoutDupVenues = dropSameDayVenueRepeats(classified);
+  const withoutDupVenues = repairSameDayVenueRepeats(classified, plan, city);
   const deduped = repairDuplicateCategories(withoutDupVenues, plan, city, {
     usedNames: tripExcludedLandmarks,
   });
@@ -407,6 +391,18 @@ async function enrichDay(
   }
 
   const timedForHours = delayFirstActivityToOpeningHours(deduped, city.landmarks, date);
+
+  return { rawDay, dayIndex, date, timedForHours };
+}
+
+/** Directions + pricing for a day that already has locations (safe to parallelize). */
+async function finalizeLocatedDay(
+  work: LocatedDayWork,
+  plan: TripPlan,
+  city: CityConfig,
+  conflicts?: PlannerConflict[],
+): Promise<ItineraryDay> {
+  const { rawDay, date, timedForHours } = work;
 
   const { routeSegments, totalKm, segmentCosts, segmentDurations } = await buildRouteSegments(
     timedForHours,
@@ -486,7 +482,7 @@ async function enrichDay(
     .filter((a) => a.type !== "travel" && a.location)
     .map((a) => a.location!);
 
-  const dayResult: ItineraryDay = {
+  return {
     day: rawDay.day,
     date,
     weekday: formatDayHeader(date).split(",")[0],
@@ -510,8 +506,18 @@ async function enrichDay(
     routeSegments: pricedSegments,
     mapUrl: buildStaticMapUrl(mapLocations),
   };
+}
 
-  return dayResult;
+async function enrichDay(
+  rawDay: RawItinerary["days"][0],
+  plan: TripPlan,
+  city: CityConfig,
+  dayIndex: number,
+  tripExcludedLandmarks: Set<string> = new Set(),
+  conflicts?: PlannerConflict[],
+): Promise<ItineraryDay> {
+  const located = locateDayActivities(rawDay, plan, city, dayIndex, tripExcludedLandmarks);
+  return finalizeLocatedDay(located, plan, city, conflicts);
 }
 
 export type EnrichOptions = {
@@ -585,12 +591,13 @@ export async function enrichItinerary(
     );
   } else {
     const tripExcluded = new Set<string>();
-    days = [];
-    for (let index = 0; index < prepared.days.length; index++) {
-      days.push(
-        await enrichDay(prepared.days[index]!, plan, city, index, tripExcluded, conflicts),
-      );
-    }
+    // Locate days sequentially (landmark no-reuse), then route in parallel.
+    const located = prepared.days.map((rawDay, index) =>
+      locateDayActivities(rawDay, plan, city, index, tripExcluded),
+    );
+    days = await Promise.all(
+      located.map((work) => finalizeLocatedDay(work, plan, city, conflicts)),
+    );
   }
 
   if (options?.adjustDay && options.previousItinerary) {
@@ -631,8 +638,4 @@ export async function enrichItinerary(
     days,
     conflicts: conflicts.length > 0 ? conflicts : undefined,
   };
-}
-
-export function isDemoMode(): boolean {
-  return process.env.DEMO_MODE === "true";
 }
