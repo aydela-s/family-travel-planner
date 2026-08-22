@@ -14,17 +14,17 @@ export default function PlanLoading() {
   return (
     <WizardShell
       footer={
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-8 flex flex-row gap-2 sm:gap-3">
           <button
             type="button"
             disabled
             tabIndex={-1}
             aria-hidden
-            className={`order-2 sm:order-1 sm:flex-1 ${btnSecondaryClassName} invisible pointer-events-none`}
+            className={`min-w-0 flex-1 ${btnSecondaryClassName} invisible pointer-events-none`}
           >
             Back
           </button>
-          <button type="button" disabled className={`order-1 w-full sm:order-2 sm:flex-1 ${btnPrimaryClassName}`}>
+          <button type="button" disabled className={`min-w-0 flex-1 ${btnPrimaryClassName}`}>
             Sounds good →
           </button>
         </div>

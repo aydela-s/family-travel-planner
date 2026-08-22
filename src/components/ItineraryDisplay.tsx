@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { DayRouteMap } from "@/components/DayRouteMap";
 import { WeekBoard } from "@/components/WeekBoard";
 import PlanSelectionChips from "@/components/PlanSelectionChips";
 import ShareItineraryControls from "@/components/ShareItineraryControls";
+import { btnActionCompactClassName } from "@/components/plan-wizard/shared";
 import {
   formatAdultsLabel,
   formatKidsWithAges,
@@ -434,7 +435,7 @@ function TimelineItem({
           )}
           {ratingBadge ? (
             <p>
-              <span className="inline-block whitespace-nowrap rounded-md bg-background/80 px-1.5 py-0.5 text-xs font-semibold text-muted">
+              <span className="inline-block whitespace-nowrap text-xs font-semibold text-muted">
                 {ratingBadge}
               </span>
             </p>
@@ -562,12 +563,15 @@ function DayTabs({
     if (next) onSelect(next.day);
   }
 
+  const dayCount = days.length;
+
   return (
     <div
       role="tablist"
       aria-label="Trip days"
       onKeyDown={onKeyDown}
-      className="-mx-1 flex gap-3 overflow-x-auto px-1 py-1"
+      className="flex w-full justify-start gap-1.5 py-1 sm:gap-3"
+      style={{ "--day-count": dayCount } as CSSProperties}
     >
       {days.map((day) => {
         const selected = day.day === selectedDay;
@@ -582,14 +586,18 @@ function DayTabs({
             tabIndex={selected ? 0 : -1}
             disabled={disabled}
             onClick={() => onSelect(day.day)}
-            className={`box-border flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full border text-center transition sm:h-[4.75rem] sm:w-[4.75rem] ${
+            className={`box-border flex aspect-square min-w-0 shrink-0 flex-col items-center justify-center gap-1.5 rounded-full border text-center transition [width:min(4.75rem,calc((100%-((var(--day-count)-1)*0.375rem))/var(--day-count)))] sm:[width:min(4.75rem,calc((100%-((var(--day-count)-1)*0.75rem))/var(--day-count)))] ${
               selected
                 ? "border-primary bg-primary text-white"
                 : "border-border bg-surface text-ink hover:bg-secondary-muted"
             } disabled:cursor-not-allowed disabled:opacity-60`}
           >
-            <span className="text-xs font-semibold sm:text-sm">Day {day.day}</span>
-            <span className={`text-[10px] sm:text-xs ${selected ? "text-white/85" : "text-muted"}`}>
+            <span className="text-[10px] font-semibold leading-none min-[360px]:text-xs sm:text-sm">
+              Day {day.day}
+            </span>
+            <span
+              className={`text-[9px] leading-none min-[360px]:text-[10px] sm:text-xs ${selected ? "text-white/85" : "text-muted"}`}
+            >
               {dayTabSublabel(day)}
             </span>
           </button>
@@ -734,7 +742,15 @@ export default function ItineraryDisplay({
   const showSelectionChips = plan && onApplyPlanUpdate && onEditPlanInWizard;
   const tabsId = useId();
   const [view, setView] = useState<"week" | "day">("week");
+  const viewUserOverride = useRef(false);
   const [selectedDay, setSelectedDay] = useState(itinerary.days[0]?.day ?? 1);
+
+  useEffect(() => {
+    if (viewUserOverride.current) return;
+    if (window.matchMedia("(max-width: 639px)").matches) {
+      setView("day");
+    }
+  }, []);
 
   useEffect(() => {
     const ids = itinerary.days.map((day) => day.day);
@@ -755,6 +771,7 @@ export default function ItineraryDisplay({
 
   function selectDay(dayNumber: number) {
     setSelectedDay(dayNumber);
+    viewUserOverride.current = true;
     setView("day");
   }
 
@@ -779,13 +796,13 @@ export default function ItineraryDisplay({
       )}
 
       <header className="space-y-4">
-        <div className="flex items-start justify-between gap-3 sm:gap-4">
-          <div className="min-w-0">
+        <div className="flex items-start justify-between gap-2 sm:gap-4">
+          <div className="min-w-0 flex-1">
             <h2 className="flex items-center gap-2.5 text-3xl font-bold tracking-tight text-ink sm:text-4xl">
               <PinIcon />
               <span>{itinerary.destinationCity || itinerary.destination}</span>
             </h2>
-            <p className="mt-2 text-base text-muted sm:text-lg">
+            <p className="mt-2 text-xs leading-snug text-muted sm:text-base">
               {plan
                 ? [
                     plan.startDate && plan.endDate
@@ -806,6 +823,7 @@ export default function ItineraryDisplay({
               itinerary={itinerary}
               plan={plan}
               disabled={isLoading}
+              buttonClassName={btnActionCompactClassName}
             />
           </div>
         </div>
@@ -838,7 +856,10 @@ export default function ItineraryDisplay({
           >
             <button
               type="button"
-              onClick={() => setView("week")}
+              onClick={() => {
+                viewUserOverride.current = true;
+                setView("week");
+              }}
               className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
                 view === "week" ? "bg-primary text-white" : "text-muted hover:bg-secondary-muted hover:text-ink"
               }`}
@@ -847,7 +868,10 @@ export default function ItineraryDisplay({
             </button>
             <button
               type="button"
-              onClick={() => setView("day")}
+              onClick={() => {
+                viewUserOverride.current = true;
+                setView("day");
+              }}
               className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
                 view === "day" ? "bg-primary text-white" : "text-muted hover:bg-secondary-muted hover:text-ink"
               }`}

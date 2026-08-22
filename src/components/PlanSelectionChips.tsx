@@ -292,8 +292,6 @@ export default function PlanSelectionChips({
     if (step != null) onEditInWizard(step);
   }
 
-  const openChip = openKey ? chips.find((c) => c.key === openKey) : null;
-
   function renderChipMenu(chip: ChipDef, panelClassName: string) {
     return (
       <div
@@ -359,6 +357,31 @@ export default function PlanSelectionChips({
     );
   }
 
+  function mobileChipButton(chip: ChipDef, isOpen: boolean) {
+    return (
+      <button
+        type="button"
+        disabled={disabled || !chip.editable}
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? `${listId}-${chip.key}` : undefined}
+        onClick={() => handleSegmentClick(chip)}
+        className={`inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-left transition ${
+          isOpen
+            ? "border-primary bg-primary-muted"
+            : "border-border bg-surface hover:border-secondary/50 hover:bg-secondary-muted/60"
+        } disabled:cursor-not-allowed disabled:opacity-60`}
+      >
+        <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-primary" aria-hidden>
+          {chip.icon}
+        </span>
+        <span className="min-w-0 truncate text-xs font-semibold text-ink">
+          <span className="text-muted">{chip.label}: </span>
+          <span className={isOpen ? "text-primary" : "text-ink"}>{chip.value}</span>
+        </span>
+      </button>
+    );
+  }
+
   function chipButton(chip: ChipDef, isOpen: boolean, cellClassName: string) {
     return (
       <button
@@ -386,31 +409,24 @@ export default function PlanSelectionChips({
 
   return (
     <div ref={rootRef} className={`relative min-w-0 ${disabled ? "opacity-60" : ""}`}>
-      {/* Mobile: 3-column grid + full-width menu below */}
+      {/* Mobile: wrapping chips + anchored menu below the active chip */}
       <div className="lg:hidden">
-        <div className="overflow-hidden rounded-2xl border border-border">
-          <ul
-            className="grid grid-cols-3 divide-x divide-y divide-border bg-background"
-            aria-label="Trip plan selections"
-          >
-            {chips.map((chip) => {
-              const isOpen = openKey === chip.key;
-              return (
-                <li key={chip.key} className="min-w-0">
-                  {chipButton(chip, isOpen, "px-2 py-2.5")}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-        {openChip ? (
-          <div className="mt-1.5">
-            {renderChipMenu(
-              openChip,
-              "overflow-hidden rounded-xl border border-border bg-surface py-0.5 shadow-[var(--shadow-card)]",
-            )}
-          </div>
-        ) : null}
+        <ul className="flex flex-wrap gap-1.5" aria-label="Trip plan selections">
+          {chips.map((chip) => {
+            const isOpen = openKey === chip.key;
+            return (
+              <li key={chip.key} className="relative max-w-full min-w-0">
+                {mobileChipButton(chip, isOpen)}
+                {isOpen
+                  ? renderChipMenu(
+                      chip,
+                      "absolute left-0 top-full z-30 mt-1 w-max min-w-[8rem] max-w-[14rem] overflow-hidden rounded-xl border border-border bg-surface py-0.5 shadow-[var(--shadow-card)]",
+                    )
+                  : null}
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
       {/* Desktop: horizontal strip + column-aligned dropdown */}

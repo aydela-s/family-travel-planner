@@ -22,6 +22,10 @@ export const btnCtaClassName =
 export const btnActionClassName =
   "inline-flex items-center gap-1.5 rounded-full border border-primary/45 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-[var(--shadow-soft)] transition hover:bg-secondary-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50";
 
+/** Compact Share / Download for narrow itinerary headers. */
+export const btnActionCompactClassName =
+  "inline-flex items-center gap-1 rounded-full border border-primary/45 bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary shadow-[var(--shadow-soft)] transition hover:bg-secondary-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 sm:gap-1.5 sm:px-4 sm:py-2 sm:text-sm";
+
 /** Quiet tertiary action. */
 export const btnGhostClassName =
   "rounded-full border border-border bg-background px-6 py-3.5 text-sm font-semibold text-muted transition hover:border-secondary/50 hover:bg-secondary-muted hover:text-primary disabled:opacity-50";
@@ -116,6 +120,7 @@ export function OptionCard({
   description,
   onClick,
   icon,
+  emoji,
   disabled = false,
 }: {
   selected: boolean;
@@ -123,15 +128,22 @@ export function OptionCard({
   description?: string;
   onClick: () => void;
   icon?: React.ReactNode;
+  emoji?: string;
   disabled?: boolean;
 }) {
+  const hasEmoji = Boolean(emoji);
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-disabled={disabled}
-      className={`rounded-2xl border p-4 text-left transition ${
+      aria-label={label}
+      className={`rounded-2xl border text-left transition ${
+        hasEmoji
+          ? "flex w-full items-center gap-1.5 px-2.5 py-3 sm:gap-2.5 sm:px-4 sm:py-4"
+          : "p-4"
+      } ${
         disabled
           ? "cursor-not-allowed border-border bg-background opacity-55"
           : selected
@@ -140,10 +152,25 @@ export function OptionCard({
       }`}
     >
       {icon && <div className="mb-3 text-primary">{icon}</div>}
-      <span className={`font-semibold ${disabled ? "text-muted" : "text-ink"}`}>{label}</span>
-      {description ? (
-        <p className="mt-1 text-sm leading-relaxed text-muted">{description}</p>
-      ) : null}
+      {hasEmoji ? (
+        <>
+          <span className="shrink-0 text-xl leading-none" aria-hidden>
+            {emoji}
+          </span>
+          <span
+            className={`whitespace-nowrap text-xs font-semibold sm:text-sm ${disabled ? "text-muted" : "text-ink"}`}
+          >
+            {label}
+          </span>
+        </>
+      ) : (
+        <>
+          <span className={`font-semibold ${disabled ? "text-muted" : "text-ink"}`}>{label}</span>
+          {description ? (
+            <p className="mt-1 text-sm leading-relaxed text-muted">{description}</p>
+          ) : null}
+        </>
+      )}
     </button>
   );
 }

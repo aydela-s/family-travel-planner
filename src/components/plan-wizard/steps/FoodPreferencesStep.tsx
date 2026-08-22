@@ -17,7 +17,11 @@ export function stayCategoryFromType(type: AccommodationType | ""): StayCategory
   return "";
 }
 
-const primaryOptions: { value: Exclude<StayCategory, "">; label: string; emoji: string }[] = [
+const primaryOptions: {
+  value: Exclude<StayCategory, "">;
+  label: string;
+  emoji: string;
+}[] = [
   { value: "hotel", label: "Hotel", emoji: "🏨" },
   { value: "rental", label: "Rental", emoji: "🏠" },
   { value: "friends", label: "Family/friends", emoji: "👨‍👩‍👧" },
@@ -135,15 +139,23 @@ export default function FoodPreferencesStep({
 
       <div>
         <p className="text-sm font-semibold text-ink">Stay type</p>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-          {primaryOptions.map((option) => (
-            <OptionCard
-              key={option.value}
-              selected={category === option.value}
-              label={`${option.emoji} ${option.label}`}
-              onClick={() => onPrimary(option.value)}
-            />
-          ))}
+        {/*
+          Parent @container (not viewport): lg sidebar shrinks content width, so
+          min-[56rem]:grid-cols-4 kept 4 columns when cells were ~160px and
+          Family/friends (~165px) overflowed. 45rem ≈ 4×165 + gaps.
+        */}
+        <div className="@container/stay w-full min-w-0">
+          <div className="mt-3 grid grid-cols-2 gap-2 @min-[45rem]/stay:grid-cols-4 sm:gap-3">
+            {primaryOptions.map((option) => (
+              <OptionCard
+                key={option.value}
+                selected={category === option.value}
+                emoji={option.emoji}
+                label={option.label}
+                onClick={() => onPrimary(option.value)}
+              />
+            ))}
+          </div>
         </div>
       </div>
 

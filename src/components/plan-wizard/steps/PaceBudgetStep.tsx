@@ -60,10 +60,10 @@ export default function PaceBudgetStep({ formData, updateFormData }: StepProps) 
     <div className="space-y-8">
       <StepIntro emoji="🎒" title="Pace & spend" />
 
-      <div className="grid items-start gap-10 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-y-5 min-[520px]:grid-cols-2 min-[520px]:gap-x-4 min-[520px]:gap-y-0">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">Pace</p>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-2 flex justify-start gap-1.5 sm:mt-3 sm:gap-2">
             {travelStyles.map((option) => {
               const selected = formData.travelStyle === option.value;
               return (
@@ -78,7 +78,7 @@ export default function PaceBudgetStep({ formData, updateFormData }: StepProps) 
                       walkingLimit: walkingLimitFromTravelStyle(option.value),
                     })
                   }
-                  className={`flex h-14 w-[6rem] shrink-0 flex-col items-center justify-center rounded-2xl border transition ${
+                  className={`flex h-14 min-w-0 max-w-[6rem] flex-1 basis-0 flex-col items-center justify-center rounded-2xl border transition ${
                     selected
                       ? "border-primary bg-secondary-muted"
                       : "border-border bg-surface hover:border-secondary/50 hover:bg-secondary-muted/60"
@@ -93,7 +93,7 @@ export default function PaceBudgetStep({ formData, updateFormData }: StepProps) 
 
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">Spend</p>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-2 flex justify-start gap-1.5 sm:mt-3 sm:gap-2">
             {budgetOrder.map((value) => {
               const selected = formData.budgetStyle === value;
               const meta = BUDGET_STYLE_LABELS[value];
@@ -104,7 +104,7 @@ export default function PaceBudgetStep({ formData, updateFormData }: StepProps) 
                   aria-label={meta.label}
                   aria-pressed={selected}
                   onClick={() => updateFormData({ budgetStyle: value })}
-                  className={`flex h-14 w-[6rem] shrink-0 flex-col items-center justify-center rounded-2xl border transition ${
+                  className={`flex h-14 min-w-0 max-w-[6rem] flex-1 basis-0 flex-col items-center justify-center rounded-2xl border transition ${
                     selected
                       ? "border-primary bg-secondary-muted"
                       : "border-border bg-surface hover:border-secondary/50 hover:bg-secondary-muted/60"

@@ -40,7 +40,7 @@ export default function ActivityInterestsStep({ formData, updateFormData }: Step
 
       <div>
         <p className="text-sm font-semibold text-ink">Interests</p>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
           {activityInterestOptions.map(({ label, emoji }) => {
             const selected = formData.interests.includes(label);
             return (
@@ -48,21 +48,21 @@ export default function ActivityInterestsStep({ formData, updateFormData }: Step
                 key={label}
                 type="button"
                 onClick={() => toggleInterest(label)}
-                className={`relative flex flex-col items-center gap-2 rounded-2xl border px-3 py-5 text-center transition ${
+                className={`relative flex flex-col items-center gap-1.5 rounded-2xl border px-2 py-4 text-center transition sm:gap-2 sm:px-3 sm:py-5 ${
                   selected
                     ? "border-primary bg-primary-muted text-primary"
                     : "border-border bg-background text-ink hover:bg-secondary-muted"
                 }`}
               >
                 {selected ? (
-                  <span className="absolute right-2 top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                  <span className="absolute right-1.5 top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white sm:right-2 sm:top-2">
                     ✓
                   </span>
                 ) : null}
-                <span className="text-3xl" aria-hidden>
+                <span className="text-2xl sm:text-3xl" aria-hidden>
                   {emoji}
                 </span>
-                <span className="text-sm font-semibold leading-snug">{label}</span>
+                <span className="text-xs font-semibold leading-snug sm:text-sm">{label}</span>
               </button>
             );
           })}
