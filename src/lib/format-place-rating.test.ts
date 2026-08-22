@@ -28,8 +28,9 @@ describe("formatPlaceRatingBadge", () => {
   });
 
   it("formats a compact star badge with short review count", () => {
-    expect(formatPlaceRatingBadge(4.5, 3421)).toBe("★4.5 (3.4k)");
-    expect(formatPlaceRatingBadge(4.7, 2300)).toBe("★4.7 (2.3k)");
+    expect(formatPlaceRatingBadge(4.5, 3421)).toBe("★4.5 · (3.4k)");
+    expect(formatPlaceRatingBadge(4.7, 2300)).toBe("★4.7 · (2.3k)");
+    expect(formatPlaceRatingBadge(4.6, 4600)).toBe("★4.6 · (4.6k)");
   });
 
   it("omits review count when missing", () => {
