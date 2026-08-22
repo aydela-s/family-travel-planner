@@ -56,7 +56,7 @@ export const HYBRID_THEMES: Record<HybridId, HybridTheme> = {
     surface: "bg-white",
     teal: "#016d76",
     coral: "#ff5757",
-    fontClass: "font-[family-name:var(--font-poppins)]",
+    fontClass: "font-[family-name:var(--font-jakarta)]",
     homeKicker: "Family travel planning",
     homeTitle: "Plan a family trip that actually works",
     homeBody:

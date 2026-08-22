@@ -1,6 +1,8 @@
 "use client";
 
+import { WeekBoard } from "@/components/WeekBoard";
 import type { ItineraryActivity, ItineraryDay } from "@/types/itinerary";
+import { formatPlaceRatingBadge } from "@/lib/format";
 import { namesMatch } from "@/lib/pricing/transport-planner";
 import { useState } from "react";
 import { useHarborSkin } from "../harbor-skin";
@@ -82,6 +84,7 @@ export function HarborSlot({
 }) {
   const [open, setOpen] = useState(false);
   const skin = useHarborSkin();
+  const ratingBadge = formatPlaceRatingBadge(activity.rating, activity.reviewCount);
   const expandable = showChevron && slotCanExpand(activity, stayName);
   const useSignals = (palette ?? skin) === "signals";
   const hoverFill = expandable
@@ -133,8 +136,17 @@ export function HarborSlot({
           </button>
         ) : null}
       </div>
-      {open && activity.notes ? (
-        <p className="mt-2 text-sm leading-relaxed text-muted">{activity.notes}</p>
+      {open ? (
+        <div className="mt-2 space-y-1.5 text-sm leading-relaxed text-muted">
+          {ratingBadge ? (
+            <p>
+              <span className="inline-block whitespace-nowrap rounded-md bg-background/80 px-1.5 py-0.5 text-xs font-semibold text-muted">
+                {ratingBadge}
+              </span>
+            </p>
+          ) : null}
+          {activity.notes ? <p>{activity.notes}</p> : null}
+        </div>
       ) : null}
     </>
   );
@@ -233,7 +245,6 @@ export function WeekColumns({
   days,
   selected,
   onSelect,
-  showChevron = false,
 }: {
   days: ItineraryDay[];
   selected?: number;
@@ -241,37 +252,11 @@ export function WeekColumns({
   showChevron?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-      {days.map((day, index) => {
-        const active = selected === index;
-        return (
-          <section
-            key={day.date}
-            className={`min-w-0 rounded-2xl border p-2.5 transition ${
-              onSelect
-                ? "hover:border-secondary hover:bg-secondary-muted/60 hover:shadow-[var(--shadow-soft)]"
-                : "border-transparent"
-            } ${active ? "border-primary bg-primary-muted/50" : "border-border bg-surface"}`}
-            onClick={() => onSelect?.(index)}
-          >
-            <button
-              type="button"
-              disabled={!onSelect}
-              onClick={(event) => {
-                event.stopPropagation();
-                onSelect?.(index);
-              }}
-              className={`mb-2 w-full cursor-pointer text-left text-sm font-semibold ${
-                active ? "text-primary" : "text-ink"
-              }`}
-            >
-              {day.weekday} {day.date.slice(-2)}
-              <span className="mt-0.5 block text-xs font-normal text-muted">{day.displayTitle}</span>
-            </button>
-            <BoardBlocks day={day} compact showChevron={showChevron} />
-          </section>
-        );
-      })}
-    </div>
+    <WeekBoard
+      days={days}
+      selectedIndex={selected}
+      disabled={!onSelect}
+      onSelectDay={onSelect ? (_day, index) => onSelect(index) : undefined}
+    />
   );
 }

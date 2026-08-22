@@ -25,7 +25,7 @@ const CONCEPT_FONT: Record<LabConceptId, string> = {
   journal: "font-[family-name:var(--font-poppins)]",
   board: "font-[family-name:var(--font-lab-plex)]",
   companion: "font-[family-name:var(--font-lab-outfit)]",
-  harbor: "font-[family-name:var(--font-poppins)]",
+  harbor: "font-[family-name:var(--font-jakarta)]",
   route: "font-[family-name:var(--font-lab-dm)]",
   daylight: "font-[family-name:var(--font-lab-outfit)]",
 };

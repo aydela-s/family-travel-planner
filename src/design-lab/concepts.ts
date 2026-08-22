@@ -112,7 +112,7 @@ export const LAB_CONCEPTS: Record<LabConceptId, LabConceptMeta> = {
     name: "Harbor",
     shortName: "Harbor",
     oneLiner: "Ledger structure in product colors — week board first, then a day view with a map.",
-    idea: "Keep the two-column homepage and numbered wizard, restyle them with FamilyTravely teal/coral and Poppins. The itinerary opens as a week board; switch to one day to follow it with a map.",
+    idea: "Keep the two-column homepage and numbered wizard, restyle them with FamilyTravely teal/coral and Plus Jakarta Sans. The itinerary opens as a week board; switch to one day to follow it with a map.",
     whyFamily: "You compare the week, then zoom into today — the way parents actually use a plan.",
     hierarchy: "Homepage split brief → numbered wizard → week of day columns → selected day + route map.",
     wizard: "Same indexed brief as Ledger, with product language and teal/coral instead of cream paper.",

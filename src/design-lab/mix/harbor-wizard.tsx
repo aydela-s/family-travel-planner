@@ -2,131 +2,89 @@
 
 import { FamilyTravelyLogo } from "@/components/FamilyTravelyLogo";
 import ActivityInterestsStep from "@/components/plan-wizard/steps/ActivityInterestsStep";
-import NapScheduleStep from "@/components/plan-wizard/steps/NapScheduleStep";
 import PaceBudgetStep from "@/components/plan-wizard/steps/PaceBudgetStep";
 import StayTransitStep from "@/components/plan-wizard/steps/StayTransitStep";
+import TravelersStep from "@/components/plan-wizard/steps/TravelersStep";
 import WhereWhenStep from "@/components/plan-wizard/steps/WhereWhenStep";
 import {
   btnCtaClassName,
   btnPrimaryClassName,
   btnSecondaryClassName,
-  CounterControl,
-  DynamicHint,
-  getTravelerHints,
-  inputClassName,
-  labelClassName,
-  StepIntro,
 } from "@/components/plan-wizard/shared";
-import { DEFAULT_NAP_ENTRY, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
-import { WIZARD_STEP_TITLES } from "@/lib/plan-wizard/step-gate";
-import type { StepProps } from "@/types/trip-plan";
+import { WIZARD_STEP_TITLES, wizardUnlockedThroughIndex } from "@/lib/plan-wizard/step-gate";
 import Link from "next/link";
 import { conceptPath } from "../concepts";
 import { useHarborSkin } from "../harbor-skin";
 import { useDesignLab } from "../state";
 
-const childAges = Array.from({ length: 18 }, (_, age) => age);
+const STEPS = [
+  WhereWhenStep,
+  TravelersStep,
+  StayTransitStep,
+  PaceBudgetStep,
+  ActivityInterestsStep,
+] as const;
 
-function defaultNapsOpen() {
-  return [{ ...DEFAULT_NAP_ENTRY }];
-}
-
-function HarborTravelersStep({ formData, updateFormData }: StepProps) {
-  function handleChildCountChange(count: number) {
-    const children = [...formData.children];
-    while (children.length < count) children.push(0);
-    while (children.length > count) children.pop();
-    const wasShown = shouldShowNapSection(formData);
-    const willShow = shouldShowNapSection({ children });
-    updateFormData({
-      children,
-      ...(!willShow ? { naps: [] } : !wasShown ? { naps: defaultNapsOpen() } : {}),
-    });
-  }
-
-  function handleChildAgeChange(index: number, age: number) {
-    const children = [...formData.children];
-    children[index] = age;
-    const wasShown = shouldShowNapSection(formData);
-    const willShow = shouldShowNapSection({ children });
-    updateFormData({
-      children,
-      ...(!willShow ? { naps: [] } : !wasShown ? { naps: defaultNapsOpen() } : {}),
-    });
-  }
-
-  const hints = getTravelerHints(formData.children);
-
+function StepCheckIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
   return (
-    <div className="space-y-6">
-      <StepIntro
-        emoji="👨‍👩‍👧‍👦"
-        title="Who's coming along?"
-        subtitle="Tell us who's in your travel squad so we can plan for every age."
+    <svg viewBox="0 0 20 20" className={className} fill="none" aria-hidden>
+      <path
+        d="M5 10.5 8.5 14 15 6.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-
-      <div className="grid grid-cols-2 gap-4">
-        <CounterControl
-          label="Adults"
-          value={formData.adults}
-          min={1}
-          max={12}
-          onChange={(adults) => updateFormData({ adults })}
-        />
-        <CounterControl
-          label="Kids"
-          value={formData.children.length}
-          min={0}
-          max={10}
-          onChange={handleChildCountChange}
-        />
-      </div>
-
-      {formData.children.length > 0 ? (
-        <div>
-          <p className={labelClassName}>How old is each kiddo?</p>
-          <div className="mt-3 grid grid-cols-2 gap-4">
-            {formData.children.map((age, index) => (
-              <label key={index} className="block rounded-2xl border border-border bg-background p-4">
-                <span className="text-sm font-semibold text-ink">Child {index + 1}</span>
-                <select
-                  className={inputClassName}
-                  value={age}
-                  onChange={(event) => handleChildAgeChange(index, Number(event.target.value))}
-                >
-                  {childAges.map((option) => (
-                    <option key={option} value={option}>
-                      {option === 0 ? "Under 1" : `${option} year${option === 1 ? "" : "s"}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {hints.map((hint) => (
-        <DynamicHint key={hint}>{hint}</DynamicHint>
-      ))}
-    </div>
+    </svg>
   );
 }
 
-const STEPS = [
-  WhereWhenStep,
-  HarborTravelersStep,
-  StayTransitStep,
-  PaceBudgetStep,
-  NapScheduleStep,
-  ActivityInterestsStep,
-] as const;
+/** Soft fill + check: completed stays quiet; only the current step gets dark-teal fill. */
+function SoftCheckStepIndicator({
+  index,
+  active,
+  completed,
+  locked,
+}: {
+  index: number;
+  active: boolean;
+  completed: boolean;
+  locked: boolean;
+}) {
+  if (active) {
+    return (
+      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold tabular-nums text-white">
+        {index + 1}
+      </span>
+    );
+  }
+  if (completed) {
+    return (
+      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-muted text-primary">
+        <StepCheckIcon />
+      </span>
+    );
+  }
+  if (locked) {
+    return (
+      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-xs font-medium tabular-nums text-muted/50">
+        {index + 1}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-xs font-medium tabular-nums text-muted">
+      {index + 1}
+    </span>
+  );
+}
 
 export function HarborWizard() {
   const { plan, updatePlan, stepIndex, goStep, canContinue, canGenerate } = useDesignLab();
   const signals = useHarborSkin() === "signals";
   const Step = STEPS[stepIndex] ?? WhereWhenStep;
   const last = stepIndex === WIZARD_STEP_TITLES.length - 1;
+  const unlockedThroughIndex = wizardUnlockedThroughIndex(plan);
 
   return (
     <div className="min-h-screen bg-background text-ink">
@@ -140,30 +98,34 @@ export function HarborWizard() {
             <ol className="space-y-1">
               {WIZARD_STEP_TITLES.map((title, index) => {
                 const active = index === stepIndex;
+                const locked = index > unlockedThroughIndex;
+                const completed = !active && !locked && index < unlockedThroughIndex;
                 return (
                   <li key={title}>
                     <button
                       type="button"
-                      onClick={() => goStep(index)}
+                      onClick={() => {
+                        if (locked || active) return;
+                        goStep(index);
+                      }}
+                      disabled={locked}
+                      aria-current={active ? "step" : undefined}
                       className={`flex w-full items-center gap-2 rounded-full px-2 py-2 text-left text-sm ${
                         active
                           ? "font-semibold text-primary"
-                          : signals
-                            ? "font-medium text-muted hover:bg-secondary-muted hover:text-ink"
-                            : "font-medium text-muted hover:bg-secondary-muted hover:text-primary"
+                          : locked
+                            ? "cursor-not-allowed font-medium text-muted/50"
+                            : signals
+                              ? "font-medium text-muted hover:bg-secondary-muted hover:text-ink"
+                              : "font-medium text-muted hover:bg-secondary-muted hover:text-primary"
                       }`}
                     >
-                      <span
-                        className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs tabular-nums ${
-                          active
-                            ? "bg-primary text-white"
-                            : signals
-                              ? "border border-border text-muted"
-                              : "border border-primary/25 text-primary"
-                        }`}
-                      >
-                        {index + 1}
-                      </span>
+                      <SoftCheckStepIndicator
+                        index={index}
+                        active={active}
+                        completed={completed}
+                        locked={locked}
+                      />
                       <span className={active && !signals ? "border-b-2 border-accent pb-0.5" : ""}>{title}</span>
                     </button>
                   </li>
@@ -176,15 +138,18 @@ export function HarborWizard() {
             <Step formData={plan} updateFormData={updatePlan} />
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              {stepIndex > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => goStep(stepIndex - 1)}
-                  className={`order-2 sm:order-1 sm:flex-1 ${btnSecondaryClassName}`}
-                >
-                  Back
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={() => goStep(stepIndex - 1)}
+                disabled={stepIndex === 0}
+                tabIndex={stepIndex === 0 ? -1 : undefined}
+                aria-hidden={stepIndex === 0}
+                className={`order-2 sm:order-1 sm:flex-1 ${btnSecondaryClassName} ${
+                  stepIndex === 0 ? "invisible pointer-events-none" : ""
+                }`}
+              >
+                Back
+              </button>
               {last ? (
                 <Link
                   href={canGenerate ? conceptPath("harbor", "itinerary") : "#"}
@@ -200,7 +165,7 @@ export function HarborWizard() {
                   type="button"
                   disabled={!canContinue}
                   onClick={() => goStep(stepIndex + 1)}
-                  className={`order-1 w-full sm:flex-1 ${btnPrimaryClassName}`}
+                  className={`order-1 w-full sm:order-2 sm:flex-1 ${btnPrimaryClassName}`}
                 >
                   Sounds good →
                 </button>

@@ -2,6 +2,7 @@
 
 import PlanSelectionChips from "@/components/PlanSelectionChips";
 import ShareItineraryControls from "@/components/ShareItineraryControls";
+import { formatAdultsLabel, formatKidsWithAges } from "@/lib/format";
 import { formatCoverDateRange } from "@/lib/itinerary-export";
 import { namesMatch } from "@/lib/pricing/transport-planner";
 import { stayHomeLocation } from "@/lib/planning-engine/stay-home";
@@ -131,11 +132,7 @@ function TravelLeg({
       </div>
       <div className="min-w-0 flex-1 py-0.5 text-sm leading-relaxed text-muted">
         <p className="font-semibold not-italic text-ink">{travelModeLabel(transportationType)}</p>
-        {meta ? (
-          <p className="italic [font-synthesis:style]">
-            {meta}
-          </p>
-        ) : null}
+        {meta ? <p className="italic [font-synthesis:style]">{meta}</p> : null}
         {maps ? (
           <p>
             <a
@@ -169,8 +166,8 @@ function CurrentStyleHeader({
     plan.startDate && plan.endDate
       ? formatCoverDateRange(plan.startDate, plan.endDate) || itinerary.tripStartFormatted
       : itinerary.tripStartFormatted,
-    `${plan.adults} adult${plan.adults !== 1 ? "s" : ""}`,
-    plan.children.length > 0 ? `${plan.children.length} kid${plan.children.length !== 1 ? "s" : ""}` : null,
+    formatAdultsLabel(plan.adults),
+    formatKidsWithAges(plan.children) || null,
   ]
     .filter(Boolean)
     .join(" · ");

@@ -26,6 +26,39 @@ export function DesignLabHub() {
           <Link href={conceptPath("harbor")} className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
             Open Harbor
           </Link>
+          <Link href="/design-lab/wizard-steps" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Wizard step options
+          </Link>
+          <Link href="/design-lab/travelers" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Travelers options
+          </Link>
+          <Link href="/design-lab/stay" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Stay options
+          </Link>
+          <Link href="/design-lab/food-naps" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Food & naps options
+          </Link>
+          <Link href="/design-lab/interests" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Interests options
+          </Link>
+          <Link href="/design-lab/pace-budget" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Pace & budget options
+          </Link>
+          <Link href="/design-lab/fonts" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Font styles
+          </Link>
+          <Link href="/design-lab/loading" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Loading options
+          </Link>
+          <Link href="/design-lab/chips" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Chip options
+          </Link>
+          <Link href="/design-lab/mobile" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Mobile options
+          </Link>
+          <Link href="/design-lab/homepage" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
+            Homepage options
+          </Link>
           <Link href="/design-lab/compare" className="rounded-full bg-white px-4 py-2 text-sm font-semibold ring-1 ring-slate-200">
             Compare all
           </Link>

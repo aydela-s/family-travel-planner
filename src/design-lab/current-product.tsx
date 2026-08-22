@@ -3,11 +3,10 @@
 import ItineraryDisplay from "@/components/ItineraryDisplay";
 import { FamilyTravelyLogo } from "@/components/FamilyTravelyLogo";
 import { BRAND } from "@/config/brand";
-import { WIZARD_STEP_TITLES } from "@/lib/plan-wizard/step-gate";
+import { WIZARD_STEP_TITLES, wizardUnlockedThroughIndex } from "@/lib/plan-wizard/step-gate";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import ActivityInterestsStep from "@/components/plan-wizard/steps/ActivityInterestsStep";
-import NapScheduleStep from "@/components/plan-wizard/steps/NapScheduleStep";
 import PaceBudgetStep from "@/components/plan-wizard/steps/PaceBudgetStep";
 import StayTransitStep from "@/components/plan-wizard/steps/StayTransitStep";
 import TravelersStep from "@/components/plan-wizard/steps/TravelersStep";
@@ -26,7 +25,6 @@ const STEPS = [
   TravelersStep,
   StayTransitStep,
   PaceBudgetStep,
-  NapScheduleStep,
   ActivityInterestsStep,
 ] as const;
 
@@ -57,17 +55,22 @@ export function CurrentWizardPane({ onShowItinerary }: { onShowItinerary: () => 
       stepIndex={stepIndex}
       totalSteps={WIZARD_STEP_TITLES.length}
       stepTitle={WIZARD_STEP_TITLES[stepIndex]}
+      unlockedThroughIndex={wizardUnlockedThroughIndex(plan)}
+      onSelectStep={goStep}
       footer={
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          {stepIndex > 0 ? (
-            <button
-              type="button"
-              onClick={() => goStep(stepIndex - 1)}
-              className={`order-2 sm:order-1 sm:flex-1 ${btnSecondaryClassName}`}
-            >
-              Back
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => goStep(stepIndex - 1)}
+            disabled={stepIndex === 0}
+            tabIndex={stepIndex === 0 ? -1 : undefined}
+            aria-hidden={stepIndex === 0}
+            className={`order-2 sm:order-1 sm:flex-1 ${btnSecondaryClassName} ${
+              stepIndex === 0 ? "invisible pointer-events-none" : ""
+            }`}
+          >
+            Back
+          </button>
           {last ? (
             <button
               type="button"
@@ -82,7 +85,7 @@ export function CurrentWizardPane({ onShowItinerary }: { onShowItinerary: () => 
               type="button"
               disabled={!canContinue}
               onClick={() => goStep(stepIndex + 1)}
-              className={`order-1 w-full sm:flex-1 ${btnPrimaryClassName}`}
+              className={`order-1 w-full sm:order-2 sm:flex-1 ${btnPrimaryClassName}`}
             >
               Sounds good →
             </button>
@@ -108,7 +111,6 @@ export function CurrentItineraryPane({ onEditInWizard }: { onEditInWizard: (step
           <ItineraryDisplay
             itinerary={itinerary}
             plan={plan}
-            isDemo
             onApplyPlanUpdate={updatePlan}
             onEditPlanInWizard={(stepIndex, updates) => {
               if (updates) updatePlan(updates);

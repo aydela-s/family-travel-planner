@@ -1,5 +1,13 @@
 import type { Metadata } from "next";
-import { DM_Sans, IBM_Plex_Sans, Newsreader, Outfit, Source_Serif_4 } from "next/font/google";
+import {
+  DM_Sans,
+  IBM_Plex_Sans,
+  Inter,
+  Manrope,
+  Newsreader,
+  Outfit,
+  Source_Serif_4,
+} from "next/font/google";
 import { notFound } from "next/navigation";
 import "@/design-lab/design-lab.css";
 
@@ -33,6 +41,18 @@ const outfit = Outfit({
   variable: "--font-lab-outfit",
 });
 
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-lab-inter",
+});
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-lab-manrope",
+});
+
 export const metadata: Metadata = {
   title: "Design Lab",
   robots: { index: false, follow: false },
@@ -44,7 +64,7 @@ export default function DesignLabLayout({ children }: { children: React.ReactNod
 
   return (
     <div
-      className={`lab-root ${ibmPlex.variable} ${sourceSerif.variable} ${newsreader.variable} ${dmSans.variable} ${outfit.variable}`}
+      className={`lab-root ${ibmPlex.variable} ${sourceSerif.variable} ${newsreader.variable} ${dmSans.variable} ${outfit.variable} ${inter.variable} ${manrope.variable}`}
     >
       {children}
     </div>

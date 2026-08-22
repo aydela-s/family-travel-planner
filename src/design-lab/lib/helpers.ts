@@ -1,6 +1,6 @@
 import type { Itinerary, ItineraryActivity, ItineraryDay } from "@/types/itinerary";
 import type { TripPlan } from "@/types/trip-plan";
-import { formatTripDateRange } from "@/lib/format";
+import { formatAdultsLabel, formatKidsWithAges, formatTripDateRange } from "@/lib/format";
 import {
   getAccommodationLabel,
   getBudgetStyleLabelPlain,
@@ -25,10 +25,9 @@ export function tripTotals(itinerary: Itinerary) {
 }
 
 export function partyLine(plan: TripPlan): string {
-  const adults = `${plan.adults} adult${plan.adults === 1 ? "" : "s"}`;
-  if (plan.children.length === 0) return adults;
-  const kids = `${plan.children.length} kid${plan.children.length === 1 ? "" : "s"} (ages ${plan.children.join(", ")})`;
-  return `${adults} · ${kids}`;
+  const adults = formatAdultsLabel(plan.adults);
+  const kids = formatKidsWithAges(plan.children);
+  return kids ? `${adults} · ${kids}` : adults;
 }
 
 export function planFacts(plan: TripPlan) {

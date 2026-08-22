@@ -18,11 +18,22 @@ export function DesignLabChrome({
   navBasePath,
 }: {
   conceptId?: LabConceptId;
-  screen?: LabScreen | "hub" | "compare" | "vs" | "signals";
+  screen?: LabScreen | "hub" | "compare" | "wizard-steps" | "travelers" | "stay" | "food-naps" | "interests" | "pace-budget" | "fonts" | "loading" | "chips" | "mobile" | "homepage" | "vs" | "signals";
   navBasePath?: string;
 }) {
   const pathname = usePathname();
   const onCompare = pathname.startsWith("/design-lab/compare");
+  const onWizardSteps = pathname.startsWith("/design-lab/wizard-steps");
+  const onTravelers = pathname.startsWith("/design-lab/travelers");
+  const onStay = pathname.startsWith("/design-lab/stay");
+  const onFoodNaps = pathname.startsWith("/design-lab/food-naps");
+  const onInterests = pathname.startsWith("/design-lab/interests");
+  const onPaceBudget = pathname.startsWith("/design-lab/pace-budget");
+  const onFonts = pathname.startsWith("/design-lab/fonts");
+  const onLoading = pathname.startsWith("/design-lab/loading");
+  const onChips = pathname.startsWith("/design-lab/chips");
+  const onMobile = pathname.startsWith("/design-lab/mobile");
+  const onHomepage = pathname.startsWith("/design-lab/homepage");
   const onVs = pathname.startsWith("/design-lab/vs");
   const onSignals = pathname === "/design-lab/signals" || pathname.startsWith("/design-lab/signals/");
   const onMix = pathname === "/design-lab/mix" || pathname.startsWith("/design-lab/mix/");
@@ -54,6 +65,72 @@ export function DesignLabChrome({
             Signals UI
           </Link>
           <Link
+            href="/design-lab/wizard-steps"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onWizardSteps ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Step options
+          </Link>
+          <Link
+            href="/design-lab/travelers"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onTravelers ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Travelers
+          </Link>
+          <Link
+            href="/design-lab/stay"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onStay ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Stay
+          </Link>
+          <Link
+            href="/design-lab/food-naps"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onFoodNaps ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Food & naps
+          </Link>
+          <Link
+            href="/design-lab/interests"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onInterests ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Interests
+          </Link>
+          <Link
+            href="/design-lab/pace-budget"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onPaceBudget ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Pace & budget
+          </Link>
+          <Link
+            href="/design-lab/fonts"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onFonts ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Fonts
+          </Link>
+          <Link
+            href="/design-lab/loading"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onLoading ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Loading
+          </Link>
+          <Link
+            href="/design-lab/chips"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onChips ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Chips
+          </Link>
+          <Link
+            href="/design-lab/mobile"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onMobile ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Mobile
+          </Link>
+          <Link
+            href="/design-lab/homepage"
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${onHomepage ? "bg-[#016d76] text-white" : "bg-[#e6f3f4] text-[#016d76]"}`}
+          >
+            Homepage
+          </Link>
+          <Link
             href="/design-lab/compare"
             className={`rounded-full px-3 py-1 text-xs font-semibold ${onCompare ? "bg-slate-900 text-white" : "bg-slate-100"}`}
           >
@@ -76,7 +153,7 @@ export function DesignLabChrome({
           ))}
         </div>
       </div>
-      {conceptId && screen && screen !== "hub" && screen !== "compare" && screen !== "vs" && screen !== "signals" ? (
+      {conceptId && screen && screen !== "hub" && screen !== "compare" && screen !== "wizard-steps" && screen !== "travelers" && screen !== "stay" && screen !== "food-naps" && screen !== "interests" && screen !== "pace-budget" && screen !== "fonts" && screen !== "loading" && screen !== "chips" && screen !== "mobile" && screen !== "homepage" && screen !== "vs" && screen !== "signals" ? (
         <div className="flex gap-1 border-t border-slate-100 px-2 py-1.5">
           {LAB_SCREENS.map((item) => (
             <Link
@@ -104,12 +181,12 @@ function ConceptChip({
 }: {
   id: LabConceptId;
   conceptId?: LabConceptId;
-  screen?: LabScreen | "hub" | "compare" | "vs" | "signals";
+  screen?: LabScreen | "hub" | "compare" | "wizard-steps" | "travelers" | "stay" | "food-naps" | "interests" | "pace-budget" | "fonts" | "loading" | "chips" | "mobile" | "homepage" | "vs" | "signals";
   preserveScreen: boolean;
   emphasis?: boolean;
 }) {
   const active = conceptId === id;
-  const href = preserveScreen && screen && screen !== "hub" && screen !== "compare" && screen !== "vs" && screen !== "signals"
+  const href = preserveScreen && screen && screen !== "hub" && screen !== "compare" && screen !== "wizard-steps" && screen !== "travelers" && screen !== "stay" && screen !== "food-naps" && screen !== "interests" && screen !== "pace-budget" && screen !== "fonts" && screen !== "loading" && screen !== "chips" && screen !== "mobile" && screen !== "homepage" && screen !== "vs" && screen !== "signals"
     ? conceptPath(id, screen)
     : conceptPath(id);
   return (

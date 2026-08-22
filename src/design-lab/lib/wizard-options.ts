@@ -5,11 +5,10 @@ import type { AccommodationType, BudgetStyle, TransportationType, TravelStyle } 
 
 export const LAB_WIZARD_SECTIONS = [
   { id: "where", title: "Where & when", prompt: "Where are you going, and which days?" },
-  { id: "who", title: "Who’s coming", prompt: "Adults, kids, and ages — this changes naps and pace." },
+  { id: "who", title: "Who’s coming", prompt: "Adults, kids, ages, and nap windows when little ones need rest." },
   { id: "stay", title: "Stay & getting around", prompt: "Where you’ll sleep and how you’ll move between stops." },
   { id: "pace", title: "Pace & spend", prompt: "How full each day should feel, and how you like to spend." },
-  { id: "rhythm", title: "Food & naps", prompt: "Dietary needs and rest windows the plan has to honor." },
-  { id: "interests", title: "What sounds fun", prompt: "Pick the kinds of days your kids will actually enjoy." },
+  { id: "interests", title: "What sounds fun", prompt: "Interests and dietary needs the plan should honor." },
 ] as const;
 
 export const STAY_CATEGORIES = [
