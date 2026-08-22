@@ -64,6 +64,21 @@ describe("places → CityConfig mapping (FAM-59)", () => {
       "Parks & Gardens",
     ]);
     expect(interestTagsForSearchCategory("Zoos & Aquariums")).toEqual(["zoos"]);
+    expect(placesSearchCategoriesFromInterests(["Animal Experiences"])).toEqual([
+      "petting zoo animal sanctuary farm animals horseback riding",
+    ]);
+    expect(
+      interestTagsForSearchCategory("petting zoo animal sanctuary farm animals horseback riding"),
+    ).toEqual(["animal-experiences"]);
+    expect(placesSearchCategoriesFromInterests(["Tours & Sightseeing"])).toEqual([
+      "hop on hop off sightseeing tour boat cruise guided tour",
+    ]);
+    expect(
+      interestTagsForSearchCategory("hop on hop off sightseeing tour boat cruise guided tour"),
+    ).toEqual(["tours"]);
+    expect(placesSearchCategoriesFromInterests(["Spas"])).toEqual([
+      "family spa hot springs thermal baths wellness",
+    ]);
     expect(placesSearchCategoriesFromInterests(["Interactive Museums"])).toEqual([
       "science museum children's museum interactive exhibits",
     ]);
@@ -87,13 +102,26 @@ describe("places → CityConfig mapping (FAM-59)", () => {
     ).toEqual([
       "children's theater family show puppet show kids entertainment magic show",
       "family recreation center kids sports ice skating bowling community center",
-      "children's museum family art activity pottery painting kids museum",
+      "family art museum gallery painting kids art",
     ]);
     expect(
       interestTagsForSearchCategory(
         "children's theater family show puppet show kids entertainment magic show",
       ),
     ).toEqual(["entertainment"]);
+  });
+
+  it("refines petting zoos, tours, and hybrid water parks to the taxonomy tags", () => {
+    expect(refineInterestTagsForPlaceName("County Petting Zoo", ["zoos"])).toEqual([
+      "animal-experiences",
+    ]);
+    expect(refineInterestTagsForPlaceName("Old Town Trolley Tour", ["history"])).toEqual(["tours"]);
+    expect(refineInterestTagsForPlaceName("Hawaiian Falls Water Park", ["theme-parks"])).toEqual([
+      "beaches",
+    ]);
+    expect(refineInterestTagsForPlaceName("Disney's Typhoon Lagoon", ["theme-parks"])).toContain(
+      "theme-parks",
+    );
   });
 
   it("strips shopping tags from strip centers and generic plazas", () => {
@@ -298,7 +326,7 @@ describe("places → CityConfig mapping (FAM-59)", () => {
   it("tags Fritz's Adventure / DINO KIDZ as indoor-play, not playgrounds or theme parks", () => {
     const landmarks = landmarksFromPlacesResults([
       {
-        category: "Playgrounds & Indoor Play",
+        category: "Indoor & Outdoor Play",
         places: [
           place({
             id: "1",

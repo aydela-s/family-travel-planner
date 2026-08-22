@@ -22,7 +22,7 @@ function sdPlan(overrides: Partial<TripPlan> = {}): TripPlan {
     dietaryRestrictions: "",
     naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
     budgetStyle: "balanced",
-    interests: ["Parks & Gardens", "Beaches & Waterfronts"],
+    interests: ["Parks & Gardens", "Swimming & Water Play"],
     ...overrides,
   };
 }

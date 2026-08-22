@@ -17,7 +17,7 @@ function plan(): TripPlan {
     dietaryRestrictions: "",
     naps: [],
     budgetStyle: "balanced",
-    interests: ["Beaches & Waterfronts", "Interactive Museums"],
+    interests: ["Swimming & Water Play", "Interactive Museums"],
   };
 }
 

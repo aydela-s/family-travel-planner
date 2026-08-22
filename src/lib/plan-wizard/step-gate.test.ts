@@ -25,7 +25,7 @@ function filledThroughInterests(overrides: Partial<TripPlan> = {}): TripPlan {
     walkingLimit: "medium",
     naps: [{ startTime: "12:00 PM", endTime: "2:00 PM", type: "regular" }],
     budgetStyle: "balanced",
-    interests: ["Beaches"],
+    interests: ["Swimming & Water Play"],
     ...overrides,
   };
 }

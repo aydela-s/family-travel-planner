@@ -4,15 +4,19 @@ import type { ItineraryActivity } from "@/types/itinerary";
 
 /**
  * Name patterns for each interest category, most specific first. A venue is
- * classified by the first rule it matches, so "San Diego Zoo Safari Park" is a
- * zoo rather than a park and a children's museum is interactive, not museums.
+ * classified by the first rule it matches — see docs/interest-categories.md.
  */
 const NAME_RULES: ReadonlyArray<{ tag: LandmarkInterestTag; pattern: RegExp }> = [
+  {
+    tag: "animal-experiences",
+    pattern:
+      /\b(petting\s*(zoo|farm)|animal\s*(sanctuary|encounter|experience|feeding)|horseback|pony\s*rides?|alpaca|llama|cat\s*cafe|butterfly\s*(garden|house|conservator\w*|experience)|bird\s*encounter|reptile\s*encounter|wildlife\s*sanctuary)\b/i,
+  },
   {
     // Paid water play covers Swimming & Water Play (beaches), not Parks & Gardens.
     tag: "beaches",
     pattern:
-      /\b(aquatic(\s+center)?|indoor\s+water\s*park|water\s*park|waterpark|splash\s*pad|hawaiian\s+waters|hawaiian\s+falls)\b/i,
+      /\b(aquatic(\s+center)?|indoor\s+water\s*park|splash\s*pad|kiddie\s+pool|swimming\s+pool|public\s+pool|hawaiian\s+waters|hawaiian\s+falls)\b/i,
   },
   {
     tag: "theme-parks",
@@ -20,16 +24,28 @@ const NAME_RULES: ReadonlyArray<{ tag: LandmarkInterestTag; pattern: RegExp }> =
       /\b(theme\s*park|amusement\s*park|six\s*flags|legoland|disneyland|disney|universal\s*studios|sea\s*world|seaworld|fun\s*plex|pier\s*rides)\b/i,
   },
   {
+    // Generic / hybrid water parks — rides + swim equally → Swimming & Water Play.
+    tag: "beaches",
+    pattern: /\b(water\s*park|waterpark)\b/i,
+  },
+  {
     tag: "zoos",
+    pattern: /\b(zoo|aquarium|safari(\s+park)?|wildlife\s+park|marine[\s-]life)\b/i,
+  },
+  {
+    tag: "tours",
     pattern:
-      /\b(zoo|aquarium|safari|wildlife|animal\s*(park|sanctuary|encounter)|butterfly\s*(house|pavilion)|petting\s*farm)\b/i,
+      /\b(hop[-\s]?on|sightseeing(\s+(tour|cruise|bus))?|guided\s+tour|walking\s+tour|bus\s+tour|boat\s+tour|trolley\s+tour|city\s+tour)\b/i,
   },
   {
     tag: "interactive",
     pattern:
-      /\b(children'?s\s*museum|kids?\s*museum|discovery\s*(center|centre|museum|place)|science\s*(center|centre|museum)|exploratorium|hands[-\s]?on|maker\s*space|play\s*street)\b/i,
+      /\b(children'?s\s*museum|kids?\s*museum|discovery\s*(center|centre|museum|place)|science\s*(center|centre|museum)|exploratorium|hands[-\s]?on|maker\s*space|play\s*street|planetarium)\b/i,
   },
-  { tag: "museums", pattern: /\b(museum|gallery|art\s*(center|centre|institute)|planetarium)\b/i },
+  {
+    tag: "museums",
+    pattern: /\b(house\s+museum|historic\s+house|museum|gallery|art\s*(center|centre|institute))\b/i,
+  },
   {
     tag: "history",
     pattern:
@@ -38,7 +54,7 @@ const NAME_RULES: ReadonlyArray<{ tag: LandmarkInterestTag; pattern: RegExp }> =
   {
     tag: "indoor-play",
     pattern:
-      /\b(trampolin\w*|soft\s*play|indoor\s*play|play\s*cafe|bounce|urban\s*air|sky\s*zone|kids\s*empire|adventure\s*park|dino\s*kidz)\b/i,
+      /\b(trampolin\w*|soft\s*play|indoor\s*play|play\s*cafe|bounce|urban\s*air|sky\s*zone|kids\s*empire|adventure\s+park|dino\s*kidz)\b/i,
   },
   { tag: "playgrounds", pattern: /\b(playground|play\s*area|play\s*space)\b/i },
   {
@@ -53,14 +69,14 @@ const NAME_RULES: ReadonlyArray<{ tag: LandmarkInterestTag; pattern: RegExp }> =
   {
     tag: "entertainment",
     pattern:
-      /\b(theat(er|re)|cinema|imax|arcade|concert|circus|observatory|planetarium\s*show|escape\s*room)\b/i,
+      /\b(theat(er|re)|cinema|imax|concert|circus|fair|carnival|observatory|magic\s+show)\b/i,
   },
-  { tag: "spas", pattern: /\b(spa|hot\s*springs|thermal\s*baths?|onsen|bathhouse)\b/i },
   {
     tag: "sports",
     pattern:
-      /\b(swim(ming)?|pool|stadium|arena|ballpark|golf|bowling|skate|climbing|surf(ing)?|kayak|bike\s*park)\b/i,
+      /\b(arcade|escape\s*room|mini\s*golf|go[\s-]?karts?|stadium|arena|ballpark|golf|bowling|skate|climbing|surf(ing)?|kayak|bike\s*park|family\s+entertainment\s+center)\b/i,
   },
+  { tag: "spas", pattern: /\b(spa|hot\s*springs|thermal\s*baths?|onsen|bathhouse)\b/i },
   {
     tag: "beaches",
     pattern: /\b(beach|cove|boardwalk|pier|shore(line)?|seawall|waterfront|harbor|harbour|bay)\b/i,

@@ -32,6 +32,7 @@ import {
 } from "@/lib/analytics";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { hasResolvedDestinationCenter } from "@/lib/city-detect";
+import { normalizeInterestLabels } from "@/lib/schedule/interest-map";
 import StepTransition from "./StepTransition";
 import DestinationStep from "./steps/WhereWhenStep";
 import { WizardShell } from "./WizardShell";
@@ -239,7 +240,11 @@ export default function TripPlanWizard() {
         if (!res.ok) throw new Error(data.error || "Shared itinerary not found.");
         if (cancelled) return;
         if (data.plan) {
-          setFormData({ ...initialTripPlan, ...(data.plan as TripPlan) });
+          const loaded = { ...initialTripPlan, ...(data.plan as TripPlan) };
+          setFormData({
+            ...loaded,
+            interests: normalizeInterestLabels(loaded.interests ?? []),
+          });
         }
         setItinerary(data.itinerary as Itinerary);
       } catch (e) {
@@ -546,7 +551,7 @@ export default function TripPlanWizard() {
               </p>
             )}
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-row gap-2 sm:gap-3">
               {/* Always reserve Back so the primary CTA doesn’t resize when leaving step 1. */}
               <button
                 type="button"
@@ -554,7 +559,7 @@ export default function TripPlanWizard() {
                 disabled={isFirstStep || isLoading || continueBusy}
                 tabIndex={isFirstStep ? -1 : undefined}
                 aria-hidden={isFirstStep}
-                className={`order-2 sm:order-1 sm:flex-1 ${btnSecondaryClassName} ${
+                className={`min-w-0 flex-1 ${btnSecondaryClassName} ${
                   isFirstStep ? "invisible pointer-events-none" : ""
                 }`}
               >
@@ -566,7 +571,7 @@ export default function TripPlanWizard() {
                   type="button"
                   onClick={() => handleGenerate()}
                   disabled={isLoading || continueBusy}
-                  className={`order-1 w-full sm:order-2 sm:flex-1 ${btnCtaClassName}`}
+                  className={`min-w-0 flex-1 ${btnCtaClassName}`}
                 >
                   Generate itinerary
                 </button>
@@ -575,7 +580,7 @@ export default function TripPlanWizard() {
                   type="button"
                   onClick={() => void goNext()}
                   disabled={continueBusy}
-                  className={`order-1 w-full sm:order-2 sm:flex-1 ${btnPrimaryClassName}`}
+                  className={`min-w-0 flex-1 ${btnPrimaryClassName}`}
                 >
                   {continueBusy ? "One moment…" : "Sounds good →"}
                 </button>

@@ -49,7 +49,7 @@ function sdPlan(overrides: Partial<TripPlan> = {}): TripPlan {
     interests: [
       "Indoor & Outdoor Play",
       "Interactive Museums",
-      "Beaches & Waterfronts",
+      "Swimming & Water Play",
       "Shows & Entertainment",
     ],
     ...overrides,
@@ -443,7 +443,7 @@ describe("planTrip staged engine", () => {
         "Shows & Entertainment",
         "Indoor & Outdoor Play",
         "Interactive Museums",
-        "Beaches & Waterfronts",
+        "Swimming & Water Play",
       ],
     });
     const { raw, blueprint } = planTrip(plan, { cityOverride: city, plannerEngine: "staged" });
@@ -464,7 +464,7 @@ describe("planTrip staged engine", () => {
 
   it("never schedules two indoor-play stops on the same day", () => {
     const plan = sdPlan({
-      interests: ["Indoor & Outdoor Play", "Beaches & Waterfronts", "Parks & Gardens"],
+      interests: ["Indoor & Outdoor Play", "Swimming & Water Play", "Parks & Gardens"],
     });
     const themed = applyDailyThemes(buildTripStrategy(plan, { city }), plan, city);
     const committed = commitStopsToBlueprint(themed, plan, city);
@@ -502,7 +502,7 @@ describe("planTrip staged engine", () => {
       interests: [
         "Theme Parks",
         "Indoor & Outdoor Play",
-        "Beaches & Waterfronts",
+        "Swimming & Water Play",
         "Parks & Gardens",
       ],
     });

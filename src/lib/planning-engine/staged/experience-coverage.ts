@@ -1,5 +1,5 @@
 import type { LandmarkInterestTag } from "@/config/city-pricing";
-import { INTEREST_LABEL_TO_TAGS } from "@/lib/schedule/interest-map";
+import { INTEREST_LABEL_TO_TAGS, normalizeInterestLabels } from "@/lib/schedule/interest-map";
 import type { ExperienceCoverage, ExperienceCoverageItem } from "@/lib/planning-engine/staged/types";
 import type { BudgetStyle, TripPlan } from "@/types/trip-plan";
 
@@ -38,12 +38,8 @@ export function coverageEntriesFromInterests(
   interests: string[],
 ): Array<{ key: string; tag: LandmarkInterestTag; label: string }> {
   const entries: Array<{ key: string; tag: LandmarkInterestTag; label: string }> = [];
-  for (const label of interests.filter(Boolean)) {
-    if (
-      label === "Indoor & Outdoor Play" ||
-      label === "Playgrounds & Indoor Play" ||
-      label === "Playgrounds"
-    ) {
+  for (const label of normalizeInterestLabels(interests.filter(Boolean))) {
+    if (label === "Indoor & Outdoor Play") {
       entries.push({ key: "playgrounds", tag: "playgrounds", label });
       entries.push({ key: "indoor-play", tag: "indoor-play", label });
       continue;

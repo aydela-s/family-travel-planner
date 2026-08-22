@@ -122,7 +122,7 @@ function cityHasTag(city: CityConfig, tags: LandmarkInterestTag[]): boolean {
 /** Themes available for interest-driven full days given plan + destination. */
 export function eligibleInterestThemes(plan: TripPlan, city: CityConfig): ThemeDefinition[] {
   // Use all mapped tags (not primary-only) so play_indoor and playgrounds both qualify
-  // when the wizard selects "Playgrounds & Indoor Play".
+  // when the wizard selects "Indoor & Outdoor Play".
   const selected = new Set(interestTagsFromPlan(plan.interests));
   const selectedList = [...selected];
 

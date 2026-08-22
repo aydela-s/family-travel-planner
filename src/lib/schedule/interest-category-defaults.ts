@@ -29,7 +29,7 @@ export const INTEREST_CATEGORY_DEFAULTS: Record<
     indoorOutdoor: "outdoor",
   },
   beaches: {
-    id: "beaches_waterfronts",
+    id: "swimming_water_play",
     durationMin: 120,
     durationMax: 180,
     energyLevel: "medium",
@@ -61,7 +61,7 @@ export const INTEREST_CATEGORY_DEFAULTS: Record<
     indoorOutdoor: "indoor",
   },
   playgrounds: {
-    id: "playgrounds_indoor_play",
+    id: "indoor_outdoor_play",
     durationMin: 45,
     durationMax: 90,
     energyLevel: "high",
@@ -69,7 +69,7 @@ export const INTEREST_CATEGORY_DEFAULTS: Record<
     indoorOutdoor: "both",
   },
   "indoor-play": {
-    id: "playgrounds_indoor_play",
+    id: "indoor_outdoor_play",
     durationMin: 90,
     durationMax: 120,
     energyLevel: "high",
@@ -80,6 +80,14 @@ export const INTEREST_CATEGORY_DEFAULTS: Record<
     id: "zoos_aquariums",
     durationMin: 120,
     durationMax: 180,
+    energyLevel: "medium",
+    weatherDependent: "mixed",
+    indoorOutdoor: "both",
+  },
+  "animal-experiences": {
+    id: "animal_experiences",
+    durationMin: 60,
+    durationMax: 120,
     energyLevel: "medium",
     weatherDependent: "mixed",
     indoorOutdoor: "both",
@@ -99,6 +107,14 @@ export const INTEREST_CATEGORY_DEFAULTS: Record<
     energyLevel: "medium",
     weatherDependent: false,
     indoorOutdoor: "indoor",
+  },
+  tours: {
+    id: "tours_sightseeing",
+    durationMin: 90,
+    durationMax: 180,
+    energyLevel: "medium",
+    weatherDependent: "mixed",
+    indoorOutdoor: "both",
   },
   "food-markets": {
     id: "food_markets",

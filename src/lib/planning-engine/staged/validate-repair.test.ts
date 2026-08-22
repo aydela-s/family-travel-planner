@@ -33,7 +33,7 @@ function sdPlan(overrides: Partial<TripPlan> = {}): TripPlan {
     interests: [
       "Indoor & Outdoor Play",
       "Interactive Museums",
-      "Beaches & Waterfronts",
+      "Swimming & Water Play",
       "Shows & Entertainment",
     ],
     ...overrides,

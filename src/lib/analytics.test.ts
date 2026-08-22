@@ -40,7 +40,7 @@ const samplePlan: TripPlan = {
   dietaryRestrictions: "",
   naps: [],
   budgetStyle: "save",
-  interests: ["Beaches & Waterfronts"],
+  interests: ["Swimming & Water Play"],
 };
 
 const engagementKey = itineraryEngagementKey({

@@ -114,9 +114,13 @@ export function placesSearchCategoriesFromInterests(
       return "science museum children's museum interactive exhibits";
     }
     if (label === "Theme Parks") {
-      return "theme park amusement park water park";
+      return "theme park amusement park roller coaster";
     }
-    if (label === "Playgrounds & Indoor Play" || label === "Playgrounds") {
+    if (
+      label === "Indoor & Outdoor Play" ||
+      label === "Playgrounds & Indoor Play" ||
+      label === "Playgrounds"
+    ) {
       return "indoor playground soft play kids play cafe";
     }
     if (label === "Shows & Entertainment" || label === "Shows") {
@@ -131,8 +135,17 @@ export function placesSearchCategoriesFromInterests(
     }
     if (label === "Museums & Art") {
       return kidQueries
-        ? "children's museum family art activity pottery painting kids museum"
+        ? "family art museum gallery painting kids art"
         : "art museum family gallery";
+    }
+    if (label === "Animal Experiences") {
+      return "petting zoo animal sanctuary farm animals horseback riding";
+    }
+    if (label === "Tours & Sightseeing") {
+      return "hop on hop off sightseeing tour boat cruise guided tour";
+    }
+    if (label === "Spas") {
+      return "family spa hot springs thermal baths wellness";
     }
     if (label === "Shopping") {
       return "shopping mall outlet center premium outlets galleria";
@@ -162,8 +175,17 @@ export function interestTagsForSearchCategory(category: string): LandmarkInteres
   if (/science museum|children'?s museum|interactive exhibit/.test(lower)) {
     return ["interactive"];
   }
-  if (/theme park|amusement park|water park/.test(lower)) {
+  if (/theme park|amusement park|roller coaster/.test(lower)) {
     return ["theme-parks"];
+  }
+  if (/petting zoo|animal sanctuary|farm animals|horseback/.test(lower)) {
+    return ["animal-experiences"];
+  }
+  if (/hop on hop off|sightseeing tour|boat cruise|guided tour/.test(lower)) {
+    return ["tours"];
+  }
+  if (/family spa|hot springs|thermal baths|wellness/.test(lower)) {
+    return ["spas"];
   }
   if (/indoor playground|soft play|play cafe/.test(lower)) {
     return ["playgrounds", "indoor-play"];
@@ -174,7 +196,7 @@ export function interestTagsForSearchCategory(category: string): LandmarkInteres
   if (/family\s+recreation|kids?\s+sports|community\s+center|ice\s+skating/.test(lower)) {
     return ["sports"];
   }
-  if (/family\s+art|pottery|painting|kids?\s+museum|children'?s?\s+museum/.test(lower)) {
+  if (/family\s+art|pottery|painting|kids?\s+art/.test(lower)) {
     return ["museums"];
   }
   if (/shopping\s+mall|outlet\s+center|premium\s+outlets|galleria/.test(lower)) {
@@ -194,6 +216,8 @@ export function interestTagsForSearchCategory(category: string): LandmarkInteres
       return tags;
     }
   }
+  if (/petting|sanctuary|horseback|cat\s*cafe/.test(lower)) return ["animal-experiences"];
+  if (/hop[-\s]?on|sightseeing|guided\s+tour|boat\s+cruise/.test(lower)) return ["tours"];
   if (/zoo|aquarium/.test(lower)) return ["zoos"];
   if (/museum|gallery/.test(lower)) return ["museums"];
   if (/playground|soft play|bounce/.test(lower)) return ["playgrounds", "indoor-play"];
@@ -269,15 +293,33 @@ export function refineInterestTagsForPlaceName(
     if (next.length === 0) next.push("parks");
   }
 
-  // Aquatic centers / water parks count as water-play (beaches coverage).
-  // Match brand names like "Hawaiian Waters" that omit the words "water park".
-  if (
+  // Water play vs ride-dominant parks (docs/interest-categories.md):
+  // hybrid / splash / aquatic → Swimming; major branded ride parks stay Theme Parks.
+  const isWaterPlayName =
     /\b(aquatic|indoor\s+water\s*park|water\s*park|waterpark|splash\s*pad|hawaiian\s+waters|hawaiian\s+falls)\b/i.test(
       name,
-    )
-  ) {
-    if (!next.includes("beaches")) next.push("beaches");
-    next = next.filter((t) => t !== "theme-parks" && t !== "parks");
+    );
+  const isRideDominantWaterPark =
+    /\b(disney|universal|six\s*flags|legoland|seaworld|aquatica|typhoon\s+lagoon|blizzard\s+beach)\b/i.test(
+      name,
+    );
+  if (/\b(petting|animal\s+sanctuary|horseback|cat\s*cafe|alpaca|pony\s*rides?)\b/i.test(name)) {
+    if (!next.includes("animal-experiences")) next.push("animal-experiences");
+    next = next.filter((t) => t !== "zoos");
+  }
+  if (/\b(hop[-\s]?on|sightseeing|guided\s+tour|trolley\s+tour|boat\s+cruise)\b/i.test(name)) {
+    if (!next.includes("tours")) next.push("tours");
+    next = next.filter((t) => t !== "history");
+  }
+
+  if (isWaterPlayName) {
+    if (isRideDominantWaterPark) {
+      if (!next.includes("theme-parks")) next.push("theme-parks");
+      next = next.filter((t) => t !== "parks");
+    } else {
+      if (!next.includes("beaches")) next.push("beaches");
+      next = next.filter((t) => t !== "theme-parks" && t !== "parks");
+    }
   }
 
   return next;

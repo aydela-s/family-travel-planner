@@ -7,9 +7,24 @@ import { interestTagsFromPlan } from "@/lib/schedule/interest-map";
 import { PACKED_LONGER_ACTIVITY_MIN } from "@/lib/schedule/travel-style";
 
 describe("interest category defaults (docs/interest-categories.md)", () => {
+  it("uses canonical category ids from the taxonomy doc", () => {
+    expect(INTEREST_CATEGORY_DEFAULTS.beaches.id).toBe("swimming_water_play");
+    expect(INTEREST_CATEGORY_DEFAULTS.playgrounds.id).toBe("indoor_outdoor_play");
+    expect(INTEREST_CATEGORY_DEFAULTS["indoor-play"].id).toBe("indoor_outdoor_play");
+    expect(INTEREST_CATEGORY_DEFAULTS["animal-experiences"].id).toBe("animal_experiences");
+    expect(INTEREST_CATEGORY_DEFAULTS.tours.id).toBe("tours_sightseeing");
+  });
+
   it("maps Nature without Parks & Gardens alias", () => {
     expect(interestTagsFromPlan(["Nature & Scenic Views"])).toEqual(["nature"]);
     expect(interestTagsFromPlan(["Parks & Gardens"])).toEqual(["parks"]);
+  });
+
+  it("maps Animal Experiences and Tours & Sightseeing to distinct catalog tags", () => {
+    expect(interestTagsFromPlan(["Animal Experiences"])).toEqual(["animal-experiences"]);
+    expect(interestTagsFromPlan(["Tours & Sightseeing"])).toEqual(["tours"]);
+    expect(interestTagsFromPlan(["Zoos & Aquariums"])).toEqual(["zoos"]);
+    expect(interestTagsFromPlan(["History & Landmarks"])).toEqual(["history"]);
   });
 
   it("uses category duration maxima for packed longer adventures", () => {

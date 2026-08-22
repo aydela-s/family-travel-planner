@@ -30,9 +30,9 @@ const plan: TripPlan = {
   naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
   budgetStyle: "balanced",
   interests: [
-    "Playgrounds & Indoor Play",
+    "Indoor & Outdoor Play",
     "Interactive Museums",
-    "Beaches & Waterfronts",
+    "Swimming & Water Play",
     "Shows & Entertainment",
   ],
 };

@@ -3,9 +3,9 @@
     "destination": "San Diego",
     "dates": "2026-09-15 – 2026-09-19",
     "interests": [
-      "Playgrounds & Indoor Play",
+      "Indoor & Outdoor Play",
       "Interactive Museums",
-      "Beaches & Waterfronts",
+      "Swimming & Water Play",
       "Shows & Entertainment"
     ],
     "ages": [
@@ -24,7 +24,7 @@
         {
           "key": "playgrounds",
           "tag": "playgrounds",
-          "label": "Playgrounds & Indoor Play",
+          "label": "Indoor & Outdoor Play",
           "target": 1,
           "completed": 0,
           "source": "interest"
@@ -32,7 +32,7 @@
         {
           "key": "indoor-play",
           "tag": "indoor-play",
-          "label": "Playgrounds & Indoor Play",
+          "label": "Indoor & Outdoor Play",
           "target": 1,
           "completed": 0,
           "source": "interest"
@@ -48,7 +48,7 @@
         {
           "key": "beaches",
           "tag": "beaches",
-          "label": "Beaches & Waterfronts",
+          "label": "Swimming & Water Play",
           "target": 1,
           "completed": 0,
           "source": "interest"
@@ -93,7 +93,7 @@
         "timeline": [
           {
             "time": "08:30",
-            "endTime": "10:00",
+            "endTime": "10:30",
             "type": "activity",
             "title": "Explore Kate Sessions Park"
           },
@@ -101,19 +101,19 @@
             "time": "11:15",
             "endTime": "12:15",
             "type": "meal",
-            "title": "Takeout or delivery lunch at your stay"
+            "title": "Delivery lunch at your stay"
           },
           {
             "time": "12:30",
             "endTime": "14:00",
             "type": "nap",
-            "title": "Nap & Quiet Time"
+            "title": "Nap"
           },
           {
-            "time": "14:15",
-            "endTime": "17:45",
+            "time": "15:30",
+            "endTime": "17:00",
             "type": "activity",
-            "title": "Explore Belmont Park"
+            "title": "Family time at Funbox (Plaza Bonita, National City)"
           },
           {
             "time": "18:00",
@@ -147,33 +147,21 @@
         "timeline": [
           {
             "time": "08:30",
-            "endTime": "10:00",
+            "endTime": "11:00",
             "type": "activity",
-            "title": "Explore Mission Beach Boardwalk"
+            "title": "Explore Coronado Beach"
           },
           {
             "time": "11:15",
             "endTime": "12:15",
             "type": "meal",
-            "title": "Takeout or delivery lunch at your stay"
+            "title": "Delivery lunch at your stay"
           },
           {
             "time": "12:30",
             "endTime": "14:00",
             "type": "nap",
-            "title": "Nap & Quiet Time"
-          },
-          {
-            "time": "14:15",
-            "endTime": "15:45",
-            "type": "activity",
-            "title": "Explore Coronado Beach"
-          },
-          {
-            "time": "16:00",
-            "endTime": "16:30",
-            "type": "activity",
-            "title": "Afternoon stroll near Coronado Beach"
+            "title": "Nap"
           },
           {
             "time": "18:00",
@@ -205,7 +193,7 @@
         "timeline": [
           {
             "time": "08:30",
-            "endTime": "10:00",
+            "endTime": "09:45",
             "type": "activity",
             "title": "Explore Waterfront Park Playground"
           },
@@ -213,25 +201,19 @@
             "time": "11:15",
             "endTime": "12:15",
             "type": "meal",
-            "title": "Takeout or delivery lunch at your stay"
+            "title": "Delivery lunch at your stay"
           },
           {
             "time": "12:30",
             "endTime": "14:00",
             "type": "nap",
-            "title": "Nap & Quiet Time"
+            "title": "Nap"
           },
           {
-            "time": "14:15",
-            "endTime": "15:45",
+            "time": "15:30",
+            "endTime": "17:00",
             "type": "activity",
             "title": "Family time at Play City Eastlake"
-          },
-          {
-            "time": "16:00",
-            "endTime": "16:30",
-            "type": "activity",
-            "title": "Afternoon stroll near Play City Eastlake"
           },
           {
             "time": "18:00",
@@ -263,7 +245,7 @@
         "timeline": [
           {
             "time": "08:30",
-            "endTime": "10:00",
+            "endTime": "11:00",
             "type": "activity",
             "title": "Explore Mission Bay Park"
           },
@@ -271,25 +253,19 @@
             "time": "11:15",
             "endTime": "12:15",
             "type": "meal",
-            "title": "Takeout or delivery lunch at your stay"
+            "title": "Delivery lunch at your stay"
           },
           {
             "time": "12:30",
             "endTime": "14:00",
             "type": "nap",
-            "title": "Nap & Quiet Time"
+            "title": "Nap"
           },
           {
-            "time": "14:15",
-            "endTime": "15:45",
+            "time": "15:30",
+            "endTime": "17:00",
             "type": "activity",
-            "title": "Explore La Jolla Cove"
-          },
-          {
-            "time": "16:00",
-            "endTime": "16:30",
-            "type": "activity",
-            "title": "Afternoon stroll near La Jolla Cove"
+            "title": "Family time at Funbox (Plaza Bonita, National City)"
           },
           {
             "time": "18:00",
@@ -329,31 +305,25 @@
             "time": "08:30",
             "endTime": "10:00",
             "type": "activity",
-            "title": "Explore Torrey Pines State Natural Reserve"
+            "title": "Explore Balboa Park"
           },
           {
             "time": "11:15",
             "endTime": "12:15",
             "type": "meal",
-            "title": "Takeout or delivery lunch at your stay"
+            "title": "Delivery lunch at your stay"
           },
           {
             "time": "12:30",
             "endTime": "14:00",
             "type": "nap",
-            "title": "Nap & Quiet Time"
+            "title": "Nap"
           },
           {
-            "time": "14:15",
-            "endTime": "15:45",
+            "time": "15:30",
+            "endTime": "17:00",
             "type": "activity",
-            "title": "Explore La Jolla Cove"
-          },
-          {
-            "time": "16:00",
-            "endTime": "16:30",
-            "type": "activity",
-            "title": "Pack up & unwind"
+            "title": "Family time at Funbox (Plaza Bonita, National City)"
           },
           {
             "time": "18:00",
@@ -372,7 +342,7 @@
         {
           "key": "playgrounds",
           "tag": "playgrounds",
-          "label": "Playgrounds & Indoor Play",
+          "label": "Indoor & Outdoor Play",
           "target": 1,
           "completed": 1,
           "source": "interest"
@@ -380,7 +350,7 @@
         {
           "key": "indoor-play",
           "tag": "indoor-play",
-          "label": "Playgrounds & Indoor Play",
+          "label": "Indoor & Outdoor Play",
           "target": 1,
           "completed": 0,
           "source": "interest"
@@ -396,7 +366,7 @@
         {
           "key": "beaches",
           "tag": "beaches",
-          "label": "Beaches & Waterfronts",
+          "label": "Swimming & Water Play",
           "target": 1,
           "completed": 1,
           "source": "interest"
@@ -436,67 +406,64 @@
           "discourage_anchor_tags"
         ],
         "anchor": {
-          "name": "Waterfront Park Playground",
+          "name": "Mission Bay Park",
           "tags": [
-            "playgrounds",
-            "parks"
+            "parks",
+            "sports",
+            "beaches",
+            "playgrounds"
           ],
           "isPaid": false
         },
         "support": [
           {
-            "name": "Coronado Beach",
+            "name": "Funbox (Plaza Bonita, National City)",
             "tags": [
-              "beaches",
-              "nature"
+              "indoor-play",
+              "playgrounds",
+              "entertainment"
             ],
-            "isPaid": false
+            "isPaid": true
           }
         ],
         "meals": [
           {
             "slot": "lunch",
-            "mode": "takeout_at_stay",
+            "mode": "delivery_at_stay",
             "restaurantName": null,
-            "nearLandmarkName": "Waterfront Park Playground"
+            "nearLandmarkName": "Mission Bay Park"
           },
           {
             "slot": "dinner",
             "mode": "named_restaurant",
             "restaurantName": "Mr. Charlie's",
-            "nearLandmarkName": "Waterfront Park Playground"
+            "nearLandmarkName": "Carlton"
           }
         ],
         "timeline": [
           {
             "time": "08:30",
-            "endTime": "10:00",
+            "endTime": "10:15",
             "type": "activity",
-            "title": "Explore Coronado Beach"
+            "title": "Family time at Funbox (Plaza Bonita, National City)"
           },
           {
             "time": "11:15",
             "endTime": "12:15",
             "type": "meal",
-            "title": "Takeout or delivery lunch at your stay"
+            "title": "Delivery lunch at your stay"
           },
           {
             "time": "12:30",
-            "endTime": "14:00",
+            "endTime": "14:15",
             "type": "nap",
-            "title": "Nap & Quiet Time"
+            "title": "Nap"
           },
           {
-            "time": "14:15",
-            "endTime": "15:45",
+            "time": "15:30",
+            "endTime": "17:30",
             "type": "activity",
-            "title": "Explore Waterfront Park Playground"
-          },
-          {
-            "time": "16:00",
-            "endTime": "16:30",
-            "type": "activity",
-            "title": "Afternoon stroll near Waterfront Park Playground"
+            "title": "Explore Mission Bay Park"
           },
           {
             "time": "18:00",
@@ -525,74 +492,52 @@
           "prefer_free_anchor"
         ],
         "anchor": {
-          "name": "La Jolla Cove",
+          "name": "Coronado Beach",
           "tags": [
             "beaches",
             "nature"
           ],
           "isPaid": false
         },
-        "support": [
-          {
-            "name": "Kate Sessions Park",
-            "tags": [
-              "playgrounds",
-              "parks",
-              "nature"
-            ],
-            "isPaid": false
-          }
-        ],
+        "support": [],
         "meals": [
           {
             "slot": "lunch",
-            "mode": "takeout_at_stay",
+            "mode": "delivery_at_stay",
             "restaurantName": null,
-            "nearLandmarkName": "La Jolla Cove"
+            "nearLandmarkName": "Coronado Beach"
           },
           {
             "slot": "dinner",
             "mode": "named_restaurant",
-            "restaurantName": "Evolution Fast Food",
-            "nearLandmarkName": "La Jolla Cove"
+            "restaurantName": "The Prado at Balboa Park",
+            "nearLandmarkName": "Carlton"
           }
         ],
         "timeline": [
           {
-            "time": "08:30",
-            "endTime": "10:00",
-            "type": "activity",
-            "title": "Explore Kate Sessions Park"
-          },
-          {
-            "time": "11:15",
+            "time": "11:30",
             "endTime": "12:15",
             "type": "meal",
-            "title": "Takeout or delivery lunch at your stay"
+            "title": "Delivery lunch at your stay"
           },
           {
             "time": "12:30",
             "endTime": "14:00",
             "type": "nap",
-            "title": "Nap & Quiet Time"
+            "title": "Nap"
           },
           {
-            "time": "14:15",
-            "endTime": "15:45",
+            "time": "15:30",
+            "endTime": "17:30",
             "type": "activity",
-            "title": "Explore La Jolla Cove"
-          },
-          {
-            "time": "16:00",
-            "endTime": "16:30",
-            "type": "activity",
-            "title": "Afternoon stroll near La Jolla Cove"
+            "title": "Explore Coronado Beach"
           },
           {
             "time": "18:00",
             "endTime": "19:00",
             "type": "meal",
-            "title": "Dinner at Evolution Fast Food"
+            "title": "Dinner at The Prado at Balboa Park"
           }
         ]
       },
@@ -613,74 +558,53 @@
           "prefer_paid_anchor"
         ],
         "anchor": {
-          "name": "Fleet Science Center",
+          "name": "Birch Aquarium at Scripps",
           "tags": [
+            "zoos",
             "interactive",
-            "museums"
+            "nature"
           ],
           "isPaid": true
         },
-        "support": [
-          {
-            "name": "Balboa Park",
-            "tags": [
-              "parks",
-              "museums",
-              "playgrounds"
-            ],
-            "isPaid": false
-          }
-        ],
+        "support": [],
         "meals": [
           {
             "slot": "lunch",
-            "mode": "takeout_at_stay",
+            "mode": "delivery_at_stay",
             "restaurantName": null,
-            "nearLandmarkName": "Fleet Science Center"
+            "nearLandmarkName": "Birch Aquarium at Scripps"
           },
           {
             "slot": "dinner",
             "mode": "named_restaurant",
-            "restaurantName": "Plumeria Vegetarian Restaurant",
-            "nearLandmarkName": "Fleet Science Center"
+            "restaurantName": "Evolution Fast Food",
+            "nearLandmarkName": "Carlton"
           }
         ],
         "timeline": [
           {
-            "time": "08:30",
-            "endTime": "10:00",
-            "type": "activity",
-            "title": "Explore Balboa Park"
-          },
-          {
-            "time": "11:15",
+            "time": "11:30",
             "endTime": "12:15",
             "type": "meal",
-            "title": "Takeout or delivery lunch at your stay"
+            "title": "Delivery lunch at your stay"
           },
           {
             "time": "12:30",
             "endTime": "14:00",
             "type": "nap",
-            "title": "Nap & Quiet Time"
+            "title": "Nap"
           },
           {
-            "time": "14:15",
-            "endTime": "15:45",
+            "time": "15:30",
+            "endTime": "17:30",
             "type": "activity",
-            "title": "Explore Fleet Science Center"
-          },
-          {
-            "time": "16:00",
-            "endTime": "16:30",
-            "type": "activity",
-            "title": "Afternoon stroll near Fleet Science Center"
+            "title": "Explore Birch Aquarium at Scripps"
           },
           {
             "time": "18:00",
             "endTime": "19:00",
             "type": "meal",
-            "title": "Dinner at Plumeria Vegetarian Restaurant"
+            "title": "Dinner at Evolution Fast Food"
           }
         ]
       },
@@ -701,75 +625,53 @@
           "discourage_anchor_tags"
         ],
         "anchor": {
-          "name": "Mission Bay Park",
+          "name": "Kate Sessions Park",
           "tags": [
+            "playgrounds",
             "parks",
-            "sports",
-            "beaches",
-            "playgrounds"
+            "nature"
           ],
           "isPaid": false
         },
-        "support": [
-          {
-            "name": "Mission Beach Boardwalk",
-            "tags": [
-              "beaches",
-              "sports"
-            ],
-            "isPaid": false
-          }
-        ],
+        "support": [],
         "meals": [
           {
             "slot": "lunch",
-            "mode": "takeout_at_stay",
+            "mode": "delivery_at_stay",
             "restaurantName": null,
-            "nearLandmarkName": "Mission Bay Park"
+            "nearLandmarkName": "Kate Sessions Park"
           },
           {
             "slot": "dinner",
             "mode": "named_restaurant",
-            "restaurantName": "Kindred",
-            "nearLandmarkName": "Mission Bay Park"
+            "restaurantName": "Plumeria Vegetarian Restaurant",
+            "nearLandmarkName": "Carlton"
           }
         ],
         "timeline": [
           {
-            "time": "08:30",
-            "endTime": "10:00",
-            "type": "activity",
-            "title": "Explore Mission Beach Boardwalk"
-          },
-          {
-            "time": "11:15",
+            "time": "11:30",
             "endTime": "12:15",
             "type": "meal",
-            "title": "Takeout or delivery lunch at your stay"
+            "title": "Delivery lunch at your stay"
           },
           {
             "time": "12:30",
             "endTime": "14:00",
             "type": "nap",
-            "title": "Nap & Quiet Time"
+            "title": "Nap"
           },
           {
-            "time": "14:15",
-            "endTime": "15:45",
+            "time": "15:30",
+            "endTime": "17:00",
             "type": "activity",
-            "title": "Explore Mission Bay Park"
-          },
-          {
-            "time": "16:00",
-            "endTime": "16:30",
-            "type": "activity",
-            "title": "Afternoon stroll near Mission Bay Park"
+            "title": "Explore Kate Sessions Park"
           },
           {
             "time": "18:00",
             "endTime": "19:00",
             "type": "meal",
-            "title": "Dinner at Kindred"
+            "title": "Dinner at Plumeria Vegetarian Restaurant"
           }
         ]
       },
@@ -796,10 +698,10 @@
           "discourage_anchor_tags"
         ],
         "anchor": {
-          "name": "Liberty Public Market",
+          "name": "Mission Beach Boardwalk",
           "tags": [
-            "food-markets",
-            "shopping"
+            "beaches",
+            "sports"
           ],
           "isPaid": false
         },
@@ -807,47 +709,41 @@
         "meals": [
           {
             "slot": "lunch",
-            "mode": "takeout_at_stay",
+            "mode": "delivery_at_stay",
             "restaurantName": null,
-            "nearLandmarkName": "Liberty Public Market"
+            "nearLandmarkName": "Mission Beach Boardwalk"
           },
           {
             "slot": "dinner",
             "mode": "named_restaurant",
-            "restaurantName": "The Prado at Balboa Park",
-            "nearLandmarkName": "Liberty Public Market"
+            "restaurantName": "Civico 1845",
+            "nearLandmarkName": "Carlton"
           }
         ],
         "timeline": [
           {
             "time": "08:30",
-            "endTime": "10:00",
+            "endTime": "11:00",
             "type": "activity",
-            "title": "Family time at Liberty Public Market"
+            "title": "Explore Mission Beach Boardwalk"
           },
           {
             "time": "11:15",
             "endTime": "12:15",
             "type": "meal",
-            "title": "Takeout or delivery lunch at your stay"
+            "title": "Delivery lunch at your stay"
           },
           {
             "time": "12:30",
             "endTime": "14:00",
             "type": "nap",
-            "title": "Nap & Quiet Time"
-          },
-          {
-            "time": "14:15",
-            "endTime": "14:45",
-            "type": "activity",
-            "title": "Pack up & unwind"
+            "title": "Nap"
           },
           {
             "time": "18:00",
             "endTime": "19:00",
             "type": "meal",
-            "title": "Dinner at The Prado at Balboa Park"
+            "title": "Dinner at Civico 1845"
           }
         ]
       }
@@ -858,86 +754,67 @@
       "day": 1,
       "scoreActivities": [
         "Explore Kate Sessions Park",
-        "Explore Belmont Park"
+        "Family time at Funbox (Plaza Bonita, National City)"
       ],
       "stagedTheme": "arrival",
-      "stagedAnchor": "Waterfront Park Playground",
+      "stagedAnchor": "Mission Bay Park",
       "stagedSupport": [
-        "Coronado Beach"
+        "Funbox (Plaza Bonita, National City)"
       ],
       "stagedActivities": [
-        "Explore Coronado Beach",
-        "Explore Waterfront Park Playground",
-        "Afternoon stroll near Waterfront Park Playground"
+        "Family time at Funbox (Plaza Bonita, National City)",
+        "Explore Mission Bay Park"
       ]
     },
     {
       "day": 2,
       "scoreActivities": [
-        "Explore Mission Beach Boardwalk",
-        "Explore Coronado Beach",
-        "Afternoon stroll near Coronado Beach"
+        "Explore Coronado Beach"
       ],
       "stagedTheme": "beach",
-      "stagedAnchor": "La Jolla Cove",
-      "stagedSupport": [
-        "Kate Sessions Park"
-      ],
+      "stagedAnchor": "Coronado Beach",
+      "stagedSupport": [],
       "stagedActivities": [
-        "Explore Kate Sessions Park",
-        "Explore La Jolla Cove",
-        "Afternoon stroll near La Jolla Cove"
+        "Explore Coronado Beach"
       ]
     },
     {
       "day": 3,
       "scoreActivities": [
         "Explore Waterfront Park Playground",
-        "Family time at Play City Eastlake",
-        "Afternoon stroll near Play City Eastlake"
+        "Family time at Play City Eastlake"
       ],
       "stagedTheme": "interactive",
-      "stagedAnchor": "Fleet Science Center",
-      "stagedSupport": [
-        "Balboa Park"
-      ],
+      "stagedAnchor": "Birch Aquarium at Scripps",
+      "stagedSupport": [],
       "stagedActivities": [
-        "Explore Balboa Park",
-        "Explore Fleet Science Center",
-        "Afternoon stroll near Fleet Science Center"
+        "Explore Birch Aquarium at Scripps"
       ]
     },
     {
       "day": 4,
       "scoreActivities": [
         "Explore Mission Bay Park",
-        "Explore La Jolla Cove",
-        "Afternoon stroll near La Jolla Cove"
+        "Family time at Funbox (Plaza Bonita, National City)"
       ],
       "stagedTheme": "playgrounds",
-      "stagedAnchor": "Mission Bay Park",
-      "stagedSupport": [
-        "Mission Beach Boardwalk"
-      ],
+      "stagedAnchor": "Kate Sessions Park",
+      "stagedSupport": [],
       "stagedActivities": [
-        "Explore Mission Beach Boardwalk",
-        "Explore Mission Bay Park",
-        "Afternoon stroll near Mission Bay Park"
+        "Explore Kate Sessions Park"
       ]
     },
     {
       "day": 5,
       "scoreActivities": [
-        "Explore Torrey Pines State Natural Reserve",
-        "Explore La Jolla Cove",
-        "Pack up & unwind"
+        "Explore Balboa Park",
+        "Family time at Funbox (Plaza Bonita, National City)"
       ],
       "stagedTheme": "departure",
-      "stagedAnchor": "Liberty Public Market",
+      "stagedAnchor": "Mission Beach Boardwalk",
       "stagedSupport": [],
       "stagedActivities": [
-        "Family time at Liberty Public Market",
-        "Pack up & unwind"
+        "Explore Mission Beach Boardwalk"
       ]
     }
   ]

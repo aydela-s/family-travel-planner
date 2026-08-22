@@ -27,7 +27,7 @@ function sdPlan(): TripPlan {
     interests: [
       "Indoor & Outdoor Play",
       "Interactive Museums",
-      "Beaches & Waterfronts",
+      "Swimming & Water Play",
       "Shows & Entertainment",
     ],
   };
@@ -98,7 +98,7 @@ describe("compare planner engines (artifact)", () => {
         interests: [
           "Indoor & Outdoor Play",
           "Interactive Museums",
-          "Beaches & Waterfronts",
+          "Swimming & Water Play",
           "Shows & Entertainment",
         ],
         ages: [4, 8],

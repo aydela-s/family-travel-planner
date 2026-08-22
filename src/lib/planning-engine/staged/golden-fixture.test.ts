@@ -29,7 +29,7 @@ export function goldenSanDiegoPlan(): TripPlan {
     interests: [
       "Indoor & Outdoor Play",
       "Interactive Museums",
-      "Beaches & Waterfronts",
+      "Swimming & Water Play",
       "Shows & Entertainment",
     ],
   };

@@ -16,8 +16,12 @@ export type LandmarkInterestTag =
   /** Indoor playgrounds, soft play, bounce houses / inflatable parks. */
   | "indoor-play"
   | "zoos"
+  /** Petting farms, sanctuaries, encounters — distinct from observe-first zoos. */
+  | "animal-experiences"
   | "theme-parks"
   | "interactive"
+  /** Guided tours and sightseeing loops — distinct from landmark visits. */
+  | "tours"
   | "food-markets"
   | "shopping"
   | "entertainment"
@@ -877,7 +881,7 @@ export const CITY_CONFIGS: CityConfig[] = [
         openingHours: { open: "05:00", close: "23:00" },
         intensity: "low",
         ageTags: ["toddler", "child", "tween", "teen"],
-        interestTags: ["parks", "zoos", "museums"],
+        interestTags: ["parks", "museums"],
         indoor: false,
       },
       {

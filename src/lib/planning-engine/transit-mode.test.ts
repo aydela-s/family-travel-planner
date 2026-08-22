@@ -26,7 +26,7 @@ function basePlan(overrides: Partial<TripPlan> = {}): TripPlan {
     dietaryRestrictions: "",
     naps: null,
     budgetStyle: "balanced",
-    interests: ["Zoos & Aquariums", "Beaches & Waterfronts", "Parks & Gardens"],
+    interests: ["Zoos & Aquariums", "Swimming & Water Play", "Parks & Gardens"],
     accommodationType: "hotel_no_breakfast",
     stayAddress: "",
     ...overrides,
@@ -119,7 +119,7 @@ describe("transit quality gates", () => {
         startDate: "2026-09-15",
         endDate: "2026-09-19",
         travelStyle: "packed",
-        interests: ["Zoos & Aquariums", "Beaches & Waterfronts", "Parks & Gardens", "Theme Parks"],
+        interests: ["Zoos & Aquariums", "Swimming & Water Play", "Parks & Gardens", "Theme Parks"],
       }),
       { plannerEngine: "score" },
     );

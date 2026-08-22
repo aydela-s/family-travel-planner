@@ -3,6 +3,26 @@ import type { LandmarkInterestTag } from "@/config/city-pricing";
 export type { LandmarkInterestTag };
 
 /**
+ * Legacy wizard labels still stored on shared / saved trips.
+ * Keep mapped so those plans keep planning; display via normalizeInterestLabels.
+ */
+export const LEGACY_INTEREST_LABEL_TO_CANONICAL: Record<string, string> = {
+  "Beaches & Waterfronts": "Swimming & Water Play",
+  "Playgrounds & Indoor Play": "Indoor & Outdoor Play",
+  Playgrounds: "Indoor & Outdoor Play",
+};
+
+/** Rewrite stored/legacy labels to the current wizard names (deduped, order preserved). */
+export function normalizeInterestLabels(interests: string[]): string[] {
+  const out: string[] = [];
+  for (const label of interests) {
+    const canonical = LEGACY_INTEREST_LABEL_TO_CANONICAL[label] ?? label;
+    if (canonical && !out.includes(canonical)) out.push(canonical);
+  }
+  return out;
+}
+
+/**
  * Wizard interest label → catalog interest key(s).
  * Category membership rules: docs/interest-categories.md
  */
@@ -17,11 +37,14 @@ export const INTEREST_LABEL_TO_TAGS: Record<string, LandmarkInterestTag[]> = {
   "Museums & Art": ["museums"],
   // Outdoor playgrounds + indoor soft play / bounce houses (parks alias omitted on purpose).
   Playgrounds: ["playgrounds", "indoor-play"],
+  "Indoor & Outdoor Play": ["playgrounds", "indoor-play"],
   "Playgrounds & Indoor Play": ["playgrounds", "indoor-play"],
   "Zoos & Aquariums": ["zoos"],
+  "Animal Experiences": ["animal-experiences"],
   "Theme Parks": ["theme-parks"],
   // Hands-on only — do not alias to look-don't-touch art/history museums (see interest-categories.md).
   "Interactive Museums": ["interactive"],
+  "Tours & Sightseeing": ["tours"],
   "Food Markets": ["food-markets"],
   Shopping: ["shopping"],
   "Shows & Entertainment": ["entertainment"],
@@ -51,15 +74,17 @@ export function primaryInterestTagsFromPlan(interests: string[]): Set<LandmarkIn
 
 const TAG_FALLBACK_LABEL: Partial<Record<LandmarkInterestTag, string>> = {
   parks: "Parks & Gardens",
-  beaches: "Swimming / Beaches",
+  beaches: "Swimming & Water Play",
   nature: "Nature & Scenic Views",
   history: "History & Landmarks",
   museums: "Museums & Art",
-  playgrounds: "Playgrounds",
-  "indoor-play": "Indoor Play",
+  playgrounds: "Indoor & Outdoor Play",
+  "indoor-play": "Indoor & Outdoor Play",
   zoos: "Zoos & Aquariums",
+  "animal-experiences": "Animal Experiences",
   "theme-parks": "Theme Parks",
   interactive: "Interactive Museums",
+  tours: "Tours & Sightseeing",
   "food-markets": "Food Markets",
   shopping: "Shopping",
   entertainment: "Shows & Entertainment",
@@ -76,8 +101,9 @@ export function interestSourceLabels(
   planInterests: string[] = [],
 ): string[] {
   if (!tags?.length) return [];
+  const selected = normalizeInterestLabels(planInterests);
   const matched: string[] = [];
-  for (const label of planInterests) {
+  for (const label of selected) {
     const labelTags = INTEREST_LABEL_TO_TAGS[label] ?? [];
     if (labelTags.some((t) => tags.includes(t))) {
       matched.push(label);
@@ -91,7 +117,7 @@ export function interestSourceLabels(
     if (!fallback.includes(label)) fallback.push(label);
   }
   return fallback.map((label) =>
-    planInterests.length > 0 && !planInterests.includes(label)
+    selected.length > 0 && !selected.includes(label)
       ? `${label} (not in your interests)`
       : label,
   );

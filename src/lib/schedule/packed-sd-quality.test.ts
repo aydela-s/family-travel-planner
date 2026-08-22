@@ -22,8 +22,8 @@ function sdPacked(overrides: Partial<TripPlan> = {}): TripPlan {
     naps: [],
     budgetStyle: "balanced",
     interests: [
-      "Beaches & Waterfronts",
-      "Playgrounds & Indoor Play",
+      "Swimming & Water Play",
+      "Indoor & Outdoor Play",
       "Nature & Scenic Views",
       "Theme Parks",
     ],

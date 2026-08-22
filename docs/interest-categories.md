@@ -4,66 +4,108 @@ Use this as the source of truth for what activity types belong under each intere
 
 Category duration / energy defaults used by the scheduler live in `src/lib/schedule/interest-category-defaults.ts`.
 
+## General classification rule
+
+**Classify an attraction based on its primary visitor purpose, not merely one feature it contains.**
+
+Examples: a city park with a small playground is still **Parks & Gardens** if the park itself is the draw; a sculpture garden is **Museums & Art** when art is the primary attraction and **Parks & Gardens** when the garden/park setting is; a water park is **Theme Parks** only when rides clearly dominate, **Swimming & Water Play** when swimming/splash dominates or when rides and swimming are mixed equally.
+
 ---
 
 ## 🌳 Parks & Gardens
 `id: parks_gardens`
 
-- Public parks, city parks, green spaces
-- Botanical gardens, arboretums, rose gardens
-- Riverside/lakeside parks and promenades
-- Picnic areas and park pavilions
-- Public gardens attached to palaces/estates (e.g. Versailles gardens)
-- Community gardens open to visitors
-- Off-leash dog parks (only if family has noted pet interest — otherwise skip)
+Primary intent = Relax outdoors / explore landscaped spaces
 
-**Not included:** playgrounds (see Playgrounds & Indoor Play), nature reserves/hiking trails (see Nature & Scenic Views)
+**Look for:**
+
+- City parks
+- Botanical gardens
+- Public gardens
+- Formal gardens
+- Large landscaped parks
+- Arboretums
+- Picnic-friendly parks
+- Scenic parks with walking paths
+- Family parks where the primary draw is the park itself
+- Sculpture gardens **when the garden/park is the primary attraction**
+- Dog parks (generally lower priority for family itineraries unless pets or dog-park interest is specifically relevant)
+
+**Don't use for:** playgrounds as the primary attraction, hiking/nature destinations, dedicated sports facilities, or sculpture gardens where art is the primary draw (use **Museums & Art**).
 
 ---
 
-## 🌊 Beaches & Waterfronts
-`id: beaches_waterfronts`
+## 🏊 Swimming & Water Play
+`id: swimming_water_play`  
+Legacy label: Beaches & Waterfronts (`beaches_waterfronts`). Catalog coverage today still maps via the `beaches` tag.
 
-- Public beaches (swimming, sunbathing)
-- Waterfront boardwalks and promenades
-- Harbor/marina areas
-- Lake shores and swimming holes
-- Water parks (if not already covered by Theme Parks — flag overlap)
-- Boat tours, ferry rides, gondola rides
-- Kayaking, paddleboarding, snorkeling (family-friendly/beginner level)
-- Tide pools and rock pool exploration
+Primary intent = Swim / splash / cool off
 
-**Not included:** water activities inside a theme park (tag as Theme Parks), aquariums (see Zoos & Aquariums)
+**Look for:**
+
+- Public pools
+- Water parks
+- Hybrid water parks that mix major rides and swimming equally
+- Splash pads
+- Aquatic centers
+- Swimming beaches
+- Lakes/rivers with designated swimming
+- Kiddie pools
+- Family water-play areas
+- Interactive fountains intended for water play
+
+**Don't use for:** aquariums, boat tours, scenic waterfronts, or beaches where swimming/water play isn't a meaningful activity (scenic beaches → **Nature & Scenic Views**; boat sightseeing → **Tours & Sightseeing**). Water parks where rides clearly dominate → **Theme Parks**.
 
 ---
 
 ## 🌿 Nature & Scenic Views
 `id: nature_scenic`
 
-- Hiking trails (family/stroller-friendly graded separately from strenuous)
-- Nature reserves and wildlife sanctuaries (non-zoo, self-guided)
-- Scenic overlooks, viewpoints, lookout towers
-- Waterfalls, caves, natural landmarks
-- Forests, botanical trails
-- Cable cars / gondolas primarily for scenery (not transport)
-- Stargazing spots, observatories (astronomy-focused)
-- Farms and orchards (petting-farm crossover — tag both if applicable with Zoos & Aquariums)
+Primary intent = Experience natural scenery / hike
 
-**Not included:** manicured public gardens (Parks & Gardens), beaches (Beaches & Waterfronts)
+**Look for:**
+
+- Nature preserves
+- Wildlife/nature trails
+- Hiking trails
+- Scenic overlooks
+- Mountains/hills
+- Waterfalls
+- Canyons
+- Lakes/rivers primarily visited for scenery
+- Beaches primarily visited for scenery/nature
+- Forests
+- Natural landmarks
+- Cable cars / gondolas primarily for scenery (not transport)
+- Stargazing spots / outdoor observatories when scenery or night sky is the draw
+
+**Don't use for:** standard city parks, zoos, aquariums, or dedicated animal encounters.
 
 ---
 
 ## 🏛️ History & Landmarks
 `id: history_landmarks`
 
-- Historical monuments and statues
-- Castles, palaces, forts
-- Religious sites of historical significance (churches, temples, mosques — as landmarks, not for worship)
-- Archaeological sites and ruins
-- Old towns / historic districts (walking tours)
-- War memorials and museums (age-appropriateness flag needed — see notes below)
-- Guided historical walking tours
-- UNESCO World Heritage sites
+Primary intent = See historically/culturally significant places
+
+**Look for:**
+
+- Historic buildings
+- Historic districts
+- Monuments
+- Memorials
+- Famous landmarks
+- Historic sites
+- Forts
+- Castles
+- Presidential/government landmarks
+- Archaeological sites
+- Historic homes (exterior/landmark visits; not house museums)
+- Cultural heritage sites
+- Religious landmarks/sites of historical or cultural significance (visited as landmarks, not for worship)
+- UNESCO World Heritage sites that are landmarks/districts rather than museum collections
+
+**Don't use for:** history museums and historic house museums — use **Museums & Art**; guided historical tours as the primary experience — use **Tours & Sightseeing**.
 
 **Age note:** War/genocide memorial sites should be flagged `mature_content: true` so they're deprioritized or excluded for young children (under ~8) unless a parent explicitly opts in.
 
@@ -72,54 +114,119 @@ Category duration / energy defaults used by the scheduler live in `src/lib/sched
 ## 🎨 Museums & Art
 `id: museums_art`
 
-- Art museums and galleries
-- Sculpture gardens/parks
-- Art walks, street art tours
-- Design museums, architecture-focused museums
-- Craft/artisan workshops (pottery, painting classes for families)
+Primary intent = Explore exhibits and collections
+
+**Look for:**
+
+- Art museums
+- History museums
+- Historic house museums
+- Science museums
+- Natural history museums
+- Cultural museums
+- Specialty museums
+- Galleries
+- Art exhibitions
+- Sculpture gardens **when art is the primary attraction**
+- Design / architecture museums
 - Photography exhibits
 
-**Not included:** interactive/hands-on science-style museums (see Interactive Museums), history museums (see History & Landmarks — unless primarily art-focused, e.g. Louvre gets both tags)
+**Don't use for:** children's museums — those belong under **Interactive Museums**. Historic buildings/sites/monuments without a museum-collection experience belong under **History & Landmarks**. Large immersive ticketed attractions belong under **Interactive Museums**.
 
 ---
 
-## 🛝 Playgrounds & Indoor Play
-`id: playgrounds_indoor_play`
+## 🛝 Indoor & Outdoor Play
+`id: indoor_outdoor_play`  
+Legacy label: Playgrounds & Indoor Play (`playgrounds_indoor_play`). Catalog coverage today maps to `playgrounds` + `indoor-play`.
 
-- Outdoor public playgrounds
-- Indoor play centers / soft play
+Primary intent = Unstructured/active children's play
+
+**Look for:**
+
+- Playgrounds
+- Indoor playgrounds
+- Soft-play centers
 - Trampoline parks
-- Splash pads / spray parks
-- Ball pits, climbing walls (kid-scale)
-- Arcades (family-friendly)
-- Mini golf
-- Bounce houses / inflatable parks
+- Bounce houses
+- Kids' play centers
+- Indoor climbing/play structures
+- Ball pits
+- Adventure playgrounds
+- Family activity centers primarily focused on free-form play
 
-**Age note:** Sub-tag by age suitability where possible (toddler 0-3, young child 4-7, older child 8-12) since equipment varies a lot by age.
+**Don't use for:** theme parks, museums, zoos, pools, splash pads (→ **Swimming & Water Play**), structured sports, arcades, escape rooms, or family entertainment centers (those last three → **Sports & Recreation**).
+
+**Age note:** Sub-tag by age suitability where possible (toddler 0–3, young child 4–7, older child 8–12) since equipment varies a lot by age.
 
 ---
 
 ## 🦁 Zoos & Aquariums
 `id: zoos_aquariums`
 
-- Zoos and safari parks
-- Aquariums and marine life centers
-- Petting zoos and farms
-- Butterfly gardens/conservatories
-- Bird sanctuaries and aviaries
-- Wildlife rehabilitation centers open to visitors
-- Reptile houses/exhibits
+Primary intent = Observe diverse animal/marine collections
+
+**Look for:**
+
+- Zoos
+- Aquariums
+- Safari parks
+- Wildlife parks
+- Large marine-life facilities
+- Major wildlife collections
+
+**Don't use for:** farms, petting zoos, animal sanctuaries (including those that mix observation and encounter roughly equally), animal encounters, horseback riding, or animal-feeding experiences where interaction is the primary attraction (→ **Animal Experiences**).
+
+---
+
+## 🐾 Animal Experiences
+`id: animal_experiences` → catalog tag `animal-experiences`
+
+Primary intent = Interact with animals
+
+**Look for:**
+
+- Petting zoos
+- Farms with animals
+- Farm visits that mix market shopping and animal interaction
+- Animal sanctuaries
+- Wildlife sanctuaries that mix observation and encounter roughly equally
+- Animal encounters
+- Animal feeding experiences
+- Horseback riding
+- Pony rides
+- Alpaca/llama farms
+- Butterfly experiences
+- Bird encounters
+- Reptile encounters
+- Animal rescue/rehabilitation visits
+- Cat cafes
+
+**Don't use for:** traditional zoos and aquariums (observe-first collections).
+
+**Core distinction:**
+
+- **Zoos & Aquariums** = primarily observe animals
+- **Animal Experiences** = interact with animals
 
 ---
 
 ## 🎢 Theme Parks
 `id: theme_parks`
 
-- Amusement/theme parks (roller coasters, rides)
-- Water parks
-- Family entertainment centers (go-karts, laser tag combined venues)
-- Fairs and carnivals (seasonal — flag as date-dependent)
-- Character/branded parks
+Primary intent = Rides and amusement
+
+**Look for:**
+
+- Theme parks
+- Amusement parks
+- Major ride-focused family parks
+- Roller coasters
+- Large rides
+- Water/theme amusement parks where rides clearly dominate as the primary attraction
+- Legoland-style parks
+- Disney-style parks
+
+**Don't use for:** individual attractions, playgrounds, arcades, mini golf, small family entertainment centers (→ **Sports & Recreation**), fairs/carnivals (→ **Shows & Entertainment**), or hybrid water parks that mix major rides and swimming equally (→ **Swimming & Water Play**).
 
 **Note:** These are typically full-day, high-energy commitments — flag as `high_energy: true, min_half_day: true` so the pacing engine (Relaxed/Balanced/Packed) doesn't stack multiple in one day.
 
@@ -128,56 +235,125 @@ Category duration / energy defaults used by the scheduler live in `src/lib/sched
 ## 🧪 Interactive Museums
 `id: interactive_museums`
 
-- Science museums / science centers
-- Children's museums
-- Hands-on discovery centers
-- Planetariums
-- Technology/innovation museums
-- Escape rooms (age-appropriate difficulty tiers)
-- Interactive history experiences (e.g. recreated period rooms with activities)
+Primary intent = Hands-on learning/play
 
-**Not included:** traditional look-don't-touch art/history museums (see Museums & Art / History & Landmarks)
+**Look for:**
+
+- Hands-on science centers
+- Children's museums
+- Interactive technology museums
+- Discovery centers
+- Hands-on educational exhibits
+- STEM centers
+- Immersive attractions
+- Large immersive ticketed attractions (immersive art/experience venues that sit between art, interactive, and show)
+- Experiment-based museums
+- Interactive history/science experiences
+- Planetariums
+- Educational craft/workshop experiences where hands-on learning is the primary purpose
+
+**Don't use for:** conventional museums where visitors primarily look at exhibits/artifacts, or recreational workshops/classes where play/recreation is the primary purpose (→ **Sports & Recreation**).
+
+**Core distinction:**
+
+- **Museums & Art** = primarily view/explore exhibits — often better for older kids + adults
+- **Interactive Museums** = touch, experiment, build, play, or participate — primarily for kids / hands-on learning
+
+---
+
+## 🗺️ Tours & Sightseeing
+`id: tours_sightseeing` → catalog tag `tours`
+
+Primary intent = Guided exploration
+
+**Look for:**
+
+- Guided walking tours
+- City sightseeing tours
+- Hop-on/hop-off buses
+- Boat sightseeing tours
+- Bus tours
+- Scenic tours
+- Architecture tours
+- Cultural tours
+- Food tours
+- Historical tours
+- Guided local experiences
+- Sightseeing cruises
+
+**Don't use for:** standalone landmarks that don't involve a tour (→ **History & Landmarks** or the landmark's primary category).
 
 ---
 
 ## 🥕 Food Markets
 `id: food_markets`
 
-- Farmers markets
-- Public food halls / food courts with local vendors
-- Street food markets
-- Specialty markets (cheese, spice, seafood markets)
-- Night markets
-- Cooking classes tied to a market visit
-- Local produce/artisan markets with tastings
+Primary intent = Explore local food
 
-**Not included:** sit-down restaurant meals (these are handled separately in the "Meals" itinerary block, not as an "activity")
+**Look for:**
+
+- Farmers markets
+- Food halls
+- Public markets
+- Specialty food markets
+- Street food markets
+- International food markets
+- Night markets where food is a primary attraction
+- Marketplaces where food is a primary attraction
+- Cooking classes tied to a market visit
+
+**Don't use for:** normal grocery stores or shopping malls. Sit-down restaurant meals are handled separately in the Meals itinerary block, not as an interest activity. Farm visits that mix market shopping and animal interaction → **Animal Experiences**.
 
 ---
 
 ## 🛍️ Shopping
 `id: shopping`
 
-- Shopping districts / main shopping streets
-- Malls (only when relevant to trip, e.g. rainy-day backup)
-- Local boutiques and artisan shops
+Primary intent = Browse/buy goods
+
+**Look for:**
+
+- Shopping districts
+- Malls
+- Outlet malls
+- Pedestrian shopping streets
+- Specialty shopping areas
+- Local boutiques
+- Artisan markets **when shopping is the primary purpose**
 - Souvenir markets
-- Toy stores (kid-specific draw)
-- Outlet centers (flag as `time_intensive: true` — families rarely want a half day here unless requested)
+- Department stores
+- Toy stores (when a meaningful kid-specific draw)
+
+**Don't use for:** food markets where food is the primary attraction.
+
+**Note:** Outlet centers can be flagged `time_intensive: true` — families rarely want a half day here unless requested. Malls are often best as rainy-day backups rather than primary plans.
 
 ---
 
 ## 🎭 Shows & Entertainment
 `id: shows_entertainment`
 
-- Theater and live performances (family-appropriate)
+Primary intent = Watch a live/entertainment performance
+
+**Look for:**
+
+- Theater
 - Musicals
-- Puppet shows / children's theater
-- Circus performances
+- Concerts
+- Children's shows
+- Family performances
+- Circuses
 - Magic shows
-- Concerts (family-friendly/daytime)
-- Cultural performances (dance, music tied to local culture)
-- Movie screenings (outdoor cinema, special format like IMAX as a novelty)
+- Comedy
+- Live performances
+- Dance performances
+- Movie theaters
+- Puppet shows
+- Cultural performances
+- Seasonal entertainment/events
+- Fairs and carnivals
+
+**Don't use for:** sporting events/games (→ **Sports & Recreation**), theme parks, or large immersive ticketed attractions (→ **Interactive Museums**).
 
 **Age note:** Flag evening showtimes against the family's bedtime data — this is a common scheduling conflict source.
 
@@ -186,31 +362,63 @@ Category duration / energy defaults used by the scheduler live in `src/lib/sched
 ## ⚽ Sports & Recreation
 `id: sports_recreation`
 
-- Bike rentals and family bike routes
-- Ice skating / roller skating
+Primary intent = Participate in recreational activities **or** attend family-friendly sporting events
+
+**Look for:**
+
+- Mini golf
 - Bowling
-- Swimming pools (public/recreational, not beach)
-- Rock climbing (indoor, kid-friendly walls)
-- Sports games as spectators (family-friendly matches)
-- Adventure/rope courses (age-gated)
-- Skiing/snow activities (seasonal)
-- Horseback riding
+- Go-karts
+- Ice skating
+- Roller skating
+- Rock climbing
+- Sports centers
+- Recreational facilities
+- Tennis
+- Golf
+- Batting cages
+- Soccer activities
+- Kayaking/canoeing
+- Bike rentals/trails
+- Fishing
+- Adventure activities / rope courses
+- Family recreation centers
+- Family entertainment centers (combined venues such as go-karts, laser tag, arcade clusters)
+- Arcades
+- Escape rooms
+- Recreational craft workshops/classes where recreation is the primary purpose
+- Family-friendly spectator sporting events and games
+
+**Don't use for:** swimming/water parks when swimming/splash is the primary attraction (→ **Swimming & Water Play**), or theme parks when rides are the primary attraction.
 
 ---
 
 ## 🧖 Spas
 `id: spas`
 
-- Spa treatments (typically adult-only — flag as `requires_childcare: true` or `adults_only: true`)
-- Hot springs / thermal baths (family-friendly ones exist — tag those separately as `family_friendly: true`)
-- Wellness centers with family-oriented offerings (rare — sub-tag explicitly)
+Primary intent = Adult relaxation/wellness
 
-**Note:** This is your one category that's mostly adult-oriented. Worth deciding in the wizard whether this means "parent solo time while other parent covers kids" — that's a scheduling/logistics implication, not just an activity type.
+**Look for:**
+
+- Spas
+- Massage
+- Wellness centers
+- Thermal baths
+- Hot springs
+- Saunas
+- Beauty/wellness treatments
+- Resort spa facilities
+
+**Important:** Because this is a family planner, prioritize **places that can actually accommodate the traveling adults/children** rather than adult-only spas. Adult-only venues may still be tagged `requires_childcare: true` or `adults_only: true` when they are the only realistic match.
+
+**Note:** This is the category most likely to imply parent solo time while another adult covers kids — a scheduling/logistics implication, not just an activity type.
 
 ---
 
 ## Cross-cutting tags to consider adding to every activity
+
 Regardless of category, each activity object should probably also carry:
+
 - `min_age` / `max_age` (or age suitability band)
 - `duration_estimate` (in minutes)
 - `energy_level` (low / medium / high)
@@ -224,27 +432,30 @@ These let the scheduling engine make pacing and rainy-day-backup decisions witho
 
 ## Default cross-cutting tag values by category
 
-These are **category-level defaults** — a sensible starting value the AI/code can assign automatically when generating an activity, which should still be overridable per specific activity (e.g. "Louvre guided tour" runs longer than the Museums & Art default, so it overrides `duration_estimate`).
+These are **category-level defaults** — a sensible starting value the AI/code can assign automatically when generating an activity, which should still be overridable per specific activity (e.g. a Louvre visit runs longer than the Museums & Art default, so it overrides `duration_estimate`).
 
 | Category | `min_age`/`max_age` | `duration_estimate` | `energy_level` | `weather_dependent` | `cost_tier` | `indoor_outdoor` |
 |---|---|---|---|---|---|---|
 | 🌳 Parks & Gardens | 0 / 99 | 60–90 min | low | true | free–low | outdoor |
-| 🌊 Beaches & Waterfronts | 1 / 99 | 120–180 min | medium | true | free–low | outdoor |
+| 🏊 Swimming & Water Play | 1 / 99 | 90–180 min | medium–high | mixed (indoor pools false, beaches/outdoor parks true) | free–medium | both |
 | 🌿 Nature & Scenic Views | 3 / 99 | 90–150 min | medium | true | free–low | outdoor |
 | 🏛️ History & Landmarks | 5 / 99 | 60–90 min | low–medium | false | low–medium | both |
 | 🎨 Museums & Art | 4 / 99 | 60–120 min | low | false | medium | indoor |
-| 🛝 Playgrounds & Indoor Play | 0 / 10 | 45–90 min | high | false (indoor variants) / true (outdoor) | free–low | both |
+| 🛝 Indoor & Outdoor Play | 0 / 10 | 45–90 min | high | false (indoor) / true (outdoor) | free–low | both |
 | 🦁 Zoos & Aquariums | 0 / 99 | 120–180 min | medium | mixed (aquariums false, zoos true) | medium–high | both |
+| 🐾 Animal Experiences | 0 / 99 | 60–120 min | medium | mixed | low–medium | both |
 | 🎢 Theme Parks | 3 / 99 | 240–480 min | high | true | high | outdoor |
 | 🧪 Interactive Museums | 3 / 12 | 90–150 min | medium | false | medium | indoor |
+| 🗺️ Tours & Sightseeing | 5 / 99 | 90–180 min | low–medium | mixed | medium | both |
 | 🥕 Food Markets | 0 / 99 | 45–75 min | low–medium | mixed (open-air true, halls false) | low–medium | both |
 | 🛍️ Shopping | 0 / 99 | 60–120 min | low | mixed (streets true, malls false) | varies | both |
-| 🎭 Shows & Entertainment | 3 / 99 | 60–120 min | low | mixed (outdoor cinema true, theater false) | medium–high | both |
-| ⚽ Sports & Recreation | 3 / 99 | 60–120 min | high | mixed (pools/skating false, bikes true) | low–medium | both |
+| 🎭 Shows & Entertainment | 3 / 99 | 60–120 min | low | mixed | medium–high | both |
+| ⚽ Sports & Recreation | 3 / 99 | 60–120 min | high (participate) / low–medium (spectator) | mixed | low–medium | both |
 | 🧖 Spas | 12 / 99 (adults-only variants: 18+) | 60–120 min | low | false | high | indoor |
 
 **Notes on the defaults:**
+
 - **Theme Parks** is the clear outlier for duration — treat it as effectively a full-day commitment in the scheduling engine, not a slot to combine with much else.
-- **Zoos & Aquariums**, **Food Markets**, **Shopping**, and **Shows & Entertainment** need the `weather_dependent` flag set per-activity rather than per-category, since indoor/outdoor varies a lot within the category itself — worth storing a sub-flag at the activity level that overrides the category default.
-- **Spas** is the only category where `min_age` should probably gate the whole category out for itineraries with young children, rather than just filtering individual activities.
-- Cost tiers are relative (free / low / medium / high) rather than fixed dollar amounts, since they'll vary heavily by destination — pair with your local-currency budget logic rather than hardcoding prices here.
+- **Zoos & Aquariums**, **Food Markets**, **Shopping**, **Shows & Entertainment**, and **Sports & Recreation** often need `weather_dependent` set per activity rather than only per category.
+- **Spas** is the only category where `min_age` should often gate the whole category out for itineraries with young children, rather than just filtering individual activities.
+- Cost tiers are relative (free / low / medium / high) rather than fixed dollar amounts — pair with local-currency budget logic rather than hardcoding prices here.

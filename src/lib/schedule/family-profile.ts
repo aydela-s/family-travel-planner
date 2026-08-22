@@ -331,7 +331,13 @@ const STROLLER_QUIET_TAGS = new Set([
   "food-markets",
   "playgrounds",
 ]);
-const STROLLER_LOUD_TAGS = new Set(["theme-parks", "entertainment", "zoos", "interactive"]);
+const STROLLER_LOUD_TAGS = new Set([
+  "theme-parks",
+  "entertainment",
+  "zoos",
+  "animal-experiences",
+  "interactive",
+]);
 
 /** Soft bias toward quiet / low-stimulation stops during a stroller nap (FAM-52). */
 export function strollerQuietScore(landmark: Landmark): number {

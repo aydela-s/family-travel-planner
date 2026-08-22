@@ -147,11 +147,11 @@ describe("FAM-7 — interest matching", () => {
     expect(pick.name).toBe("San Diego Zoo");
   });
 
-  it("does not schedule playgrounds when only Beaches & Waterfronts is selected", () => {
+  it("does not schedule playgrounds when only Swimming & Water Play is selected", () => {
     const sanDiego = CITY_CONFIGS.find((c) => c.id === "san-diego")!;
     const plan = basePlan({
       children: [5, 10],
-      interests: ["Beaches & Waterfronts"],
+      interests: ["Swimming & Water Play"],
       budgetStyle: "balanced",
       stayLat: 32.767,
       stayLng: -117.247,

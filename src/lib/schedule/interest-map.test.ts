@@ -21,4 +21,10 @@ describe("interestSourceLabels", () => {
       "Parks & Gardens (not in your interests)",
     ]);
   });
+
+  it("normalizes legacy selected labels when mapping tags back", () => {
+    expect(interestSourceLabels(["beaches"], ["Beaches & Waterfronts"])).toEqual([
+      "Swimming & Water Play",
+    ]);
+  });
 });

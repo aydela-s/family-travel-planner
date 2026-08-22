@@ -24,9 +24,9 @@ function sdPlan(overrides: Partial<TripPlan> = {}): TripPlan {
     naps: [{ startTime: "12:30 PM", endTime: "2:00 PM", type: "regular" }],
     budgetStyle: "balanced",
     interests: [
-      "Playgrounds & Indoor Play",
+      "Indoor & Outdoor Play",
       "Interactive Museums",
-      "Beaches & Waterfronts",
+      "Swimming & Water Play",
       "Shows & Entertainment",
     ],
     ...overrides,
@@ -38,7 +38,7 @@ describe("eligibleInterestThemes", () => {
 
   it("maps zoos interest to animals and includes beach/play/interactive/entertainment", () => {
     const themes = eligibleInterestThemes(
-      sdPlan({ interests: ["Zoos & Aquariums", "Beaches & Waterfronts"] }),
+      sdPlan({ interests: ["Zoos & Aquariums", "Swimming & Water Play"] }),
       city,
     ).map((t) => t.id);
     expect(themes).toContain("animals");
@@ -52,7 +52,7 @@ describe("eligibleInterestThemes", () => {
         interests: [
           "Swimming & Water Play",
           "Nature & Scenic Views",
-          "Playgrounds & Indoor Play",
+          "Indoor & Outdoor Play",
           "Theme Parks",
           "Interactive Museums",
           "Shopping",
@@ -131,7 +131,7 @@ describe("applyDailyThemes — San Diego 5-day shadow", () => {
           id === "playgrounds",
       ),
     ).toBe(true);
-    // At least one dedicated play coverage theme when Playgrounds & Indoor Play is selected
+    // At least one dedicated play coverage theme when Indoor & Outdoor Play is selected
     expect(middle.some((id) => id === "play_indoor" || id === "playgrounds")).toBe(true);
     // Indoor play is a separate coverage bucket from outdoor playgrounds
     expect(eligibleInterestThemes(plan, city).map((t) => t.id)).toContain("play_indoor");
@@ -165,7 +165,7 @@ describe("applyDailyThemes — San Diego 5-day shadow", () => {
   it("mixed-age mixed_family days require older-appeal goal", () => {
     const plan = sdPlan({
       children: [3, 14],
-      interests: ["Playgrounds & Indoor Play", "Beaches & Waterfronts"],
+      interests: ["Indoor & Outdoor Play", "Swimming & Water Play"],
       startDate: "2026-09-15",
       endDate: "2026-09-17",
     });

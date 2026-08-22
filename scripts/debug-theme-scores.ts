@@ -24,9 +24,9 @@ const plan: TripPlan = {
   dietaryRestrictions: "",
   budgetStyle: "balanced",
   interests: [
-    "Playgrounds & Indoor Play",
+    "Indoor & Outdoor Play",
     "Interactive Museums",
-    "Beaches & Waterfronts",
+    "Swimming & Water Play",
     "Shows & Entertainment",
   ],
 };

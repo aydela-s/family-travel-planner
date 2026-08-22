@@ -91,7 +91,7 @@ describe("shopping theme diversity", () => {
     };
     const plan = dallasPlan({
       destination: "San Diego",
-      interests: ["Museums & Art", "Shopping", "Beaches & Waterfronts"],
+      interests: ["Museums & Art", "Shopping", "Swimming & Water Play"],
     });
     const bp = applyDailyThemes(
       buildTripStrategy(plan, { city: withShopping }),
