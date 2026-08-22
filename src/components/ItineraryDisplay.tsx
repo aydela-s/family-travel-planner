@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useId, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { DayRouteMap } from "@/components/DayRouteMap";
+import { WeekBoard } from "@/components/WeekBoard";
 import PlanSelectionChips from "@/components/PlanSelectionChips";
 import ShareItineraryControls from "@/components/ShareItineraryControls";
 import {
+  formatAdultsLabel,
+  formatKidsWithAges,
   formatPlaceRatingBadge,
   formatTime12h,
   formatTimeCompact,
@@ -186,7 +190,7 @@ function isBoilerplateAgeNote(note: string): boolean {
 
 /** Google Maps URL preferring place id / place name over raw coordinates. */
 function mapsUrl(activity: ItineraryActivity): string | null {
-  // Naps/rests are at the stay — a hotel pin is confusing next to "Nap & Quiet Time".
+  // Naps/rests are at the stay — a hotel pin is confusing next to "Nap".
   if (activity.type === "nap" || activity.type === "rest") return null;
 
   const name = activity.location?.name?.trim();
@@ -321,10 +325,10 @@ function TravelLeg({
         ? segment.cost
         : null;
   const cost =
-    costAmount != null ? moneyWhole(costAmount, currencySymbol) : null;
+    costAmount != null && costAmount > 0 ? moneyWhole(costAmount, currencySymbol) : null;
   const maps =
     from && to ? directionsUrl(from, to, transportationType) : null;
-  const meta = [miles, duration].filter(Boolean).join(" · ");
+  const meta = [miles, duration, cost].filter(Boolean).join(" · ");
 
   return (
     <div className="relative flex gap-3 border-b border-border/60 px-3 py-2.5 sm:gap-3.5 sm:px-4">
@@ -333,27 +337,20 @@ function TravelLeg({
         <span className="my-1 h-1.5 w-1.5 shrink-0 rounded-full bg-muted" />
         <span className="w-px flex-1 border-l border-dashed border-muted/50" />
       </div>
-      <div className="flex min-w-0 flex-1 items-start justify-between gap-3 py-0.5">
-        <div className="min-w-0 text-sm italic leading-relaxed text-muted">
-          <p className="not-italic font-semibold text-ink">{travelModeLabel(transportationType)}</p>
-          {meta && <p>{meta}</p>}
-          {maps && (
-            <p>
-              <a
-                href={maps}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="not-italic font-medium text-primary underline-offset-2 hover:underline"
-              >
-                Open directions in Google Maps
-              </a>
-            </p>
-          )}
-        </div>
-        {cost && (
-          <span className="shrink-0 pt-0.5 text-sm font-semibold not-italic tabular-nums text-ink">
-            {cost}
-          </span>
+      <div className="min-w-0 flex-1 py-0.5 text-sm leading-relaxed text-muted">
+        <p className="font-semibold not-italic text-ink">{travelModeLabel(transportationType)}</p>
+        {meta ? <p className="italic [font-synthesis:style]">{meta}</p> : null}
+        {maps && (
+          <p>
+            <a
+              href={maps}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="not-italic font-medium text-primary underline-offset-2 hover:underline"
+            >
+              Open directions in Google Maps
+            </a>
+          </p>
         )}
       </div>
     </div>
@@ -380,11 +377,12 @@ function TimelineItem({
   const maps = mapsUrl(activity);
   const interestLabels =
     activity.type === "activity" ? interestSourceLabels(activity.interestTags, planInterests) : [];
-  const hasDetails = Boolean(detailNote || activity.endTime || maps || interestLabels.length > 0);
+  const hasDetails = Boolean(
+    detailNote || activity.endTime || maps || interestLabels.length > 0 || ratingBadge,
+  );
 
-  return (
-    <details className={`group border-b border-border/80 last:border-b-0 ${style.row}`}>
-      <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-3.5 marker:content-none sm:gap-3 sm:px-4 [&::-webkit-details-marker]:hidden">
+  const body = (
+    <>
         <span
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${style.iconWrap}`}
         >
@@ -395,11 +393,6 @@ function TimelineItem({
         </time>
         <span className="min-w-0 flex-1 text-sm font-semibold leading-snug text-ink sm:text-base">
           {activity.title}
-          {ratingBadge && (
-            <span className="ml-2 whitespace-nowrap rounded-md bg-background/80 px-1.5 py-0.5 text-xs font-semibold text-muted">
-              {ratingBadge}
-            </span>
-          )}
           {interestLabels.length > 0 && (
             <span className="mt-0.5 block text-xs font-medium text-muted">
               Interest: {interestLabels.join(", ")}
@@ -409,6 +402,21 @@ function TimelineItem({
         {paid && (
           <span className="shrink-0 text-sm font-semibold tabular-nums text-ink">{paid}</span>
         )}
+    </>
+  );
+
+  if (!hasDetails) {
+    return (
+      <div className={`flex items-center gap-2.5 border-b border-border/80 px-3 py-3.5 last:border-b-0 sm:gap-3 sm:px-4 ${style.row}`}>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <details className={`group border-b border-border/80 last:border-b-0 ${style.row}`}>
+      <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-3.5 marker:content-none sm:gap-3 sm:px-4 [&::-webkit-details-marker]:hidden">
+        {body}
         <span
           className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background text-ink shadow-sm transition group-open:rotate-180 group-open:border-accent group-open:bg-accent group-open:text-white"
           aria-hidden
@@ -424,6 +432,13 @@ function TimelineItem({
               {formatTime12h(activity.time)} – {formatTime12h(activity.endTime)}
             </p>
           )}
+          {ratingBadge ? (
+            <p>
+              <span className="inline-block whitespace-nowrap rounded-md bg-background/80 px-1.5 py-0.5 text-xs font-semibold text-muted">
+                {ratingBadge}
+              </span>
+            </p>
+          ) : null}
           {maps && activity.location && (
             <p>
               <a
@@ -466,27 +481,27 @@ function TripTotalBanner({
       key: "activities",
       label: "Activities",
       amount: activities,
-      wrap: "border-primary/20 bg-primary-muted/70",
+      wrap: "border-border bg-background",
       dot: "bg-itinerary-activity",
     },
     {
       key: "food",
       label: "Food",
       amount: food,
-      wrap: "border-accent/25 bg-accent-muted/80",
+      wrap: "border-border bg-background",
       dot: "bg-itinerary-meal",
     },
     {
       key: "transport",
       label: "Transport",
       amount: transport,
-      wrap: "border-secondary/30 bg-secondary-muted",
+      wrap: "border-border bg-background",
       dot: "bg-itinerary-rest",
     },
   ] as const;
 
   return (
-    <section className="rounded-3xl border border-secondary/20 bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6">
+    <section className="rounded-3xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6">
       <header className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary-muted">
           <BudgetWalletIcon />
@@ -552,7 +567,7 @@ function DayTabs({
       role="tablist"
       aria-label="Trip days"
       onKeyDown={onKeyDown}
-      className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1"
+      className="-mx-1 flex gap-3 overflow-x-auto px-1 py-1"
     >
       {days.map((day) => {
         const selected = day.day === selectedDay;
@@ -567,10 +582,10 @@ function DayTabs({
             tabIndex={selected ? 0 : -1}
             disabled={disabled}
             onClick={() => onSelect(day.day)}
-            className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full border text-center transition sm:h-[4.75rem] sm:w-[4.75rem] ${
+            className={`box-border flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full border text-center transition sm:h-[4.75rem] sm:w-[4.75rem] ${
               selected
-                ? "border-primary bg-primary text-white shadow-soft"
-                : "border-secondary/35 bg-secondary-muted/40 text-ink hover:border-secondary hover:bg-secondary-muted"
+                ? "border-primary bg-primary text-white"
+                : "border-border bg-surface text-ink hover:bg-secondary-muted"
             } disabled:cursor-not-allowed disabled:opacity-60`}
           >
             <span className="text-xs font-semibold sm:text-sm">Day {day.day}</span>
@@ -699,14 +714,12 @@ function DayCard({
 export default function ItineraryDisplay({
   itinerary,
   plan,
-  isDemo = false,
   isLoading = false,
   onApplyPlanUpdate,
   onEditPlanInWizard,
 }: {
   itinerary: Itinerary;
   plan?: TripPlan;
-  isDemo?: boolean;
   isLoading?: boolean;
   onApplyPlanUpdate?: (updates: Partial<TripPlan>) => void;
   onEditPlanInWizard?: (stepIndex: number, updates?: Partial<TripPlan>) => void;
@@ -720,6 +733,7 @@ export default function ItineraryDisplay({
   const symbol = itinerary.currencySymbol;
   const showSelectionChips = plan && onApplyPlanUpdate && onEditPlanInWizard;
   const tabsId = useId();
+  const [view, setView] = useState<"week" | "day">("week");
   const [selectedDay, setSelectedDay] = useState(itinerary.days[0]?.day ?? 1);
 
   useEffect(() => {
@@ -731,6 +745,18 @@ export default function ItineraryDisplay({
 
   const activeDay =
     itinerary.days.find((day) => day.day === selectedDay) ?? itinerary.days[0];
+  const mapLocations = useMemo(() => {
+    if (!activeDay) return [];
+    return activeDay.activities
+      .filter((activity) => activity.location && activity.type !== "nap" && activity.type !== "rest")
+      .map((activity) => activity.location!)
+      .filter((location, index, list) => list.findIndex((item) => item.name === location.name) === index);
+  }, [activeDay]);
+
+  function selectDay(dayNumber: number) {
+    setSelectedDay(dayNumber);
+    setView("day");
+  }
 
   return (
     <div className="relative space-y-6 animate-fade-in sm:space-y-8">
@@ -743,12 +769,6 @@ export default function ItineraryDisplay({
           <p className="rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-medium text-ink shadow-[var(--shadow-card)]">
             Updating your trip…
           </p>
-        </div>
-      )}
-
-      {isDemo && (
-        <div className="rounded-2xl border border-warning/30 bg-warning-muted px-4 py-3.5 text-sm text-ink">
-          <strong>Demo mode</strong> — personalized mock itinerary (no AI tip enrichment).
         </div>
       )}
 
@@ -772,10 +792,8 @@ export default function ItineraryDisplay({
                       ? formatCoverDateRange(plan.startDate, plan.endDate) ||
                         itinerary.tripStartFormatted
                       : itinerary.tripStartFormatted,
-                    `${plan.adults} adult${plan.adults !== 1 ? "s" : ""}`,
-                    plan.children.length > 0
-                      ? `${plan.children.length} kid${plan.children.length !== 1 ? "s" : ""}`
-                      : null,
+                    formatAdultsLabel(plan.adults),
+                    formatKidsWithAges(plan.children) || null,
                   ]
                     .filter(Boolean)
                     .join(" · ")
@@ -811,25 +829,74 @@ export default function ItineraryDisplay({
         disclaimer={itinerary.pricingDisclaimer}
       />
 
-      {itinerary.days.length > 0 && (
-        <DayTabs
-          days={itinerary.days}
-          selectedDay={activeDay?.day ?? selectedDay}
-          onSelect={setSelectedDay}
-          disabled={isLoading}
-          tabsId={tabsId}
-        />
-      )}
+      {itinerary.days.length > 0 ? (
+        <div className="flex justify-end">
+          <div
+            className="inline-grid grid-cols-2 rounded-full border border-ink/30 bg-surface p-1.5"
+            role="group"
+            aria-label="Itinerary view"
+          >
+            <button
+              type="button"
+              onClick={() => setView("week")}
+              className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                view === "week" ? "bg-primary text-white" : "text-muted hover:bg-secondary-muted hover:text-ink"
+              }`}
+            >
+              Week
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("day")}
+              className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                view === "day" ? "bg-primary text-white" : "text-muted hover:bg-secondary-muted hover:text-ink"
+              }`}
+            >
+              Day
+            </button>
+          </div>
+        </div>
+      ) : null}
 
-      {activeDay && (
-        <DayCard
-          day={activeDay}
-          symbol={symbol}
-          plan={plan}
-          planInterests={plan?.interests ?? []}
-          panelId={`${tabsId}-panel-${activeDay.day}`}
-          labelledBy={`${tabsId}-tab-${activeDay.day}`}
+      {view === "week" ? (
+        <WeekBoard
+          days={itinerary.days}
+          disabled={isLoading}
+          currencySymbol={symbol}
+          onSelectDay={(day) => selectDay(day.day)}
         />
+      ) : (
+        <div className="space-y-4">
+          {itinerary.days.length > 0 && (
+            <DayTabs
+              days={itinerary.days}
+              selectedDay={activeDay?.day ?? selectedDay}
+              onSelect={setSelectedDay}
+              disabled={isLoading}
+              tabsId={tabsId}
+            />
+          )}
+          {activeDay ? (
+            <div className="grid min-h-[22rem] gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <DayCard
+                day={activeDay}
+                symbol={symbol}
+                plan={plan}
+                planInterests={plan?.interests ?? []}
+                panelId={`${tabsId}-panel-${activeDay.day}`}
+                labelledBy={`${tabsId}-tab-${activeDay.day}`}
+              />
+              <div className="min-h-[22rem] overflow-hidden rounded-3xl border border-secondary/20 bg-surface">
+                <DayRouteMap
+                  locations={mapLocations}
+                  selected={undefined}
+                  label={activeDay.displayTitle || `Day ${activeDay.day}`}
+                  city={itinerary.destinationCity}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
       )}
     </div>
   );

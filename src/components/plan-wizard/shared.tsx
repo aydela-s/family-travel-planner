@@ -1,4 +1,3 @@
-import { ageAwareTravelerHints } from "@/lib/schedule/family-profile";
 import { TripPlan } from "@/types/trip-plan";
 
 /** Shared control styles — use these for consistent form chrome. */
@@ -19,6 +18,10 @@ export const btnSecondaryClassName =
 export const btnCtaClassName =
   "rounded-full bg-accent px-6 py-4 text-base font-semibold text-white shadow-[var(--shadow-accent)] transition hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50";
 
+/** Soft outlined action (Share / Download on itinerary). */
+export const btnActionClassName =
+  "inline-flex items-center gap-1.5 rounded-full border border-primary/45 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-[var(--shadow-soft)] transition hover:bg-secondary-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50";
+
 /** Quiet tertiary action. */
 export const btnGhostClassName =
   "rounded-full border border-border bg-background px-6 py-3.5 text-sm font-semibold text-muted transition hover:border-secondary/50 hover:bg-secondary-muted hover:text-primary disabled:opacity-50";
@@ -28,19 +31,16 @@ export const cardClassName =
 
 
 export function StepIntro({
-  emoji,
   title,
   subtitle,
 }: {
-  emoji: string;
+  /** @deprecated Unused — kept optional so existing call sites still type-check. */
+  emoji?: string;
   title: string;
   subtitle?: string;
 }) {
   return (
     <div className="space-y-2">
-      <span className="text-3xl" aria-hidden>
-        {emoji}
-      </span>
       <h2 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{title}</h2>
       {subtitle ? <p className="text-base leading-relaxed text-muted">{subtitle}</p> : null}
     </div>
@@ -77,26 +77,33 @@ export function OptionalLabel({
   );
 }
 
+/** Shared size/style for dietary picks and other wizard option chips. */
+export const selectChipClassName =
+  "rounded-full border px-4 py-2.5 text-sm font-medium transition";
+
 export function SelectChip({
   selected,
   onClick,
   children,
   className = "",
+  disabled = false,
 }: {
   selected: boolean;
   onClick: () => void;
   children: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-4 py-2.5 text-sm font-medium transition ${
+      disabled={disabled}
+      className={`${selectChipClassName} ${
         selected
           ? "border-primary bg-primary text-white"
           : "border-border bg-surface text-ink hover:border-secondary/60 hover:bg-secondary-muted"
-      } ${className}`}
+      } disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
     >
       {children}
     </button>
@@ -195,10 +202,12 @@ export const activityInterestOptions = [
   { label: "Nature & Scenic Views", emoji: "🌿" },
   { label: "History & Landmarks", emoji: "🏛️" },
   { label: "Museums & Art", emoji: "🎨" },
-  { label: "Playgrounds & Indoor Play", emoji: "🛝" },
+  { label: "Indoor & Outdoor Play", emoji: "🛝" },
   { label: "Zoos & Aquariums", emoji: "🦁" },
+  { label: "Animal Experiences", emoji: "🐾" },
   { label: "Theme Parks", emoji: "🎢" },
   { label: "Interactive Museums", emoji: "🧪" },
+  { label: "Tours & Sightseeing", emoji: "🗺️" },
   { label: "Food Markets", emoji: "🥕" },
   { label: "Shopping", emoji: "🛍️" },
   { label: "Shows & Entertainment", emoji: "🎭" },
@@ -220,7 +229,3 @@ export const destinationSuggestions = [
   "Tokyo, Japan",
   "Paris, France",
 ] as const;
-
-export function getTravelerHints(children: number[]) {
-  return ageAwareTravelerHints(children);
-}

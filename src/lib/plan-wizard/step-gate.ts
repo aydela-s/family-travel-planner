@@ -1,5 +1,5 @@
 import { getDatesValidationError } from "@/lib/planning-engine/date-validation";
-import { isValidNapSelection, shouldShowNapSection } from "@/lib/planning-engine/nap-options";
+import { isValidNapSelection } from "@/lib/planning-engine/nap-options";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { hasResolvedDestinationCenter } from "@/lib/city-detect";
 import { TripPlan } from "@/types/trip-plan";
@@ -10,7 +10,6 @@ export const WIZARD_STEP_TITLES = [
   "Travelers",
   "Stay & getting around",
   "Pace & spend",
-  "Food & naps",
   "Interests",
 ] as const;
 
@@ -20,7 +19,6 @@ export const WIZARD_STEP_IDS = [
   "travelers",
   "stay_transit",
   "pace_budget",
-  "food_naps",
   "interests",
 ] as const;
 
@@ -35,7 +33,11 @@ export function isWizardStepComplete(plan: TripPlan, title: WizardStepTitle): bo
     case "Where & when":
       return hasResolvedDestinationCenter(plan) && getDatesValidationError(plan) === null;
     case "Travelers":
-      return plan.adults >= 1 && plan.children.every((age) => age >= 0 && age <= 17);
+      return (
+        plan.adults >= 1 &&
+        plan.children.every((age) => age >= 0 && age <= 17) &&
+        isValidNapSelection(plan.naps, plan)
+      );
     case "Stay & getting around":
       return (
         plan.accommodationType !== "" &&
@@ -44,8 +46,6 @@ export function isWizardStepComplete(plan: TripPlan, title: WizardStepTitle): bo
       );
     case "Pace & spend":
       return plan.travelStyle !== "" && plan.budgetStyle !== "";
-    case "Food & naps":
-      return !shouldShowNapSection(plan) || isValidNapSelection(plan.naps, plan);
     case "Interests":
       return plan.interests.length > 0;
   }
@@ -57,4 +57,13 @@ export function findFirstIncompleteWizardStep(plan: TripPlan): number | null {
     if (!isWizardStepComplete(plan, WIZARD_STEP_TITLES[i]!)) return i;
   }
   return null;
+}
+
+/**
+ * Furthest step the left nav may open. Completed steps stay reachable after
+ * going back; later steps lock again if earlier required data is cleared.
+ */
+export function wizardUnlockedThroughIndex(plan: TripPlan): number {
+  const firstIncomplete = findFirstIncompleteWizardStep(plan);
+  return firstIncomplete === null ? WIZARD_STEP_TITLES.length - 1 : firstIncomplete;
 }

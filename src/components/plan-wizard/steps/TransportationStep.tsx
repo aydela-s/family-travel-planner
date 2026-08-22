@@ -37,11 +37,7 @@ export default function TransportationStep({ formData, updateFormData }: StepPro
 
   return (
     <div className="space-y-6">
-      <StepIntro
-        emoji="🚗"
-        title="How will you get around?"
-        subtitle="Pick how you'll move between stops."
-      />
+      <StepIntro emoji="🚗" title="How will you get around?" />
 
       <div className="grid gap-3 sm:grid-cols-3">
         {options.map((value) => {

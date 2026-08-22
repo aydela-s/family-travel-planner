@@ -3,6 +3,7 @@ import PlanMyTripLink from "@/components/PlanMyTripLink";
 import PrefetchPlan from "@/components/PrefetchPlan";
 import { FamilyTravelyLogo } from "@/components/FamilyTravelyLogo";
 import { BRAND } from "@/config/brand";
+import Image from "next/image";
 
 const HOW_IT_WORKS = [
   {
@@ -37,9 +38,6 @@ const WHY_FAMILYTRAVELY = [
   },
 ] as const;
 
-const tileClassName =
-  "flex h-full flex-col rounded-[1.75rem] border border-border bg-surface p-6 text-left shadow-[var(--shadow-card)] sm:p-7";
-
 function FlowArrow({ className = "" }: { className?: string }) {
   return (
     <div
@@ -59,91 +57,60 @@ function FlowArrow({ className = "" }: { className?: string }) {
   );
 }
 
-function FlowDownArrow() {
-  return (
-    <div aria-hidden className="flex justify-center py-2 text-secondary sm:hidden">
-      <svg width="12" height="28" viewBox="0 0 12 28" fill="none">
-        <path
-          d="M6 0v22M1.5 18 6 24.5 10.5 18"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </div>
-  );
-}
-
 export default function Home() {
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-background">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_15%_0%,rgba(1,109,118,0.08),transparent_50%),radial-gradient(ellipse_at_90%_5%,rgba(2,187,203,0.10),transparent_45%),radial-gradient(ellipse_at_50%_100%,rgba(255,87,87,0.06),transparent_50%)]"
-      />
-
-      <section className="relative mx-auto flex min-h-[88svh] max-w-3xl flex-col items-center justify-center px-6 py-16 text-center">
-        <div className="animate-fade-in">
-          <FamilyTravelyLogo className="mx-auto h-auto w-[min(100%,22rem)] sm:w-[26rem]" />
-        </div>
-
-        <h1 className="animate-fade-in mt-8 max-w-2xl text-3xl font-semibold tracking-tight text-primary sm:text-4xl [animation-delay:120ms]">
-          Plan a family trip that actually works
-        </h1>
-
-        <p className="animate-fade-in mt-4 max-w-xl text-base leading-relaxed text-muted sm:text-lg [animation-delay:220ms]">
-          Personalized day-by-day itineraries built around your kids, your pace, and your budget without the hours of planning.
-        </p>
-
-        <div className="animate-fade-in mt-8 flex flex-col items-center [animation-delay:320ms]">
-          <PlanMyTripLink />
-          <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
-            Start planning for free. No account needed.
+    <main className="min-h-screen bg-background text-ink">
+      <div className="mx-auto grid max-w-6xl lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+        <section className="border-b border-border px-6 py-10 sm:px-12 lg:border-b-0 lg:border-r lg:py-24">
+          <FamilyTravelyLogo className="h-auto w-36 lg:w-48" />
+          <h1 className="mt-6 max-w-xl text-[1.65rem] font-semibold leading-tight tracking-tight text-primary lg:mt-10 lg:text-5xl">
+            Plan a family trip that actually works
+          </h1>
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-muted lg:mt-5 lg:text-lg">
+            Personalized day-by-day itineraries built around your kids, your pace, and your budget without the hours of
+            planning.
           </p>
-        </div>
+          <PlanMyTripLink className="mt-8" />
+          <p className="mt-3 text-sm text-muted">Start planning for free. No account needed.</p>
+          <p className="sr-only">{BRAND.slogan}</p>
+        </section>
+        <aside className="relative min-h-[16rem] overflow-hidden sm:min-h-[20rem] lg:min-h-full">
+          <Image
+            src="/homepage-hero-family.jpg"
+            alt="A family walking together through a sunny city square"
+            fill
+            priority
+            sizes="(min-width: 1024px) 45vw, 100vw"
+            className="object-cover object-[center_35%]"
+          />
+        </aside>
+      </div>
 
-        <p className="sr-only">{BRAND.slogan}</p>
-      </section>
-
-      <section
-        aria-labelledby="how-it-works-heading"
-        className="relative border-t border-border/70 bg-secondary-muted/40"
-      >
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+      <section aria-labelledby="how-it-works-heading" className="border-t border-border bg-surface">
+        <div className="mx-auto max-w-5xl px-6 py-10 sm:px-12 lg:py-20">
           <h2
             id="how-it-works-heading"
-            className="text-center text-2xl font-semibold tracking-tight text-primary sm:text-3xl"
+            className="text-lg font-semibold tracking-tight text-primary lg:text-center lg:text-3xl"
           >
             How it works
           </h2>
-          <p className="mx-auto mt-3 max-w-lg text-center text-base leading-relaxed text-muted">
+          <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted lg:mx-auto lg:mt-3 lg:text-center lg:text-base">
             Three steps from family details to a plan you can actually follow.
           </p>
-
-          <ol className="mt-12 flex flex-col sm:flex-row sm:items-stretch sm:gap-0">
+          <ol className="mt-4 space-y-3 lg:mt-12 lg:flex lg:flex-row lg:items-stretch lg:space-y-0">
             {HOW_IT_WORKS.map((item, index) => (
-              <li
-                key={item.step}
-                className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-stretch"
-              >
-                <div className={`${tileClassName} w-full`}>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
+              <li key={item.step} className="flex min-w-0 flex-1 flex-col lg:flex-row lg:items-stretch">
+                <div className="flex h-full w-full gap-3 rounded-[1.25rem] border border-secondary/20 bg-secondary-muted/35 p-4 text-left lg:flex-col lg:rounded-[1.75rem] lg:p-7">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white lg:h-9 lg:w-9 lg:text-sm">
                     {item.step}
                   </span>
-                  <h3 className="mt-4 text-lg font-semibold tracking-tight text-ink">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 flex-1 text-sm leading-relaxed text-muted sm:text-base">
-                    {item.body}
-                  </p>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold tracking-tight text-ink lg:mt-4 lg:text-lg">{item.title}</h3>
+                    <p className="mt-0.5 flex-1 text-xs leading-relaxed text-muted lg:mt-2 lg:text-base">{item.body}</p>
+                  </div>
                 </div>
-
                 {index < HOW_IT_WORKS.length - 1 ? (
-                  <>
-                    <FlowDownArrow />
-                    <FlowArrow className="hidden w-8 sm:flex sm:self-center lg:w-10" />
-                  </>
+                  <FlowArrow className="hidden w-8 lg:flex lg:self-center lg:w-10" />
                 ) : null}
               </li>
             ))}
@@ -151,42 +118,29 @@ export default function Home() {
         </div>
       </section>
 
-      <section
-        aria-labelledby="why-familytravely-heading"
-        className="relative border-t border-border/70"
-      >
-        <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
+      <section aria-labelledby="why-familytravely-heading" className="border-t border-border">
+        <div className="mx-auto max-w-5xl px-6 py-10 sm:px-12 lg:py-20">
           <h2
             id="why-familytravely-heading"
-            className="text-center text-2xl font-semibold tracking-tight text-primary sm:text-3xl"
+            className="text-lg font-semibold tracking-tight text-primary lg:text-center lg:text-3xl"
           >
             Why {BRAND.name}
           </h2>
-          <p className="mx-auto mt-3 max-w-lg text-center text-base leading-relaxed text-muted">
-            Most trip planners ignore how families actually move through a day.
-            We plan for that from the start.
+          <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted lg:mx-auto lg:mt-3 lg:text-center lg:text-base">
+            Most trip planners ignore how families actually move through a day. We plan for that from the start.
           </p>
-
-          <ul className="mt-12 grid gap-5 sm:grid-cols-3 sm:gap-6">
+          <ul className="mt-4 space-y-3 lg:mt-12 lg:grid lg:grid-cols-3 lg:gap-6 lg:space-y-0">
             {WHY_FAMILYTRAVELY.map((item) => (
               <li key={item.title} className="min-w-0">
-                <div className="flex h-full flex-col rounded-[1.75rem] border border-secondary/20 bg-secondary-muted/35 p-6 text-left sm:p-7">
-                  <span
-                    aria-hidden
-                    className="mb-5 block h-1 w-10 rounded-full bg-accent"
-                  />
-                  <h3 className="text-lg font-semibold tracking-tight text-ink">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 flex-1 text-sm leading-relaxed text-muted sm:text-base">
-                    {item.body}
-                  </p>
+                <div className="flex h-full flex-col rounded-[1.25rem] border border-secondary/20 bg-secondary-muted/35 p-4 text-left lg:rounded-[1.75rem] lg:p-7">
+                  <span aria-hidden className="mb-2 block h-1 w-7 rounded-full bg-accent lg:mb-5 lg:w-10" />
+                  <h3 className="text-sm font-semibold tracking-tight text-ink lg:text-lg">{item.title}</h3>
+                  <p className="mt-0.5 flex-1 text-xs leading-relaxed text-muted lg:mt-2 lg:text-base">{item.body}</p>
                 </div>
               </li>
             ))}
           </ul>
-
-          <div className="mt-14 flex justify-center">
+          <div className="mt-8 flex justify-center lg:mt-14">
             <PlanMyTripLink />
           </div>
         </div>

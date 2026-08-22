@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import {
   btnGhostClassName,
   btnPrimaryClassName,
+  btnActionClassName,
   inputClassName,
   labelClassName,
 } from "@/components/plan-wizard/shared";
@@ -18,9 +19,6 @@ import { Itinerary } from "@/types/itinerary";
 import { TripPlan } from "@/types/trip-plan";
 
 type Status = "idle" | "sending" | "sent" | "error";
-
-const actionBtnClassName =
-  "inline-flex items-center gap-1.5 rounded-full border border-secondary/40 bg-secondary-muted px-4 py-2 text-sm font-semibold text-primary transition hover:border-secondary hover:bg-secondary-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary disabled:opacity-50";
 
 function ShareIcon() {
   return (
@@ -56,7 +54,7 @@ export default function ShareItineraryControls({
   itinerary,
   plan,
   disabled = false,
-  buttonClassName = actionBtnClassName,
+  buttonClassName = btnActionClassName,
 }: {
   itinerary: Itinerary;
   plan?: TripPlan;

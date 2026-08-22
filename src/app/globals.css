@@ -72,7 +72,7 @@
   --color-itinerary-transport: var(--itinerary-transport);
   --color-itinerary-accommodation: var(--itinerary-accommodation);
   --color-itinerary-budget: var(--itinerary-budget);
-  --font-sans: var(--font-poppins);
+  --font-sans: var(--font-jakarta);
   --shadow-card: 0 1px 2px rgb(31 41 55 / 0.04), 0 4px 16px rgb(31 41 55 / 0.06);
   --shadow-soft: 0 2px 8px rgb(1 109 118 / 0.14);
   --shadow-accent: 0 2px 10px rgb(255 87 87 / 0.22);
@@ -98,23 +98,19 @@ body {
 
 @keyframes step-forward {
   from {
-    opacity: 0.96;
-    transform: translateX(12px);
+    opacity: 0;
   }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
 @keyframes step-back {
   from {
-    opacity: 0.96;
-    transform: translateX(-12px);
+    opacity: 0;
   }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -160,12 +156,23 @@ body {
   animation: loading-pin-pulse 1.6s ease-in-out infinite;
 }
 
+@keyframes loading-route-dash {
+  to {
+    stroke-dashoffset: -56;
+  }
+}
+
+.animate-loading-route-dash {
+  animation: loading-route-dash 1.2s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,
   .animate-step-forward,
   .animate-step-back,
   .animate-pulse-soft,
-  .animate-loading-pin-pulse {
+  .animate-loading-pin-pulse,
+  .animate-loading-route-dash {
     animation: none;
   }
 }

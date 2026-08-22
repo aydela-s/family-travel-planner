@@ -9,11 +9,7 @@ export default function DestinationStep({
 }: StepProps) {
   return (
     <div className="space-y-6">
-      <StepIntro
-        emoji="🌍"
-        title="Where are you headed?"
-        subtitle="Pick a city from the suggestions so we can plan around the right place."
-      />
+      <StepIntro emoji="🌍" title="Where are you headed?" />
 
       <div>
         <label htmlFor="destination" className="sr-only">

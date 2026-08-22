@@ -10,11 +10,7 @@ const travelStyles = [
 export default function TravelStyleStep({ formData, updateFormData }: StepProps) {
   return (
     <div className="space-y-8">
-      <StepIntro
-        emoji="🎒"
-        title="What's your family's vibe?"
-        subtitle="Pick the travel style that feels right for your family."
-      />
+      <StepIntro emoji="🎒" title="What's your family's vibe?" />
 
       <div className="grid gap-3 sm:grid-cols-3">
         {travelStyles.map((option) => (

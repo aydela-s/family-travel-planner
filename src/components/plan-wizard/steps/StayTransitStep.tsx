@@ -1,20 +1,20 @@
 "use client";
 
 import { useEffect } from "react";
-import { StepProps, TransportationType } from "@/types/trip-plan";
+import { StepProps } from "@/types/trip-plan";
 import { detectCityFromPlan } from "@/lib/city-detect";
 import { TRANSPORTATION_LABELS } from "@/lib/format-labels";
 import {
   isPublicTransitSelectable,
   limitedTransitWarning,
   transportationOptionsForCity,
+  type GettingAroundOption,
   unavailableTransitNote,
 } from "@/lib/planning-engine/transit-mode";
 import { OptionCard, StepIntro } from "../shared";
 import FoodPreferencesStep from "./FoodPreferencesStep";
 
-const OPTION_EMOJI: Record<TransportationType, string> = {
-  walking: "🚶",
+const OPTION_EMOJI: Record<GettingAroundOption, string> = {
   "car-rental": "🚗",
   taxis: "🚕",
   "public-transportation": "🚇",
@@ -33,19 +33,21 @@ export default function StayTransitStep({ formData, updateFormData }: StepProps)
     }
   }, [transitSelectable, formData.transportationType, updateFormData]);
 
+  useEffect(() => {
+    if (formData.transportationType === "walking") {
+      updateFormData({ transportationType: "" });
+    }
+  }, [formData.transportationType, updateFormData]);
+
   return (
-    <div className="space-y-8">
-      <StepIntro
-        emoji="🏨"
-        title="Stay & getting around"
-        subtitle="Tell us where you’re based and how you’ll move between stops."
-      />
+    <div className="space-y-5">
+      <StepIntro emoji="🏨" title="Stay & getting around" />
 
       <FoodPreferencesStep formData={formData} updateFormData={updateFormData} embedded />
 
-      <div>
-        <p className="text-sm font-semibold text-ink">How will you get around?</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div className="border-t border-border pt-5">
+        <p className="text-sm font-semibold text-ink">Getting around</p>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {options.map((value) => {
             const isTransit = value === "public-transportation";
             const disabled = isTransit && !transitSelectable;

@@ -3,6 +3,7 @@ import { initialTripPlan, TripPlan } from "@/types/trip-plan";
 import {
   findFirstIncompleteWizardStep,
   isWizardStepComplete,
+  wizardUnlockedThroughIndex,
   WIZARD_STEP_TITLES,
 } from "./step-gate";
 
@@ -67,8 +68,34 @@ describe("wizard step gate", () => {
     expect(findFirstIncompleteWizardStep(filledThroughInterests())).toBeNull();
   });
 
-  it("exposes six consolidated steps and no Summary", () => {
-    expect(WIZARD_STEP_TITLES).toHaveLength(6);
+  it("keeps completed later steps unlocked after going back, until earlier data is cleared", () => {
+    const ready = filledThroughInterests();
+    expect(wizardUnlockedThroughIndex(ready)).toBe(WIZARD_STEP_TITLES.length - 1);
+
+    const missingInterests = filledThroughInterests({ interests: [] });
+    expect(wizardUnlockedThroughIndex(missingInterests)).toBe(
+      WIZARD_STEP_TITLES.indexOf("Interests"),
+    );
+
+    const stayCleared = filledThroughInterests({
+      accommodationType: "",
+      stayAddress: "",
+      transportationType: "",
+    });
+    expect(wizardUnlockedThroughIndex(stayCleared)).toBe(
+      WIZARD_STEP_TITLES.indexOf("Stay & getting around"),
+    );
+  });
+
+  it("exposes five consolidated steps and no Summary", () => {
+    expect(WIZARD_STEP_TITLES).toHaveLength(5);
     expect(WIZARD_STEP_TITLES).not.toContain("Summary");
+    expect(WIZARD_STEP_TITLES).not.toContain("Food & naps");
+  });
+
+  it("requires a nap answer on Travelers when young kids are present", () => {
+    const plan = filledThroughInterests({ naps: null });
+    expect(isWizardStepComplete(plan, "Travelers")).toBe(false);
+    expect(isWizardStepComplete(filledThroughInterests({ naps: [] }), "Travelers")).toBe(true);
   });
 });

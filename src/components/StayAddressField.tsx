@@ -230,11 +230,13 @@ export default function StayAddressField({
           {emptyHint}
         </div>
       )}
-      <p className="mt-2 text-xs text-muted">
-        {destinationCity
-          ? `We’ll prefer places near ${destinationCity}.`
-          : "Example: Marriott Downtown or 123 Main Street"}
-      </p>
+      {!disabled && (
+        <p className="mt-2 text-xs text-muted">
+          {destinationCity
+            ? `We’ll prefer places near ${destinationCity}.`
+            : "Example: Marriott Downtown or 123 Main Street"}
+        </p>
+      )}
     </div>
   );
 }

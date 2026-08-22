@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
+import { Plus_Jakarta_Sans, Poppins } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import FeedbackButton from "@/components/FeedbackButton";
@@ -8,6 +8,13 @@ import { PostHogProvider } from "@/components/PostHogProvider";
 import { BRAND } from "@/config/brand";
 import "./globals.css";
 
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+/** Kept for logo/wordmark contexts that intentionally reference Poppins. */
 const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],
@@ -33,8 +40,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${poppins.variable} antialiased`}>
+    <html lang="en" className={`${plusJakarta.variable} ${poppins.variable}`}>
+      <body className="antialiased">
         <PostHogProvider>
           <FeedbackVisibilityProvider>
             {children}

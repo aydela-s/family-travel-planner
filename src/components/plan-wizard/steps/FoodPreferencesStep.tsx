@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import StayAddressField from "@/components/StayAddressField";
 import { AccommodationType, StepProps } from "@/types/trip-plan";
-import { ACCOMMODATION_LABELS } from "@/lib/format-labels";
 import { isStayNotBookedYet } from "@/lib/planning-engine/stay-home";
 import { OptionCard } from "../shared";
 
@@ -21,24 +20,59 @@ export function stayCategoryFromType(type: AccommodationType | ""): StayCategory
 const primaryOptions: { value: Exclude<StayCategory, "">; label: string; emoji: string }[] = [
   { value: "hotel", label: "Hotel", emoji: "🏨" },
   { value: "rental", label: "Rental", emoji: "🏠" },
-  { value: "friends", label: "With family or friends", emoji: "👨‍👩‍👧" },
-  { value: "dont_know", label: "I don’t know yet", emoji: "🤷" },
+  { value: "friends", label: "Family/friends", emoji: "👨‍👩‍👧" },
+  { value: "dont_know", label: "Not sure yet", emoji: "🤷" },
 ];
 
 const hotelSubOptions: { value: AccommodationType; label: string }[] = [
-  { value: "hotel_breakfast_included", label: ACCOMMODATION_LABELS.hotel_breakfast_included },
-  { value: "hotel_no_breakfast", label: ACCOMMODATION_LABELS.hotel_no_breakfast },
+  { value: "hotel_breakfast_included", label: "Included" },
+  { value: "hotel_no_breakfast", label: "Not included" },
 ];
 
 const rentalSubOptions: { value: AccommodationType; label: string }[] = [
-  { value: "airbnb_with_kitchen", label: ACCOMMODATION_LABELS.airbnb_with_kitchen },
-  { value: "airbnb_no_kitchen", label: ACCOMMODATION_LABELS.airbnb_no_kitchen },
+  { value: "airbnb_with_kitchen", label: "Yes" },
+  { value: "airbnb_no_kitchen", label: "No" },
 ];
 
 type StayFieldsProps = StepProps & {
   /** When embedded in a combined step, hide the standalone page intro. */
   embedded?: boolean;
 };
+
+function Segmented({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: AccommodationType; label: string }[];
+  value: AccommodationType | "";
+  onChange: (value: AccommodationType) => void;
+}) {
+  return (
+    <div
+      className="inline-flex rounded-full border border-border bg-surface p-1"
+      role="group"
+    >
+      {options.map((opt) => {
+        const selected = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+              selected
+                ? "bg-primary text-white"
+                : "text-ink hover:bg-secondary-muted"
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function FoodPreferencesStep({
   formData,
@@ -84,7 +118,7 @@ export default function FoodPreferencesStep({
   }
 
   return (
-    <div className={embedded ? "space-y-5" : "space-y-6"}>
+    <div className={embedded ? "space-y-4" : "space-y-5"}>
       {!embedded && (
         <div className="space-y-2">
           <p className="text-2xl" aria-hidden>
@@ -101,7 +135,7 @@ export default function FoodPreferencesStep({
 
       <div>
         <p className="text-sm font-semibold text-ink">Stay type</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
           {primaryOptions.map((option) => (
             <OptionCard
               key={option.value}
@@ -113,41 +147,41 @@ export default function FoodPreferencesStep({
         </div>
       </div>
 
-      {category === "hotel" && (
-        <div>
-          <p className="text-sm font-semibold text-ink">Breakfast?</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {hotelSubOptions.map((option) => (
-              <OptionCard
-                key={option.value}
-                selected={formData.accommodationType === option.value}
-                label={option.label}
-                onClick={() => onSub(option.value)}
-              />
-            ))}
-          </div>
+      {category === "hotel" ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-ink">Breakfast</span>
+          <Segmented
+            options={hotelSubOptions}
+            value={
+              formData.accommodationType === "hotel_breakfast_included" ||
+              formData.accommodationType === "hotel_no_breakfast"
+                ? formData.accommodationType
+                : ""
+            }
+            onChange={onSub}
+          />
         </div>
-      )}
+      ) : null}
 
-      {category === "rental" && (
-        <div>
-          <p className="text-sm font-semibold text-ink">Kitchen?</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {rentalSubOptions.map((option) => (
-              <OptionCard
-                key={option.value}
-                selected={formData.accommodationType === option.value}
-                label={option.label}
-                onClick={() => onSub(option.value)}
-              />
-            ))}
-          </div>
+      {category === "rental" ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-ink">Kitchen</span>
+          <Segmented
+            options={rentalSubOptions}
+            value={
+              formData.accommodationType === "airbnb_with_kitchen" ||
+              formData.accommodationType === "airbnb_no_kitchen"
+                ? formData.accommodationType
+                : ""
+            }
+            onChange={onSub}
+          />
         </div>
-      )}
+      ) : null}
 
       <div>
-        <p className="text-sm font-semibold text-ink">Stay name or address</p>
-        <div className="mt-2">
+        <p className="text-sm font-semibold text-ink">Address</p>
+        <div>
           <StayAddressField
             value={formData.stayAddress ?? ""}
             destination={formData.destination}

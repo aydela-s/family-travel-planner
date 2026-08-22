@@ -1,57 +1,120 @@
-import { BudgetStyle, StepProps, walkingLimitFromTravelStyle } from "@/types/trip-plan";
+import {
+  BudgetStyle,
+  StepProps,
+  TravelStyle,
+  walkingLimitFromTravelStyle,
+} from "@/types/trip-plan";
 import { BUDGET_STYLE_LABELS } from "@/lib/format-labels";
-import { OptionCard, StepIntro } from "../shared";
+import { StepIntro } from "../shared";
 
-const travelStyles = [
-  { value: "relaxed" as const, label: "Relaxed", emoji: "🌿" },
-  { value: "balanced" as const, label: "Balanced", emoji: "⚖️" },
-  { value: "packed" as const, label: "Packed", emoji: "🚀" },
+const travelStyles: { value: TravelStyle; label: string }[] = [
+  { value: "relaxed", label: "Relaxed" },
+  { value: "balanced", label: "Balanced" },
+  { value: "packed", label: "Packed" },
 ];
 
 const budgetOrder: BudgetStyle[] = ["save", "balanced", "splurge"];
 
+const PACE_LEVEL: Record<TravelStyle, 1 | 2 | 3> = {
+  relaxed: 1,
+  balanced: 2,
+  packed: 3,
+};
+
+const BUDGET_LEVEL: Record<BudgetStyle, 1 | 2 | 3> = {
+  save: 1,
+  balanced: 2,
+  splurge: 3,
+};
+
+function PaceBars({ level }: { level: 1 | 2 | 3 }) {
+  const heights = ["h-2.5", "h-4", "h-5"] as const;
+  return (
+    <span className="inline-flex items-end gap-0.5" aria-hidden>
+      {([1, 2, 3] as const).map((n) => (
+        <span
+          key={n}
+          className={`w-2 rounded-sm ${heights[n - 1]} ${
+            n <= level ? "bg-primary" : "bg-muted/30"
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
+function DollarMeter({ level }: { level: 1 | 2 | 3 }) {
+  return (
+    <span className="inline-flex items-baseline gap-0.5 text-base font-bold tracking-tight" aria-hidden>
+      {([1, 2, 3] as const).map((n) => (
+        <span key={n} className={n <= level ? "text-primary" : "text-muted/35"}>
+          $
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function PaceBudgetStep({ formData, updateFormData }: StepProps) {
   return (
     <div className="space-y-8">
-      <StepIntro
-        emoji="🎒"
-        title="Pace & spend"
-        subtitle="Day pace shapes how full each day feels. Spending shapes the kinds of activities and restaurants we pick."
-      />
+      <StepIntro emoji="🎒" title="Pace & spend" />
 
-      <div>
-        <p className="text-sm font-semibold text-ink">Day pace</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          {travelStyles.map((option) => (
-            <OptionCard
-              key={option.value}
-              selected={formData.travelStyle === option.value}
-              label={`${option.emoji} ${option.label}`}
-              onClick={() =>
-                updateFormData({
-                  travelStyle: option.value,
-                  walkingLimit: walkingLimitFromTravelStyle(option.value),
-                })
-              }
-            />
-          ))}
+      <div className="grid items-start gap-10 sm:grid-cols-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-ink">Pace</p>
+          <div className="mt-3 flex gap-2">
+            {travelStyles.map((option) => {
+              const selected = formData.travelStyle === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-label={option.label}
+                  aria-pressed={selected}
+                  onClick={() =>
+                    updateFormData({
+                      travelStyle: option.value,
+                      walkingLimit: walkingLimitFromTravelStyle(option.value),
+                    })
+                  }
+                  className={`flex h-14 w-[6rem] shrink-0 flex-col items-center justify-center rounded-2xl border transition ${
+                    selected
+                      ? "border-primary bg-secondary-muted"
+                      : "border-border bg-surface hover:border-secondary/50 hover:bg-secondary-muted/60"
+                  }`}
+                >
+                  <PaceBars level={PACE_LEVEL[option.value]} />
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      <div>
-        <p className="text-sm font-semibold text-ink">Spending</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          {budgetOrder.map((value) => {
-            const meta = BUDGET_STYLE_LABELS[value];
-            return (
-              <OptionCard
-                key={value}
-                selected={formData.budgetStyle === value}
-                label={`${meta.emoji} ${meta.label}`}
-                onClick={() => updateFormData({ budgetStyle: value })}
-              />
-            );
-          })}
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-ink">Spend</p>
+          <div className="mt-3 flex gap-2">
+            {budgetOrder.map((value) => {
+              const selected = formData.budgetStyle === value;
+              const meta = BUDGET_STYLE_LABELS[value];
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-label={meta.label}
+                  aria-pressed={selected}
+                  onClick={() => updateFormData({ budgetStyle: value })}
+                  className={`flex h-14 w-[6rem] shrink-0 flex-col items-center justify-center rounded-2xl border transition ${
+                    selected
+                      ? "border-primary bg-secondary-muted"
+                      : "border-border bg-surface hover:border-secondary/50 hover:bg-secondary-muted/60"
+                  }`}
+                >
+                  <DollarMeter level={BUDGET_LEVEL[value]} />
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

@@ -39,16 +39,12 @@ export type PlanChipKey =
 /** Wizard step index for fields edited in the wizard (not inline). */
 export const PLAN_CHIP_WIZARD_STEP: Partial<Record<PlanChipKey, number>> = {
   stay: 2,
-  naps: 4,
-  interests: 5,
+  naps: 1,
+  dietary: 4,
+  interests: 4,
 };
 
-const READ_ONLY_KEYS = new Set<PlanChipKey>([
-  "destination",
-  "dates",
-  "travelers",
-  "dietary",
-]);
+const READ_ONLY_KEYS = new Set<PlanChipKey>(["destination", "dates", "travelers"]);
 
 type ChipDef = {
   key: PlanChipKey;
@@ -60,98 +56,64 @@ type ChipDef = {
   options?: { value: string; label: string; disabled?: boolean }[];
 };
 
-function iconClassName(tone: "primary" | "accent" = "primary") {
-  return `block h-4 w-4 shrink-0 ${tone === "accent" ? "text-accent" : "text-primary"}`;
+function iconClassName() {
+  return "block h-3.5 w-3.5 shrink-0 text-primary";
 }
 
-/** Gauge / intensity meter — reads as travel pace better than a moon. */
 function PaceIcon() {
   return (
-    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
-      <path
-        d="M4 16h3.5M10 16h3.5M16 16H20"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-      />
-      <path
-        d="M5.5 16V11M12 16V8M18.5 16V5"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-      />
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="currentColor" aria-hidden>
+      <rect x="4" y="13" width="4" height="7" rx="1" />
+      <rect x="10" y="8" width="4" height="12" rx="1" />
+      <rect x="16" y="4" width="4" height="16" rx="1" />
     </svg>
   );
 }
 
-function WalletIcon() {
+function BudgetIcon() {
   return (
-    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
-      <rect x="3.5" y="6" width="17" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.75" />
-      <path d="M3.5 10h17" stroke="currentColor" strokeWidth="1.75" />
-      <circle cx="16.5" cy="14.5" r="1" fill="currentColor" />
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="currentColor" aria-hidden>
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z" />
     </svg>
   );
 }
 
 function StayIcon() {
   return (
-    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
-      <path
-        d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-7.5Z"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="currentColor" aria-hidden>
+      <path d="M12 3.2 3.5 10.2V20a1 1 0 0 0 1 1h5.2v-6.2h4.6V21H19.5a1 1 0 0 0 1-1v-9.8L12 3.2Z" />
     </svg>
   );
 }
 
 function TransitChipIcon() {
   return (
-    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
-      <rect x="6" y="4" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.75" />
-      <path d="M8 16v3M16 16v3M6 9h12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="currentColor" aria-hidden>
+      <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z" />
     </svg>
   );
 }
 
 function NapChipIcon() {
   return (
-    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
-      <path
-        d="M12 4.5A6.5 6.5 0 1 0 18.2 14.2 5.25 5.25 0 0 1 12 4.5Z"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="currentColor" aria-hidden>
+      <path d="M13.2 3.2a8.2 8.2 0 1 0 7.6 11.4A7 7 0 0 1 13.2 3.2Z" />
     </svg>
   );
 }
 
 function DietaryIcon() {
   return (
-    <svg viewBox="0 0 24 24" className={iconClassName()} fill="none" aria-hidden>
-      <path
-        d="M8 3v8M8 11v10M6 3v5a2 2 0 0 0 4 0V3M16 3v7c0 1.5 1 2 2 2v9M16 3c0 3 0 5-2 7"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="currentColor" aria-hidden>
+      <path d="M7.2 2.8h1.8v7.2A2.1 2.1 0 0 1 7 12.1V21H5.2v-8.9a2.1 2.1 0 0 1-2-2.1V2.8h1.8v5.4h.6V2.8Zm9.2 0c2.4 0 3.6 1.8 3.6 4.4V12h-1.8v9h-1.8v-9h-1.8V7.2c0-2.6 1.2-4.4 3.6-4.4Z" />
     </svg>
   );
 }
 
 function InterestsIcon() {
   return (
-    <svg viewBox="0 0 24 24" className={iconClassName("accent")} fill="none" aria-hidden>
-      <path
-        d="M12 20s-6.5-4.2-8.5-8C2 9.2 3.2 6.5 6 5.8c1.8-.4 3.5.5 4.5 1.8C11.5 6.3 13.2 5.4 15 5.8c2.8.7 4 3.4 2.5 6.2C15.5 15.8 12 20 12 20Z"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 24 24" className={iconClassName()} fill="currentColor" aria-hidden>
+      <path d="M12 20.2s-7-4.4-9-8.2C1.4 9.2 2.8 6.2 5.8 5.4c1.9-.5 3.7.5 4.7 1.9 1-1.4 2.8-2.4 4.7-1.9 3 .8 4.4 3.8 2.8 6.6-2 3.8-9 8.2-9 8.2Z" />
     </svg>
   );
 }
@@ -186,8 +148,20 @@ function buildChips(plan: TripPlan): ChipDef[] {
   const city = detectCityFromPlan(plan);
   const transitSelectable = isPublicTransitSelectable(city);
   const transportOptions = transportationOptionsForCity(city);
-  // Same order as wizard preference chips (Stay → Transit → Pace → Naps → Budget → Interests).
-  const chips: ChipDef[] = [
+  // Wizard order: Travelers (naps) → Stay & transit → Pace & spend → Interests (dietary).
+  const chips: ChipDef[] = [];
+
+  if (shouldShowNapSection(plan) && (plan.naps?.length ?? 0) > 0) {
+    chips.push({
+      key: "naps",
+      label: "Naps",
+      value: formatNapsSummary(plan.naps),
+      editable: true,
+      icon: <NapChipIcon />,
+    });
+  }
+
+  chips.push(
     {
       key: "stay",
       label: "Stay",
@@ -221,36 +195,12 @@ function buildChips(plan: TripPlan): ChipDef[] {
         label: TRAVEL_STYLE_LABELS[value],
       })),
     },
-  ];
-
-  if (shouldShowNapSection(plan) && (plan.naps?.length ?? 0) > 0) {
-    chips.push({
-      key: "naps",
-      label: "Naps",
-      value: formatNapsSummary(plan.naps),
-      editable: true,
-      icon: <NapChipIcon />,
-    });
-  }
-
-  const dietary = plan.dietaryRestrictions?.trim();
-  if (dietary) {
-    chips.push({
-      key: "dietary",
-      label: "Dietary",
-      value: dietary,
-      editable: false,
-      icon: <DietaryIcon />,
-    });
-  }
-
-  chips.push(
     {
       key: "budget",
       label: "Budget",
       value: getBudgetStyleLabelPlain(plan.budgetStyle),
       editable: true,
-      icon: <WalletIcon />,
+      icon: <BudgetIcon />,
       options: (Object.keys(BUDGET_STYLE_LABELS) as BudgetStyle[]).map((value) => ({
         value,
         label: BUDGET_STYLE_LABELS[value].label,
@@ -265,21 +215,28 @@ function buildChips(plan: TripPlan): ChipDef[] {
     },
   );
 
+  const dietary = plan.dietaryRestrictions?.trim();
+  if (dietary) {
+    chips.push({
+      key: "dietary",
+      label: "Dietary",
+      value: dietary,
+      editable: true,
+      icon: <DietaryIcon />,
+    });
+  }
+
   return chips;
 }
 
-function EditIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5" aria-hidden>
-      <path
-        d="M12.8 3.7a1.75 1.75 0 0 1 2.48 2.47l-8.2 8.2a1.5 1.5 0 0 1-.66.38l-2.7.68a.5.5 0 0 1-.6-.6l.68-2.7c.06-.25.19-.48.38-.66l8.2-8.2Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <path d="M11.6 4.9 15.1 8.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
+function optionIsSelected(chip: ChipDef, optionLabel: string, plan: TripPlan): boolean {
+  if (chip.key === "budget") return getBudgetStyleLabelPlain(plan.budgetStyle) === optionLabel;
+  if (chip.key === "travelStyle") return getTravelStyleLabel(plan.travelStyle) === optionLabel;
+  if (chip.key === "transportation") {
+    // Option labels use TRANSPORTATION_LABELS (e.g. "Public transit"); chip value may show "Transit".
+    return getTransportationLabel(plan.transportationType) === optionLabel;
+  }
+  return chip.value === optionLabel;
 }
 
 export default function PlanSelectionChips({
@@ -319,16 +276,9 @@ export default function PlanSelectionChips({
     };
   }, [openKey]);
 
-  function handleEditClick(chip: ChipDef) {
+  function handleSegmentClick(chip: ChipDef) {
     if (disabled || !chip.editable || READ_ONLY_KEYS.has(chip.key)) return;
-
-    if (chip.options?.length) {
-      setOpenKey((current) => (current === chip.key ? null : chip.key));
-      return;
-    }
-
-    const step = PLAN_CHIP_WIZARD_STEP[chip.key];
-    if (step != null) onEditInWizard(step);
+    setOpenKey((current) => (current === chip.key ? null : chip.key));
   }
 
   function handleOptionSelect(chip: ChipDef, value: string) {
@@ -336,97 +286,174 @@ export default function PlanSelectionChips({
     onApplyUpdate(updatesForPlanChip(chip.key as PlanChipUpdateKey, value, plan));
   }
 
-  return (
-    <div ref={rootRef} className="min-w-0">
-      <ul
-        className="flex w-full flex-wrap items-center gap-1.5"
-        aria-label="Trip plan selections"
+  function handleWizardHop(chip: ChipDef) {
+    setOpenKey(null);
+    const step = PLAN_CHIP_WIZARD_STEP[chip.key];
+    if (step != null) onEditInWizard(step);
+  }
+
+  const openChip = openKey ? chips.find((c) => c.key === openKey) : null;
+
+  function renderChipMenu(chip: ChipDef, panelClassName: string) {
+    return (
+      <div
+        id={`${listId}-${chip.key}`}
+        role="listbox"
+        aria-label={`Change ${chip.label}`}
+        className={panelClassName}
       >
-        {chips.map((chip) => {
-          const isOpen = openKey === chip.key;
-          const canEdit = chip.editable && !disabled;
+        {chip.options?.length ? (
+          chip.options.map((option) => {
+            const selected = optionIsSelected(chip, option.label, plan);
+            const optionDisabled = Boolean(disabled || option.disabled);
 
-          return (
-            <li key={chip.key} className="relative max-w-full shrink-0">
-              <div
-                className={`group inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-secondary-muted/40 px-2.5 py-1.5 text-xs text-ink ${
-                  isOpen ? "border-secondary bg-secondary-muted" : ""
-                } ${disabled ? "opacity-60" : ""}`}
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                aria-disabled={optionDisabled}
+                disabled={optionDisabled}
+                onClick={() => {
+                  if (optionDisabled) return;
+                  handleOptionSelect(chip, option.value);
+                }}
+                className={`flex w-full items-center justify-between gap-3 px-2.5 py-1.5 text-left text-xs transition ${
+                  optionDisabled
+                    ? "cursor-not-allowed text-muted opacity-60"
+                    : selected
+                      ? "font-semibold text-primary hover:bg-primary-muted/50"
+                      : "text-ink hover:bg-primary-muted/50"
+                }`}
               >
-                <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden>
-                  {chip.icon}
+                <span>
+                  {option.label}
+                  {option.disabled ? " (n/a)" : ""}
                 </span>
-                <span className="min-w-0 truncate leading-snug font-medium">{chip.value}</span>
-                {chip.editable && (
-                  <button
-                    type="button"
-                    disabled={!canEdit}
-                    aria-expanded={chip.options ? isOpen : undefined}
-                    aria-controls={chip.options ? `${listId}-${chip.key}` : undefined}
-                    aria-label={`Edit ${chip.label}`}
-                    onClick={() => handleEditClick(chip)}
-                    className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-primary transition ${
-                      isOpen
-                        ? "bg-accent text-white"
-                        : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
-                    } hover:bg-accent-muted hover:text-accent disabled:cursor-not-allowed`}
-                  >
-                    <EditIcon />
-                  </button>
-                )}
-              </div>
+                {selected && !optionDisabled ? <span aria-hidden>✓</span> : null}
+              </button>
+            );
+          })
+        ) : (
+          <div className="px-2.5 py-2 text-center">
+            <p className="text-xs leading-relaxed text-muted">{chip.label} opens in the wizard</p>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => handleWizardHop(chip)}
+              className="mt-2 w-full rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+            >
+              Open wizard step
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenKey(null)}
+              className="mt-1 w-full py-1 text-xs text-muted hover:text-ink"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
-              {isOpen && chip.options && (
-                <div
-                  id={`${listId}-${chip.key}`}
-                  role="listbox"
-                  aria-label={`Change ${chip.label}`}
-                  className="absolute left-0 z-20 mt-2 w-max max-w-[min(12rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-surface py-0.5 shadow-[var(--shadow-card)]"
-                >
-                  {chip.options.map((option) => {
-                    const selected =
-                      (chip.key === "budget" &&
-                        getBudgetStyleLabelPlain(plan.budgetStyle) === option.label) ||
-                      (chip.key === "travelStyle" &&
-                        getTravelStyleLabel(plan.travelStyle) === option.label) ||
-                      (chip.key === "transportation" &&
-                        getTransportationLabel(plan.transportationType) === option.label);
-                    const optionDisabled = Boolean(disabled || option.disabled);
+  function chipButton(chip: ChipDef, isOpen: boolean, cellClassName: string) {
+    return (
+      <button
+        type="button"
+        disabled={disabled || !chip.editable}
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? `${listId}-${chip.key}` : undefined}
+        onClick={() => handleSegmentClick(chip)}
+        className={`flex h-full w-full min-w-0 flex-col items-stretch gap-1 overflow-hidden text-left transition ${cellClassName} ${
+          isOpen ? "bg-primary-muted" : "bg-surface hover:bg-background"
+        } disabled:cursor-not-allowed`}
+      >
+        <span className="flex min-w-0 items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
+          <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" aria-hidden>
+            {chip.icon}
+          </span>
+          <span className="min-w-0 truncate">{chip.label}</span>
+        </span>
+        <span className={`min-w-0 truncate text-sm font-semibold ${isOpen ? "text-primary" : "text-ink"}`}>
+          {chip.value}
+        </span>
+      </button>
+    );
+  }
 
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        role="option"
-                        aria-selected={selected}
-                        aria-disabled={optionDisabled}
-                        disabled={optionDisabled}
-                        onClick={() => {
-                          if (optionDisabled) return;
-                          handleOptionSelect(chip, option.value);
-                        }}
-                        className={`flex w-full items-center justify-between gap-2 whitespace-nowrap px-2.5 py-1.5 text-left text-xs transition ${
-                          optionDisabled
-                            ? "cursor-not-allowed text-muted opacity-60"
-                            : selected
-                              ? "font-semibold text-primary hover:bg-secondary-muted"
-                              : "text-ink hover:bg-secondary-muted/70"
-                        }`}
-                      >
-                        <span>
-                          {option.label}
-                          {option.disabled ? " (n/a)" : ""}
-                        </span>
-                        {selected && !option.disabled && <span aria-hidden>✓</span>}
-                      </button>
-                    );
-                  })}
+  return (
+    <div ref={rootRef} className={`relative min-w-0 ${disabled ? "opacity-60" : ""}`}>
+      {/* Mobile: 3-column grid + full-width menu below */}
+      <div className="lg:hidden">
+        <div className="overflow-hidden rounded-2xl border border-border">
+          <ul
+            className="grid grid-cols-3 divide-x divide-y divide-border bg-background"
+            aria-label="Trip plan selections"
+          >
+            {chips.map((chip) => {
+              const isOpen = openKey === chip.key;
+              return (
+                <li key={chip.key} className="min-w-0">
+                  {chipButton(chip, isOpen, "px-2 py-2.5")}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        {openChip ? (
+          <div className="mt-1.5">
+            {renderChipMenu(
+              openChip,
+              "overflow-hidden rounded-xl border border-border bg-surface py-0.5 shadow-[var(--shadow-card)]",
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Desktop: horizontal strip + column-aligned dropdown */}
+      <div className="hidden lg:block">
+        <div className="overflow-hidden rounded-2xl border border-border">
+          <ul className="flex min-w-0 divide-x divide-border bg-background" aria-label="Trip plan selections">
+            {chips.map((chip) => {
+              const isOpen = openKey === chip.key;
+              return (
+                <li key={chip.key} className="min-w-0 flex-1">
+                  {chipButton(chip, isOpen, "px-3 py-2.5")}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        {openKey ? (
+          <div
+            className="absolute left-0 right-0 top-full z-30 mt-1.5 grid"
+            style={{ gridTemplateColumns: `repeat(${chips.length}, minmax(0, 1fr))` }}
+          >
+            {chips.map((chip, index) => {
+              if (chip.key !== openKey) {
+                return <div key={chip.key} className="min-w-0" />;
+              }
+
+              const isLast = index === chips.length - 1;
+
+              return (
+                <div key={chip.key} className="relative min-w-0">
+                  {renderChipMenu(
+                    chip,
+                    `absolute top-0 z-30 w-max min-w-full max-w-[14rem] overflow-hidden rounded-xl border border-border bg-surface py-0.5 shadow-[var(--shadow-card)] ${
+                      isLast ? "right-0" : "left-0"
+                    }`,
+                  )}
                 </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

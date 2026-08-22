@@ -32,6 +32,9 @@ export default function DestinationAutocomplete({
   onChange,
   onSelect,
   onResolvingChange,
+  placeholder = "Start typing a city...",
+  inputClassName,
+  variant = "field",
 }: {
   value: string;
   /** Fired while typing — clears a previous Places selection on the plan. */
@@ -40,6 +43,10 @@ export default function DestinationAutocomplete({
   onSelect: (selection: DestinationSelection) => void;
   /** Fired only while waiting on Place Details for an unknown city (button busy). */
   onResolvingChange?: (resolving: boolean) => void;
+  placeholder?: string;
+  inputClassName?: string;
+  /** Standalone bordered field, or a bare input inside a Where/When bar. */
+  variant?: "field" | "segment";
 }) {
   const [query, setQuery] = useState(value);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -202,6 +209,11 @@ export default function DestinationAutocomplete({
   const showEmptyState =
     canShow && !loading && suggestions.length === 0;
 
+  const defaultInputClass =
+    variant === "segment"
+      ? "w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+      : "mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3.5 text-ink shadow-sm outline-none transition placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary-muted";
+
   return (
     <div ref={wrapperRef} className="relative">
       <input
@@ -218,19 +230,23 @@ export default function DestinationAutocomplete({
           if (pickedLabelRef.current === query) return;
           if (suggestions.length > 0 || query.length >= MIN_QUERY_LEN) setOpen(true);
         }}
-        placeholder="Start typing a city..."
-        className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3.5 text-ink shadow-sm outline-none transition placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary-muted"
+        placeholder={placeholder}
+        className={inputClassName ?? defaultInputClass}
         autoComplete="off"
         aria-autocomplete="list"
         aria-expanded={showList || showEmptyState}
       />
       {loading && (
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted">
+        <span
+          className={`absolute text-xs text-muted ${
+            variant === "segment" ? "right-0 top-0" : "right-4 top-1/2 -translate-y-1/2"
+          }`}
+        >
           Searching…
         </span>
       )}
       {showList && (
-        <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-border bg-surface py-2 shadow-[var(--shadow-card)]">
+        <ul className="absolute z-30 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-border bg-surface py-2 shadow-[var(--shadow-card)]">
           {suggestions.map((s) => (
             <li key={`${s.placeId}-${s.label}`}>
               <button
@@ -245,7 +261,7 @@ export default function DestinationAutocomplete({
         </ul>
       )}
       {showEmptyState && (
-        <div className="absolute z-20 mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm leading-relaxed text-muted shadow-[var(--shadow-card)]">
+        <div className="absolute z-30 mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm leading-relaxed text-muted shadow-[var(--shadow-card)]">
           {fetchError
             ? "Couldn’t confirm that city. Pick another suggestion from the list."
             : "No cities found — pick a suggested city from the list to continue."}

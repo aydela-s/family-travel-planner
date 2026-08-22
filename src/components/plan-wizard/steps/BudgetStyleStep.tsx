@@ -7,11 +7,7 @@ const budgetOrder: BudgetStyle[] = ["save", "balanced", "splurge"];
 export default function BudgetStyleStep({ formData, updateFormData }: StepProps) {
   return (
     <div className="space-y-6">
-      <StepIntro
-        emoji="💰"
-        title="How would you like to spend on this trip?"
-        subtitle="This shapes the kinds of activities and restaurants we pick."
-      />
+      <StepIntro emoji="💰" title="How would you like to spend on this trip?" />
 
       <div className="grid gap-3 sm:grid-cols-3">
         {budgetOrder.map((value) => {
